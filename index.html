@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<title>DFT-Agent bench reports</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+       'Microsoft YaHei', sans-serif;
+       max-width: 900px; margin: 60px auto; padding: 0 30px; color: #2c3e50; line-height: 1.7; }
+h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+ul { padding-left: 0; list-style: none; }
+li { padding: 12px 16px; margin: 8px 0; background: #ecf0f1; border-left: 4px solid #3498db;
+     border-radius: 4px; }
+li b { display: block; font-size: 16px; }
+li small { color: #7f8c8d; }
+a { color: #2980b9; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1>DFT-Agent bench reports</h1>
+
+<p>这是用 <a href="https://github.com/wanweilin/dft-agent-bench">dft-agent-bench</a>
+评测不同 solver + 大模型组合跑 Quantum ESPRESSO 任务的成绩存档。</p>
+
+<ul>
+  <li>
+    <b><a href="solverv3-vs-baseline-2026-05-11.html">
+      Solver v3 + DeepSeek-v4-pro · 12 题快速档 vs baseline
+    </a></b>
+    <small>2026-05-11 · 4 T1 + 8 T2 · 同题对照 baseline （v1 solver） · 含 v1→v3 设计差异 paper-style 描述</small>
+  </li>
+  <li>
+    <b><a href="baseline-2026-05-10.html">
+      Baseline (warpagent-qe-v1 + DeepSeek-v4-pro) · 148 题全量
+    </a></b>
+    <small>2026-05-10 · 80 T1 + 68 T2 · GPU H100 · 总成本 $4.37</small>
+  </li>
+</ul>
+
+</body>
+</html>
