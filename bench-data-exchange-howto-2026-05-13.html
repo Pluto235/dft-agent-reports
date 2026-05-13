@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bench Run Data 双向交换协议 · 操作手册 · 2026-05-13</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+         'Microsoft YaHei', sans-serif;
+         max-width: 940px; margin: 40px auto; padding: 0 28px; color: #2c3e50; line-height: 1.75; }
+  h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 12px; margin-top: 30px; }
+  h2 { color: #34495e; border-left: 5px solid #3498db; padding-left: 12px; margin-top: 46px; }
+  h3 { color: #2c3e50; margin-top: 26px; }
+  h4 { color: #34495e; margin-top: 20px; }
+  p { margin: 12px 0; }
+  a { color: #2980b9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+         background: #ecf0f1; padding: 2px 6px; border-radius: 3px; font-size: 90%; color: #c0392b; }
+  pre { background: #2c3e50; color: #ecf0f1; padding: 16px 20px; border-radius: 6px;
+        overflow-x: auto; font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 12.5px; line-height: 1.55; }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+  pre.tree { font-size: 12.5px; line-height: 1.5; }
+  pre.shell { background: #1e2733; }
+
+  .meta { background: #ecf0f1; border-left: 4px solid #3498db; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .note { background: #fdf2e9; border-left: 4px solid #e67e22; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .danger { background: #fadbd8; border-left: 4px solid #c0392b; padding: 14px 18px;
+            margin: 20px 0; border-radius: 4px; }
+  .check { background: #d5f4e6; border-left: 4px solid #27ae60; padding: 14px 18px;
+           margin: 20px 0; border-radius: 4px; }
+  .check::before { content: "✔ "; color: #27ae60; font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #d5dbdb; text-align: left;
+           vertical-align: top; }
+  th { background: #34495e; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  td code { font-size: 12px; }
+
+  nav.toc { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 14px 22px; margin: 22px 0; }
+  nav.toc h3 { margin-top: 0; color: #34495e; }
+  nav.toc ol { padding-left: 22px; margin: 6px 0; }
+  nav.toc li { padding: 2px 0; }
+
+  .svg-wrap { text-align: center; margin: 24px 0 6px; padding: 14px;
+              background: #fafbfc; border-radius: 8px; border: 1px solid #ecf0f1; }
+  .svg-wrap svg { max-width: 100%; height: auto; }
+  .diagram-caption { text-align: center; color: #7f8c8d; font-style: italic;
+                     font-size: 14px; margin: 6px 0 30px; }
+
+  .file-meta { color: #7f8c8d; font-size: 12px; margin: -8px 0 8px;
+               font-family: 'SF Mono', 'Consolas', monospace; }
+
+  h2[id], h3[id] { scroll-margin-top: 20px; }
+
+  /* 复制按钮 hint */
+  .copy-hint { display: inline-block; background: #f4d03f; color: #7d6608;
+               font-size: 12px; padding: 2px 8px; border-radius: 12px; margin-left: 8px;
+               font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Bench Run Data 双向交换协议 · 操作手册</h1>
+
+<div class="meta">
+<strong>给谁看</strong>：这份文档是发给 weilin 看的——告诉他怎么把 baseline 数据从他的服务器打包传给我（Pluto235），
+反过来我把自己的实验包给他也用同一套流程。<br>
+<strong>解决什么问题</strong>：weilin 跑了 baseline（148 题），结果只通过 HTML 报告分享给了我；
+我服务器上没有原始 run 数据（<code>state.db</code> + <code>runs_local/&lt;run_id&gt;/</code>），
+所以我的 web UI 看不到这些 run 的 transcript / per-run 详情。<br>
+<strong>方案</strong>：写一对 Python 脚本——一端 <code>export.py</code> 打包成 <code>.tar.gz</code>，
+另一端 <code>import.py</code> 解包、改路径、写 DB；中间用 GitHub Release 当传输通道。<br>
+<strong>报告生成时间</strong>：2026-05-13
+</div>
+
+<nav class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">TL;DR · 三步速览</a></li>
+  <li><a href="#s2">Bundle 数据形态</a></li>
+  <li><a href="#s3">Source 端：打包流程（weilin → Pluto235）</a></li>
+  <li><a href="#s4">Destination 端：导入流程</a></li>
+  <li><a href="#s5">export.py 全文</a></li>
+  <li><a href="#s6">import.py 全文</a></li>
+  <li><a href="#s7">反向使用（Pluto235 → weilin）</a></li>
+  <li><a href="#s8">替代传输方式</a></li>
+  <li><a href="#s9">故障排查</a></li>
+  <li><a href="#s10">未来自动化</a></li>
+  <li><a href="#s11">附录：full tier 切片 / HuggingFace dataset 方案</a></li>
+</ol>
+</nav>
+
+
+<!-- ════════════ §1 ════════════ -->
+<h2 id="s1">§1 TL;DR · 三步速览</h2>
+
+<div class="svg-wrap">
+<svg width="860" height="220" viewBox="0 0 860 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34495e"/>
+    </marker>
+  </defs>
+  <!-- weilin 服务器 -->
+  <rect x="20" y="60" width="180" height="100" rx="10" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+  <text x="110" y="92" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">weilin 服务器</text>
+  <text x="110" y="114" text-anchor="middle" fill="#ecf0f1" font-size="11">state.db + runs_local/</text>
+  <text x="110" y="132" text-anchor="middle" fill="#ecf0f1" font-size="11">148 baseline runs</text>
+  <text x="110" y="150" text-anchor="middle" fill="#ecf0f1" font-size="11">~20 GB raw</text>
+
+  <!-- export -->
+  <text x="240" y="95" text-anchor="middle" font-size="12" fill="#7f8c8d" font-weight="700">① export.py</text>
+  <text x="240" y="112" text-anchor="middle" font-size="11" fill="#7f8c8d">过滤、生成 manifest</text>
+
+  <!-- bundle -->
+  <rect x="290" y="80" width="160" height="60" rx="8" fill="#f39c12" stroke="#d68910" stroke-width="2"/>
+  <text x="370" y="105" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">bundle.tar.gz</text>
+  <text x="370" y="125" text-anchor="middle" fill="#fff" font-size="11">~500 MB · lossy tier</text>
+
+  <!-- GitHub Release -->
+  <text x="490" y="95" text-anchor="middle" font-size="12" fill="#7f8c8d" font-weight="700">② gh release</text>
+  <text x="490" y="112" text-anchor="middle" font-size="11" fill="#7f8c8d">上传 / 下载</text>
+
+  <rect x="540" y="80" width="120" height="60" rx="8" fill="#9b59b6" stroke="#7d3c98" stroke-width="2"/>
+  <text x="600" y="105" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">GitHub</text>
+  <text x="600" y="123" text-anchor="middle" fill="#ecf0f1" font-size="11">Release</text>
+
+  <!-- import -->
+  <text x="700" y="95" text-anchor="middle" font-size="12" fill="#7f8c8d" font-weight="700">③ import.py</text>
+  <text x="700" y="112" text-anchor="middle" fill="#7f8c8d">改路径、写 DB</text>
+
+  <rect x="660" y="60" width="180" height="100" rx="10" fill="#27ae60" stroke="#1e8449" stroke-width="2"/>
+  <text x="750" y="92" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Pluto235 服务器</text>
+  <text x="750" y="114" text-anchor="middle" fill="#ecf0f1" font-size="11">state.db + runs_local/</text>
+  <text x="750" y="132" text-anchor="middle" fill="#ecf0f1" font-size="11">导入后 leaderboard</text>
+  <text x="750" y="150" text-anchor="middle" fill="#ecf0f1" font-size="11">看得到 baseline 148 题</text>
+
+  <!-- arrows -->
+  <line x1="200" y1="110" x2="290" y2="110" stroke="#34495e" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="450" y1="110" x2="540" y2="110" stroke="#34495e" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="660" y1="110" x2="660" y2="110" stroke="#34495e" stroke-width="2"/>
+  <line x1="600" y1="140" x2="600" y2="180" stroke="#34495e" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="600" y="200" text-anchor="middle" font-size="11" fill="#7f8c8d">下载到 Pluto235 端</text>
+</svg>
+</div>
+<div class="diagram-caption">图 1 · 整体数据流：3 步从 weilin 服务器搬到 Pluto235 服务器</div>
+
+<h3>给 weilin 的极简版（5 分钟读完）</h3>
+
+<div class="meta">
+<strong>① 装备脚本</strong>：从 <a href="#s5">§5</a> 复制 <code>export.py</code> 全文，保存到你机器上任意位置。<br><br>
+<strong>② 跑打包</strong>（在你装了 web 的机器上、conda 环境激活后）：
+<pre class="shell"><code>python export.py \
+    --runs-local /home/weilin/bench/runs_local \
+    --filter "agent_id='v1-stable'" \
+    --tier lossy \
+    --out /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz</code></pre>
+脚本会扫 <code>state.db</code> + 拷符合 filter 条件的 run_dir，过滤掉 <code>.wfc</code> / <code>.save</code> 等大文件，
+生成 ~500 MB 的 <code>.tar.gz</code>，附 <code>manifest.json</code> 描述自己。<br><br>
+<strong>③ 上传 GitHub Release</strong>：
+<pre class="shell"><code># 一次性建仓（首次同步用）
+gh repo create Pluto235/dft-agent-data-shares --public --description "Run data exchange between Pluto235 and weilin"
+
+# 创建 release 并把 bundle 作为附件
+gh release create baseline-2026-05-13 \
+    --repo Pluto235/dft-agent-data-shares \
+    --title "weilin baseline (148 runs, v1-stable)" \
+    --notes "lossy tier, exported $(date -Iseconds)" \
+    /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz</code></pre>
+然后把 release URL 发我，我跑 <code>import.py</code> 把数据吃进我的 web。完。
+</div>
+
+
+<!-- ════════════ §2 ════════════ -->
+<h2 id="s2">§2 Bundle 数据形态</h2>
+
+<p>Bundle 是一个 <code>.tar.gz</code>，解开后是这样的目录树：</p>
+
+<pre class="tree">bench-bundle-weilin-baseline-2026-05-13/
+├── manifest.json                           # 元数据（见下）
+├── db_rows.jsonl                           # state.db 里 runs 表的 N 行，一行一 JSON
+└── runs/
+    ├── 2026-05-08T14-08-52Z_M1_T1_Si_vc_relax/
+    │   ├── report.json                     # 评分 / extracted_fields / audit_flags
+    │   ├── harness.log                     # 主程序 stdout
+    │   ├── solver_stdout.log
+    │   ├── solver_stderr.log
+    │   └── workdir/
+    │       ├── task_prompt.txt             # 原始题面
+    │       ├── transcript.json             # LLM 多轮对话（必备，per-run 页面要用）
+    │       ├── bash.log                    # 工具调用日志（必备）
+    │       ├── result.json                 # solver 提交的最终 task_outputs
+    │       ├── scf.in / scf.out            # QE 输入输出（lossy 保留）
+    │       ├── relax.out / nscf.out / dos.out / bands.out
+    │       ├── bands.dat / dos.dat         # 画图数据（lossy 保留 → 能在 web 看曲线）
+    │       └── lint.log                    # qe_input_lint 的 patch 记录
+    │   #  ↑ <strong>不保留</strong>：pseudos/ (symlink) · *.wfc* · *.save/ · __pycache__/
+    ├── 2026-05-08T14-12-34Z_M1_T1_NaCl_vc_relax/
+    │   └── ...
+    └── ... (146 more)
+</pre>
+
+<h4>manifest.json 长这样：</h4>
+
+<pre><code>{
+  "schema_version": 1,
+  "tier": "lossy",
+  "exported_at": "2026-05-13T08:42:11Z",
+  "source": {
+    "user": "weilin",
+    "host": "weilin-server.example.com",
+    "bench_dir": "/home/weilin/bench",
+    "runs_local": "/home/weilin/bench/runs_local",
+    "pseudo_dir": "/home/weilin/bench/dft-agent-bench/pseudos/GBRV_USPP_PBE_v1.5"
+  },
+  "filter": {
+    "kind": "where",
+    "expression": "agent_id='v1-stable'"
+  },
+  "n_runs": 148,
+  "db_columns": ["run_id", "mode", "task_id", "model", "status", "...",
+                 "agent_id", "qe_call_count", "qe_wall_sec", "..."],
+  "runs": [
+    {"run_id": "2026-05-08T14-08-52Z_M1_T1_Si_vc_relax",
+     "task_id": "M1_T1_Si_vc_relax", "model": "deepseek-v4-pro",
+     "status": "done", "total_score": 1.0},
+    ...
+  ]
+}
+</code></pre>
+
+<h4>为什么选 lossy tier？</h4>
+
+<table>
+<thead><tr><th>Tier</th><th>每题大小</th><th>148 题总大小</th><th>能干啥</th><th>不能干啥</th></tr></thead>
+<tbody>
+<tr><td>Minimal</td><td>~200 KB</td><td>~30 MB</td><td>Leaderboard、transcript 详情、看分数</td><td>看不到能带 / DOS 曲线图</td></tr>
+<tr><td><strong>Lossy（本协议）</strong></td><td>2-4 MB</td><td><strong>~500 MB</strong></td><td>上面 + 能带 / DOS 曲线、收敛过程</td><td>不能重做后处理（没 .wfc）</td></tr>
+<tr><td>Full</td><td>median 1 MB / max 7.7 GB</td><td>~36 GB</td><td>完全 bit-exact 复现</td><td>太大，GH Release 单文件 2 GB 上限需切片</td></tr>
+</tbody>
+</table>
+
+<p>Lossy 在体积和功能上是 sweet spot——单文件能进 GH Release 附件、500 MB 单线程下载 ~1 分钟，
+而且 web 该展示的都能展示。如果以后你真的要重做某题的后处理（比如换 dos.x 参数重画 DOS），那时再单独要 full 数据。</p>
+
+
+<!-- ════════════ §3 ════════════ -->
+<h2 id="s3">§3 Source 端：打包流程（weilin → Pluto235）</h2>
+
+<h3>3.1 准备</h3>
+
+<ol>
+<li>确认你机器上 web 用的 conda 环境（一般是 <code>tritondft</code>）能跑——
+不需要任何第三方包，<code>export.py</code> 用纯标准库写的，但需要 Python 3.10+。
+<pre class="shell"><code>conda activate tritondft   # 或者你环境的名字
+python --version           # 应该 ≥ 3.10
+which sqlite3              # 用得到</code></pre></li>
+<li>找到 <code>state.db</code> 和 <code>runs_local/</code> 的位置。一般是 <code>~/bench/runs_local/state.db</code>。
+<pre class="shell"><code>ls -lh ~/bench/runs_local/state.db
+sqlite3 ~/bench/runs_local/state.db "SELECT COUNT(*) FROM runs WHERE status='done'"</code></pre></li>
+<li>装 <code>gh</code> CLI（GitHub 官方命令行）——上传 release 用：
+<pre class="shell"><code>which gh || (curl -sS https://webi.sh/gh | sh)   # 如果没装
+gh auth login     # 跟提示走，选 SSH 或 HTTPS 都行</code></pre></li>
+</ol>
+
+<h3>3.2 准备 export.py</h3>
+
+<p>从本文档 <a href="#s5">§5</a> 把 <code>export.py</code> 整个 <code>&lt;pre&gt;</code> 块复制粘贴下来，保存为 <code>export.py</code>。
+<span class="copy-hint">三键复制：选中代码框、Ctrl+A、Ctrl+C</span></p>
+
+<h3>3.3 跑 export</h3>
+
+<p>典型命令（打包 baseline）：</p>
+
+<pre class="shell"><code># 假设你的 baseline 都是 v1-stable agent + deepseek-v4-pro，用 SQL where 筛
+python export.py \
+    --runs-local /home/weilin/bench/runs_local \
+    --filter "agent_id='v1-stable' AND status='done'" \
+    --tier lossy \
+    --out /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz
+
+# 或者直接指定 run_id 清单文件（每行一个）
+sqlite3 ~/bench/runs_local/state.db \
+    "SELECT run_id FROM runs WHERE agent_id='v1-stable' AND status='done'" \
+    > /tmp/baseline_ids.txt
+python export.py \
+    --runs-local /home/weilin/bench/runs_local \
+    --run-ids /tmp/baseline_ids.txt \
+    --tier lossy \
+    --out /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz</code></pre>
+
+<p>跑的时候会打印进度——大概 1-3 分钟（取决于磁盘速度）。结束后看到：</p>
+
+<pre><code>[export] scanning runs_local/state.db ...
+[export] filter matched 148 runs
+[export] staging  1/148  2026-05-08T14-08-52Z_M1_T1_Si_vc_relax           (1.2 MB)
+[export] staging  2/148  2026-05-08T14-12-34Z_M1_T1_NaCl_vc_relax         (0.9 MB)
+...
+[export] staging 148/148 2026-05-09T22-37-15Z_M2_T2_Ti3O5_bands_dos       (4.3 MB)
+[export] writing manifest.json (148 runs)
+[export] writing db_rows.jsonl (148 rows)
+[export] creating tarball /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz ...
+[export] DONE
+  bundle path : /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz
+  bundle size : 487.3 MB
+  n_runs      : 148
+  next step   : upload via `gh release create ...` (see howto §3.4)</code></pre>
+
+<h3>3.4 上传 GitHub Release</h3>
+
+<p><strong>首次：</strong>建一个共享 repo 当容器（一次性）：</p>
+
+<pre class="shell"><code>gh repo create Pluto235/dft-agent-data-shares \
+    --public \
+    --description "Bench run data exchanges between Pluto235 and weilin"</code></pre>
+
+<p><strong>每次同步：</strong>创建一个新 release，把 bundle 当附件：</p>
+
+<pre class="shell"><code>gh release create baseline-2026-05-13 \
+    --repo Pluto235/dft-agent-data-shares \
+    --title "weilin baseline (148 runs, v1-stable, deepseek-v4-pro)" \
+    --notes "Lossy tier; exported on $(date -Iseconds) from weilin-server.
+
+  - n_runs: 148
+  - source: /home/weilin/bench/runs_local
+  - filter: agent_id='v1-stable' AND status='done'
+  - models: deepseek-v4-pro
+  - exporter version: schema_version=1, tier=lossy" \
+    /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz</code></pre>
+
+<p>命令执行成功后会输出 release URL，类似：</p>
+<pre><code>https://github.com/Pluto235/dft-agent-data-shares/releases/tag/baseline-2026-05-13</code></pre>
+
+<p>把这个 URL 发给我（微信 / 邮件都行），就完事了。</p>
+
+<div class="check">
+打完包之后建议你本地保留一份 bundle.tar.gz 作为快照；
+等我那边 import 完报告 OK 之后可以删 <code>/tmp</code> 下的副本。
+</div>
+
+
+<!-- ════════════ §4 ════════════ -->
+<h2 id="s4">§4 Destination 端：导入流程</h2>
+
+<p>这一节是我（Pluto235）这边的操作。weilin 给了我 release URL 之后我做：</p>
+
+<h3>4.1 下载 bundle</h3>
+
+<pre class="shell"><code># gh CLI 一行搞定
+gh release download baseline-2026-05-13 \
+    --repo Pluto235/dft-agent-data-shares \
+    --dir /tmp/
+
+# 或者纯 curl
+curl -L -o /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz \
+    "https://github.com/Pluto235/dft-agent-data-shares/releases/download/baseline-2026-05-13/bench-bundle-weilin-baseline-2026-05-13.tar.gz"</code></pre>
+
+<h3>4.2 验证 + 预览</h3>
+
+<pre class="shell"><code># tar -t 看看里头啥结构
+tar tzf /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz | head -20
+
+# 把 manifest.json 单独抠出来读
+tar xzf /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz \
+    --strip-components=1 \
+    --to-stdout '*/manifest.json' | python -m json.tool | head -40</code></pre>
+
+<h3>4.3 跑 import</h3>
+
+<pre class="shell"><code>conda activate tritondft
+
+python import.py \
+    --bundle /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz \
+    --runs-local /home/shijie/bench/runs_local \
+    --pseudo-dir /home/shijie/bench/dft-agent-bench/pseudos/GBRV_USPP_PBE_v1.5 \
+    --on-conflict skip \
+    --dry-run    # 先 dry-run 看看会发生什么</code></pre>
+
+<p>dry-run 输出看 OK 后，去掉 <code>--dry-run</code> 真跑：</p>
+
+<pre class="shell"><code>python import.py \
+    --bundle /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz \
+    --runs-local /home/shijie/bench/runs_local \
+    --pseudo-dir /home/shijie/bench/dft-agent-bench/pseudos/GBRV_USPP_PBE_v1.5 \
+    --on-conflict skip</code></pre>
+
+<p>输出示例：</p>
+
+<pre><code>[import] reading manifest from /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz
+[import] bundle: tier=lossy schema=1 source=weilin@weilin-server n_runs=148
+[import] destination runs_local : /home/shijie/bench/runs_local
+[import] destination state.db   : /home/shijie/bench/runs_local/state.db
+[import] destination pseudo_dir : /home/shijie/bench/dft-agent-bench/pseudos/GBRV_USPP_PBE_v1.5
+[import] dest columns (33): run_id, mode, task_id, model, status, ..., qe_backend
+[import] dropping 0 source-only column(s): []
+[import] dropping 0 dest-only column(s) (will be NULL):  []
+
+[import]   1/148  2026-05-08T14-08-52Z_M1_T1_Si_vc_relax            → imported
+[import]   2/148  2026-05-08T14-12-34Z_M1_T1_NaCl_vc_relax          → imported
+[import]  17/148  2026-05-08T15-21-08Z_M1_T1_Au_vc_relax            → SKIP (run_id already in dest)
+...
+
+[import] DONE
+  imported : 147
+  skipped  : 1   (run_id already in dest; rerun with --on-conflict overwrite to replace)
+  failed   : 0</code></pre>
+
+<h3>4.4 重启 web，确认 leaderboard 看得到</h3>
+
+<pre class="shell"><code>bash ~/web/start.sh restart        # 视 start.sh 实现，可能是 systemctl
+curl -s http://localhost:3200/api/runs?limit=5 | python -m json.tool   # 看 leaderboard API</code></pre>
+
+<div class="check">
+完成的标志：浏览器打开 <code>http://localhost:3200</code> → leaderboard 看得到 weilin 的 baseline 148 题；
+点进任意一题 → transcript / bash log / report 都正常展示。
+</div>
+
+
+<!-- ════════════ §5 ════════════ -->
+<h2 id="s5">§5 <code>export.py</code> 全文</h2>
+
+<p class="file-meta">纯标准库 · Python 3.10+ · ~210 行 · 复制保存为 <code>export.py</code></p>
+
+<pre id="export-py"><code>#!/usr/bin/env python3
+"""bench run data exporter — 把 state.db 里指定的 runs + 它们的 run_dir 内容打成 tar.gz。
+
+用法：
+    python export.py \\
+        --runs-local /home/weilin/bench/runs_local \\
+        --filter "agent_id='v1-stable' AND status='done'" \\
+        --tier lossy \\
+        --out /tmp/bench-bundle-2026-05-13.tar.gz
+
+筛选三种方式（互斥）：
+  --filter "&lt;SQL WHERE clause&gt;"   # 任意 SQL 表达式
+  --run-ids /path/to/ids.txt        # 每行一个 run_id
+  --since 2026-05-08                 # 等价 created_at >= ...
+
+Tier 决定 workdir 里哪些文件打包：
+  minimal   只要 report.json + transcript.json + bash.log + result.json + task_prompt.txt
+  lossy     上面 + 所有 *.in / *.out / *.dat / lint.log（默认）
+  full      所有非 symlink、非 __pycache__ 内容（含 wfc / save，几十 GB）
+"""
+from __future__ import annotations
+import argparse, getpass, gzip, hashlib, json, os, shutil, sqlite3, socket, sys, tarfile, tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+SCHEMA_VERSION = 1
+TIERS = ("minimal", "lossy", "full")
+
+# tier → 在 workdir/ 里要保留的文件 glob 模式（其他全部丢）
+TIER_WORKDIR_KEEP = {
+    "minimal": ["report.json", "task_prompt.txt", "transcript.json",
+                "bash.log", "result.json", "lint.log"],
+    "lossy":   ["report.json", "task_prompt.txt", "transcript.json",
+                "bash.log", "result.json", "lint.log",
+                "*.in", "*.out", "*.dat", "*.dat.gnu", "*.dat.rap"],
+    "full":    ["*"],
+}
+# 不论 tier 都要排除的（symlink、大二进制目录、scratch）
+ALWAYS_SKIP_NAMES = {"pseudos", "__pycache__", ".save"}
+ALWAYS_SKIP_SUFFIXES = (".pyc", ".wfc", ".wfc1")
+
+# run_dir 顶层（workdir 之外）固定保留这些
+TOP_LEVEL_KEEP = ["report.json", "harness.log", "harness_stderr.log",
+                  "solver_stdout.log", "solver_stderr.log"]
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Export bench runs to a transferable tar.gz bundle.")
+    p.add_argument("--runs-local", type=Path, required=True,
+                   help="path to runs_local/ (contains state.db + run dirs)")
+    p.add_argument("--out", type=Path, required=True,
+                   help="output bundle path (.tar.gz)")
+    p.add_argument("--tier", choices=TIERS, default="lossy",
+                   help="bundle tier — controls what's kept in workdir/ (default: lossy)")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--filter", type=str, metavar="SQL_WHERE",
+                   help="SQL WHERE clause (e.g. agent_id='v1-stable' AND status='done')")
+    g.add_argument("--run-ids", type=Path, metavar="FILE",
+                   help="text file, one run_id per line")
+    g.add_argument("--since", type=str, metavar="ISO_DATE",
+                   help="created_at &gt;= this date (e.g. 2026-05-08)")
+    p.add_argument("--label", type=str, default="",
+                   help="free-form label written to manifest.json")
+    return p.parse_args()
+
+
+def select_runs(db_path: Path, args) -> tuple[list[sqlite3.Row], list[str]]:
+    con = sqlite3.connect(str(db_path))
+    con.row_factory = sqlite3.Row
+    # 用 PRAGMA 拿到实际列名（schema 会随 ALTER 漂移）
+    cols = [r["name"] for r in con.execute("PRAGMA table_info(runs)")]
+
+    if args.filter:
+        sql = f"SELECT * FROM runs WHERE {args.filter}"
+        rows = list(con.execute(sql))
+    elif args.run_ids:
+        ids = [ln.strip() for ln in args.run_ids.read_text().splitlines() if ln.strip()]
+        if not ids:
+            sys.exit("--run-ids file is empty")
+        placeholders = ",".join("?" * len(ids))
+        rows = list(con.execute(
+            f"SELECT * FROM runs WHERE run_id IN ({placeholders})", ids))
+    else:  # --since
+        rows = list(con.execute(
+            "SELECT * FROM runs WHERE created_at &gt;= ?", (args.since,)))
+    con.close()
+    return rows, cols
+
+
+def should_keep(rel_path: Path, tier: str) -> bool:
+    """Decide whether to copy this file from a run_dir into the bundle."""
+    name = rel_path.name
+    if name in ALWAYS_SKIP_NAMES:
+        return False
+    if any(name.endswith(suf) for suf in ALWAYS_SKIP_SUFFIXES):
+        return False
+    # rel_path 形如 "workdir/scf.out" 或 "report.json"
+    parts = rel_path.parts
+    if len(parts) == 1:
+        return name in TOP_LEVEL_KEEP
+    if parts[0] == "workdir":
+        patterns = TIER_WORKDIR_KEEP[tier]
+        from fnmatch import fnmatchcase
+        return any(fnmatchcase(name, pat) for pat in patterns)
+    # workdir/&lt;subdir&gt;/... — lossy/minimal 不递归子目录（除 full）
+    return tier == "full"
+
+
+def stage_run(src_run_dir: Path, dst_run_dir: Path, tier: str) -> tuple[int, int]:
+    """Copy filtered files from src to dst. Returns (n_files, total_bytes)."""
+    n_files, total_bytes = 0, 0
+    for src_path in src_run_dir.rglob("*"):
+        if src_path.is_symlink():
+            continue   # skip symlinks (pseudos etc.)
+        if not src_path.is_file():
+            continue
+        # skip dirs whose name is in ALWAYS_SKIP_NAMES (e.g. workdir/&lt;prefix&gt;.save/...)
+        if any(p in ALWAYS_SKIP_NAMES for p in src_path.parts):
+            continue
+        rel = src_path.relative_to(src_run_dir)
+        if not should_keep(rel, tier):
+            continue
+        dst_path = dst_run_dir / rel
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_path, dst_path)
+        n_files += 1
+        total_bytes += src_path.stat().st_size
+    return n_files, total_bytes
+
+
+def detect_pseudo_dir(runs_local: Path) -> str:
+    """猜源 pseudo 目录：第一个 run 的 workdir/pseudos 软链的目标。"""
+    for d in sorted(runs_local.iterdir()):
+        link = d / "workdir" / "pseudos"
+        if link.is_symlink():
+            return os.readlink(link)
+    return ""
+
+
+def main():
+    args = parse_args()
+    db_path = args.runs_local / "state.db"
+    if not db_path.exists():
+        sys.exit(f"[export] state.db not found: {db_path}")
+
+    print(f"[export] scanning {db_path}")
+    rows, cols = select_runs(db_path, args)
+    print(f"[export] filter matched {len(rows)} runs")
+    if not rows:
+        sys.exit("[export] nothing to export — check your filter")
+
+    staging = Path(tempfile.mkdtemp(prefix="bench-bundle-"))
+    bundle_root = staging / args.out.stem.replace(".tar", "")   # 去掉双重 .tar.gz 尾缀
+    bundle_root.mkdir()
+    runs_staging = bundle_root / "runs"
+    runs_staging.mkdir()
+
+    db_rows_path = bundle_root / "db_rows.jsonl"
+    runs_summary = []
+    with open(db_rows_path, "w", encoding="utf-8") as f_jsonl:
+        for i, r in enumerate(rows, 1):
+            run_id = r["run_id"]
+            src = args.runs_local / run_id
+            if not src.is_dir():
+                print(f"[export] {i:3d}/{len(rows)}  {run_id:60s} → SKIP (run_dir missing on disk)")
+                continue
+            dst = runs_staging / run_id
+            n_files, total_bytes = stage_run(src, dst, args.tier)
+            print(f"[export] {i:3d}/{len(rows)}  {run_id:60s} → {n_files:3d} files, "
+                  f"{total_bytes/1024/1024:6.2f} MB")
+            row_d = {k: r[k] for k in cols}
+            f_jsonl.write(json.dumps(row_d, default=str) + "\n")
+            runs_summary.append({"run_id": run_id, "task_id": r["task_id"],
+                                  "model": r["model"], "status": r["status"],
+                                  "total_score": r["total_score"]})
+
+    manifest = {
+        "schema_version": SCHEMA_VERSION,
+        "tier": args.tier,
+        "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "label": args.label,
+        "source": {
+            "user": getpass.getuser(),
+            "host": socket.gethostname(),
+            "runs_local": str(args.runs_local),
+            "pseudo_dir": detect_pseudo_dir(args.runs_local),
+            "exporter_python": sys.version.split()[0],
+        },
+        "filter": {
+            "kind": "where" if args.filter else ("run-ids" if args.run_ids else "since"),
+            "expression": args.filter or (str(args.run_ids) if args.run_ids else args.since),
+        },
+        "n_runs": len(runs_summary),
+        "db_columns": cols,
+        "runs": runs_summary,
+    }
+    (bundle_root / "manifest.json").write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    print(f"[export] writing tarball {args.out} ...")
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(args.out, "w:gz") as tar:
+        tar.add(bundle_root, arcname=bundle_root.name)
+
+    size_mb = args.out.stat().st_size / 1024 / 1024
+    print(f"[export] DONE")
+    print(f"  bundle path : {args.out}")
+    print(f"  bundle size : {size_mb:.1f} MB")
+    print(f"  n_runs      : {len(runs_summary)}")
+    print(f"  next step   : `gh release create &lt;tag&gt; --repo &lt;owner&gt;/&lt;repo&gt; {args.out}`")
+
+    shutil.rmtree(staging, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    main()
+</code></pre>
+
+
+<!-- ════════════ §6 ════════════ -->
+<h2 id="s6">§6 <code>import.py</code> 全文</h2>
+
+<p class="file-meta">纯标准库 · Python 3.10+ · ~230 行 · 复制保存为 <code>import.py</code></p>
+
+<pre id="import-py"><code>#!/usr/bin/env python3
+"""bench run data importer — 把 export.py 出的 tar.gz 解到本地 runs_local/ + INSERT 到 state.db。
+
+用法：
+    python import.py \\
+        --bundle /tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz \\
+        --runs-local /home/shijie/bench/runs_local \\
+        --pseudo-dir /home/shijie/bench/dft-agent-bench/pseudos/GBRV_USPP_PBE_v1.5 \\
+        --on-conflict skip
+
+冲突策略 (--on-conflict)：
+  skip       run_id 已在 dest state.db → 跳过（默认）
+  overwrite  覆盖：先 DELETE 旧行 + rm -rf 旧 run_dir → 再写新的
+  fail       直接报错退出
+
+路径重写：
+  state.db 里的 `run_dir` 列被改成 `<--runs-local>/<run_id>` 绝对路径
+  workdir/pseudos 软链重新指向 `<--pseudo-dir>`
+  pid 设 NULL，owner 保留源端值
+"""
+from __future__ import annotations
+import argparse, json, os, shutil, sqlite3, sys, tarfile, tempfile
+from pathlib import Path
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Import a bench-bundle.tar.gz into local runs_local/ + state.db.")
+    p.add_argument("--bundle", type=Path, required=True, help=".tar.gz produced by export.py")
+    p.add_argument("--runs-local", type=Path, required=True,
+                   help="destination runs_local/ dir (must contain state.db)")
+    p.add_argument("--pseudo-dir", type=Path, required=True,
+                   help="local pseudopotential dir (workdir/pseudos symlinks point here)")
+    p.add_argument("--on-conflict", choices=("skip", "overwrite", "fail"), default="skip")
+    p.add_argument("--dry-run", action="store_true",
+                   help="show what would happen; don't write anything")
+    return p.parse_args()
+
+
+def extract_bundle(bundle: Path, dest: Path) -> Path:
+    """Extract tar.gz to dest, return path to the bundle's top-level dir."""
+    with tarfile.open(bundle, "r:gz") as tar:
+        members = tar.getmembers()
+        roots = {m.name.split("/", 1)[0] for m in members if "/" in m.name or not m.isdir()}
+        tar.extractall(dest)
+    if len(roots) != 1:
+        sys.exit(f"[import] bundle should have exactly 1 top-level dir, got: {roots}")
+    return dest / next(iter(roots))
+
+
+def get_dest_columns(db_path: Path) -> list[str]:
+    con = sqlite3.connect(str(db_path))
+    cols = [r[1] for r in con.execute("PRAGMA table_info(runs)")]
+    con.close()
+    return cols
+
+
+def existing_run_ids(db_path: Path, candidate_ids: list[str]) -> set[str]:
+    if not candidate_ids:
+        return set()
+    con = sqlite3.connect(str(db_path))
+    placeholders = ",".join("?" * len(candidate_ids))
+    rows = con.execute(
+        f"SELECT run_id FROM runs WHERE run_id IN ({placeholders})", candidate_ids
+    ).fetchall()
+    con.close()
+    return {r[0] for r in rows}
+
+
+def relink_pseudos(workdir: Path, pseudo_dir: Path):
+    """Recreate workdir/pseudos symlink pointing to local pseudo_dir."""
+    link = workdir / "pseudos"
+    if link.exists() or link.is_symlink():
+        link.unlink()
+    link.symlink_to(pseudo_dir, target_is_directory=True)
+
+
+def insert_row(con: sqlite3.Connection, dest_cols: list[str], row: dict, run_dir_new: str):
+    """INSERT a single row, picking only columns that exist in dest schema."""
+    use_cols, use_vals = [], []
+    for c in dest_cols:
+        if c == "run_dir":
+            use_cols.append(c); use_vals.append(run_dir_new); continue
+        if c == "pid":
+            use_cols.append(c); use_vals.append(None); continue
+        if c in row:
+            use_cols.append(c); use_vals.append(row[c])
+        # column in dest but not in source row → leave for DB default
+    placeholders = ",".join("?" * len(use_cols))
+    cols_sql = ",".join(use_cols)
+    con.execute(f"INSERT INTO runs ({cols_sql}) VALUES ({placeholders})", use_vals)
+
+
+def main():
+    args = parse_args()
+    db_path = args.runs_local / "state.db"
+    for p, label in [(args.bundle, "bundle"), (db_path, "destination state.db"),
+                     (args.pseudo_dir, "pseudo dir")]:
+        if not p.exists():
+            sys.exit(f"[import] {label} not found: {p}")
+
+    print(f"[import] reading manifest from {args.bundle}")
+    staging = Path(tempfile.mkdtemp(prefix="bench-import-"))
+    try:
+        bundle_root = extract_bundle(args.bundle, staging)
+        manifest = json.loads((bundle_root / "manifest.json").read_text(encoding="utf-8"))
+        if manifest["schema_version"] &gt; 1:
+            sys.exit(f"[import] bundle schema_version={manifest['schema_version']} too new; "
+                     "upgrade import.py")
+        print(f"[import] bundle: tier={manifest['tier']} schema={manifest['schema_version']} "
+              f"source={manifest['source']['user']}@{manifest['source']['host']} "
+              f"n_runs={manifest['n_runs']}")
+        print(f"[import] destination runs_local : {args.runs_local}")
+        print(f"[import] destination state.db   : {db_path}")
+        print(f"[import] destination pseudo_dir : {args.pseudo_dir}")
+
+        dest_cols = get_dest_columns(db_path)
+        src_cols = set(manifest["db_columns"])
+        common = [c for c in dest_cols if c in src_cols]
+        src_only = sorted(src_cols - set(dest_cols))
+        dest_only = sorted(set(dest_cols) - src_cols)
+        print(f"[import] dest columns ({len(dest_cols)}): {', '.join(dest_cols[:6])}, ..., {dest_cols[-1]}")
+        if src_only:
+            print(f"[import] dropping {len(src_only)} source-only column(s): {src_only}")
+        if dest_only:
+            print(f"[import] dest-only column(s) (will get DB default or NULL): {dest_only}")
+
+        # Read all rows from db_rows.jsonl
+        rows = []
+        for line in (bundle_root / "db_rows.jsonl").open(encoding="utf-8"):
+            rows.append(json.loads(line))
+        all_ids = [r["run_id"] for r in rows]
+        existing = existing_run_ids(db_path, all_ids)
+
+        n_imported = n_skipped = n_failed = n_overwritten = 0
+        if args.dry_run:
+            print("[import] *** DRY RUN — no changes will be made ***")
+        else:
+            con = sqlite3.connect(str(db_path))
+
+        for i, row in enumerate(rows, 1):
+            run_id = row["run_id"]
+            dst_run_dir = args.runs_local / run_id
+
+            if run_id in existing:
+                if args.on_conflict == "skip":
+                    n_skipped += 1
+                    print(f"[import] {i:3d}/{len(rows)}  {run_id:60s} → SKIP (already in dest)")
+                    continue
+                if args.on_conflict == "fail":
+                    sys.exit(f"[import] FAIL: {run_id} already exists in dest")
+                # overwrite
+                if not args.dry_run:
+                    con.execute("DELETE FROM runs WHERE run_id=?", (run_id,))
+                    if dst_run_dir.exists():
+                        shutil.rmtree(dst_run_dir)
+                n_overwritten += 1
+
+            src_run_dir = bundle_root / "runs" / run_id
+            if not src_run_dir.exists():
+                print(f"[import] {i:3d}/{len(rows)}  {run_id:60s} → FAIL (missing in bundle)")
+                n_failed += 1
+                continue
+
+            verb = "OVERWRITE" if run_id in existing else "imported"
+            if args.dry_run:
+                print(f"[import] {i:3d}/{len(rows)}  {run_id:60s} → would {verb.lower()}")
+                continue
+
+            dst_run_dir.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(src_run_dir, dst_run_dir)
+            workdir = dst_run_dir / "workdir"
+            if workdir.is_dir():
+                relink_pseudos(workdir, args.pseudo_dir)
+
+            try:
+                insert_row(con, dest_cols, row, str(dst_run_dir))
+            except sqlite3.IntegrityError as e:
+                print(f"[import] {i:3d}/{len(rows)}  {run_id:60s} → FAIL (sqlite: {e})")
+                n_failed += 1
+                shutil.rmtree(dst_run_dir, ignore_errors=True)
+                continue
+
+            n_imported += 1
+            print(f"[import] {i:3d}/{len(rows)}  {run_id:60s} → {verb}")
+
+        if not args.dry_run:
+            con.commit()
+            con.close()
+
+        print(f"\n[import] DONE")
+        print(f"  imported   : {n_imported}")
+        print(f"  overwritten: {n_overwritten}")
+        print(f"  skipped    : {n_skipped}")
+        print(f"  failed     : {n_failed}")
+        if args.dry_run:
+            print("  (dry-run: nothing written)")
+
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+if __name__ == "__main__":
+    main()
+</code></pre>
+
+
+<!-- ════════════ §7 ════════════ -->
+<h2 id="s7">§7 反向使用（Pluto235 → weilin）</h2>
+
+<p>同一对脚本可以无修改地反向用。我（Pluto235）想把自己跑的 solverv3 27 题包给 weilin：</p>
+
+<pre class="shell"><code># 在 Pluto235 服务器：
+python export.py \
+    --runs-local /home/shijie/bench/runs_local \
+    --filter "agent_id='solverv3' AND model='deepseek-v4-pro' AND created_at &gt;= '2026-05-11T16:00'" \
+    --tier lossy \
+    --label "Pluto235 standard tier solverv3 27 runs" \
+    --out /tmp/bench-bundle-pluto235-solverv3-27-2026-05-13.tar.gz
+
+gh release create solverv3-standard27-2026-05-13 \
+    --repo Pluto235/dft-agent-data-shares \
+    --title "Pluto235 solverv3 (27 runs, standard tier)" \
+    /tmp/bench-bundle-pluto235-solverv3-27-2026-05-13.tar.gz
+
+# weilin 那边：
+gh release download solverv3-standard27-2026-05-13 \
+    --repo Pluto235/dft-agent-data-shares --dir /tmp/
+
+python import.py \
+    --bundle /tmp/bench-bundle-pluto235-solverv3-27-2026-05-13.tar.gz \
+    --runs-local /home/weilin/bench/runs_local \
+    --pseudo-dir /home/weilin/bench/dft-agent-bench/pseudos/GBRV_USPP_PBE_v1.5 \
+    --on-conflict skip</code></pre>
+
+<p>因为 <code>state.db</code> 的列在两边 schema 上是同源（都从 wanweilin/dft-agent-bench-web-fresh fork），
+import.py 会自动用 <code>PRAGMA table_info</code> 探测目标列，源端多出来的列（如 <code>agent_id</code>）只要 dest 也有就 INSERT；
+dest 多出来的列就给 NULL 或 DB 默认值。<strong>跨 fork 的微小 schema drift 不会让导入崩</strong>。</p>
+
+
+<!-- ════════════ §8 ════════════ -->
+<h2 id="s8">§8 替代传输方式</h2>
+
+<h3>方案 B：rsync over SSH（如果两边能 SSH）</h3>
+
+<p>如果你和我能互相 SSH（公司 VPN / 同实验室局域网），rsync 比 GH Release 简单太多——
+不需要中间存储、断点续传、增量同步。</p>
+
+<pre class="shell"><code># 1. 你（weilin）跑 export.py（同 §3.3），生成 bundle.tar.gz
+# 2. 我从你机器拉过来：
+rsync -avz --progress \
+    weilin@your-server.com:/tmp/bench-bundle-weilin-baseline-2026-05-13.tar.gz \
+    /tmp/
+
+# 3. 接着跑 import.py（同 §4.3）</code></pre>
+
+<p>更激进的方案：跳过 tar.gz，直接 rsync staging 目录——但需要先在源端跑 export 但<strong>不打包</strong>
+（脚本目前不支持这个 mode；如果常用可以加个 <code>--no-tarball</code>）。</p>
+
+<h3>方案 C：WeTransfer / Google Drive / 阿里云盘临时链</h3>
+
+<p>如果不想用 GH Release（比如懒得建 repo）——上传到任何文件分享服务也行，
+脚本本身跟传输无关，只关心"输入是个 bundle.tar.gz"。</p>
+
+<p><strong>缺点</strong>：链接会过期；无版本跟踪——如果以后想知道 "哪个 bundle 对应哪次 sync"，得自己记。</p>
+
+<h3>方案 D：邮件附件（仅 minimal tier）</h3>
+
+<p>Minimal tier 30 MB 大多数邮箱都能发（QQ 50 MB / Gmail 25 MB / Outlook 20 MB——刚好打边线）。
+适合一次性发 ≤ 50 题的小集合。</p>
+
+<pre class="shell"><code>python export.py --tier minimal ...   # ~30 MB output
+# 邮箱直接附件发</code></pre>
+
+
+<!-- ════════════ §9 ════════════ -->
+<h2 id="s9">§9 故障排查</h2>
+
+<h3>❌ <code>"sqlite3.IntegrityError: UNIQUE constraint failed: runs.run_id"</code></h3>
+
+<p>原因：dest 已经有这个 run_id 但 <code>--on-conflict</code> 不是 skip。
+解决：要么改 <code>--on-conflict skip</code> 跳过，要么 <code>--on-conflict overwrite</code> 强覆盖。</p>
+
+<h3>❌ <code>"pseudo dir not found"</code></h3>
+
+<p>原因：传给 <code>import.py</code> 的 <code>--pseudo-dir</code> 路径在 dest 机器上不存在。
+解决：先确认 <code>~/bench/dft-agent-bench/pseudos/</code> 下有 GBRV_USPP_PBE_v1.5 子目录；
+没有就 <code>cd ~/bench/dft-agent-bench && git pull</code>（pseudos 跟着仓走）。</p>
+
+<h3>❌ web 界面 leaderboard 不显示新导入的 run</h3>
+
+<p>检查清单：</p>
+<ol>
+<li><code>sqlite3 ~/bench/runs_local/state.db "SELECT COUNT(*) FROM runs"</code> 看 DB 行数是否增加</li>
+<li><code>ls ~/bench/runs_local/&lt;run_id&gt;/report.json</code> 看文件确实拷过来了</li>
+<li>web 服务可能 cache 了 DB；<code>bash ~/web/start.sh restart</code> 重启一下</li>
+<li>看 web backend log：<code>tail -50 ~/web/logs/*.log | grep -i error</code></li>
+</ol>
+
+<h3>⚠ created_at 显示成奇怪的时间</h3>
+
+<p>原因：源端 created_at 存的是 ISO UTC 字符串（如 <code>2026-05-08T14:08:52Z</code>），
+但前端可能按本地时区渲染。如果你跟我时区不同（你 UTC+8，我 UTC+8——其实一样），
+看起来时间偏 0 小时；其他情况下偏 ±X 小时。<strong>不是 bug，是显示约定</strong>。</p>
+
+<h3>⚠ <code>transcript.json</code> 特别大（&gt; 10 MB）</h3>
+
+<p>少数 SCF 卡死循环的 run，transcript 会膨胀到几十 MB。脚本不会主动截断，
+但 web 前端可能渲染卡顿。导入完后这种 run 单独点进去会慢，是已知现象。
+后续考虑给 import.py 加 <code>--max-transcript-mb 10</code> 选项做硬截断。</p>
+
+<h3>⚠ source-only / dest-only 列警告</h3>
+
+<p>正常：两边 fork 不同步，会有 schema drift。脚本会自动 drop 源端独有的列、
+dest 独有的列写 NULL。如果某个列你觉得"必须保留"，确保 dest 端 ALTER TABLE 加上同名列再 import。</p>
+
+
+<!-- ════════════ §10 ════════════ -->
+<h2 id="s10">§10 未来自动化建议</h2>
+
+<p>用过 3-5 次之后，可以考虑这些升级：</p>
+
+<ul>
+<li><strong>收进 <code>web/scripts/</code></strong>，作为 <code>bench-sync export/import</code> 子命令，跟 web 一起版本管。</li>
+<li><strong>增量同步</strong>：export 加 <code>--since-bundle &lt;prev.tar.gz&gt;</code>，只打这次 bundle 之后新增的 runs；
+import 加 <code>--idempotent</code> 自动跳过已存在的 ID。</li>
+<li><strong>压缩升级</strong>：现在用 <code>gzip</code>，~500 MB；换 <code>zstd</code> 能压到 ~200-300 MB（需要 <code>pip install zstandard</code>）。</li>
+<li><strong>WebHook 集成</strong>：GH Release 发布时触发 webhook → 自动通知对方 import。</li>
+<li><strong>校验和</strong>：manifest 里加 <code>sha256</code> per-run，import 时校验防中途损坏。</li>
+<li><strong>引用 wanweilin/dft-agent-bench 上游</strong>：bench 题目本身也跟着 git 走，
+所以两边 task_id 永远一致；这块不用 sync。</li>
+</ul>
+
+
+<!-- ════════════ §11 ════════════ -->
+<h2 id="s11">§11 附录：full tier 切片 / HuggingFace dataset 方案</h2>
+
+<h3>切片：当 full tier 超过 GH Release 单文件 2 GB</h3>
+
+<p>Lossy 一般够；只有想要完全 bit-exact 复现（重做 dos.x / 重画图）才需要 full。
+Full 36 GB 不可能一个文件——可以按 task group 切：</p>
+
+<pre class="shell"><code># 切成 4 份：M1_T1 / M1_T2 / M2_T1 / M2_T2
+for grp in M1_T1 M1_T2 M2_T1 M2_T2; do
+    python export.py \
+        --runs-local ~/bench/runs_local \
+        --filter "task_id LIKE '${grp}_%' AND status='done'" \
+        --tier full \
+        --out /tmp/bench-bundle-full-${grp}-2026-05-13.tar.gz
+done
+
+# 每片上传成单独的 release asset
+gh release create full-2026-05-13 --repo Pluto235/dft-agent-data-shares \
+    /tmp/bench-bundle-full-M1_T1-2026-05-13.tar.gz \
+    /tmp/bench-bundle-full-M1_T2-2026-05-13.tar.gz \
+    /tmp/bench-bundle-full-M2_T1-2026-05-13.tar.gz \
+    /tmp/bench-bundle-full-M2_T2-2026-05-13.tar.gz</code></pre>
+
+<p>Import 端循环跑 4 次即可。</p>
+
+<h3>HuggingFace Dataset</h3>
+
+<p>如果以后数据量飙到 TB 级别（比如跑 1000 题、5 模型 × 多次重复），可以转 HuggingFace Dataset：</p>
+<ul>
+<li>免费、公开</li>
+<li>有 git-lfs 自动处理大文件</li>
+<li>原生支持流式读取（不用全量下载）</li>
+<li>有版本（Revision），跟 release 等效</li>
+</ul>
+
+<p>但起步成本：要写 <code>dataset_loader.py</code> + push 到 <code>huggingface.co/datasets/&lt;org&gt;/&lt;name&gt;</code>。
+现阶段用不上。</p>
+
+
+<div class="note" style="margin-top: 40px;">
+<strong>给 weilin 的最后一句话</strong>：脚本是纯标准库写的，无依赖；
+如果跑出错（特别是 sqlite 报奇怪错误），把 <code>export.py</code> stderr 完整截图发我，
+我们一起对一下你那边的 state.db schema 是不是有自定义列。
+</div>
+
+</body>
+</html>
