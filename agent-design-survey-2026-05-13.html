@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DFT Agent 架构调研 · 跨域 SOTA 模式提炼 · 2026-05-13</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+       'Microsoft YaHei', sans-serif;
+       max-width: 1100px; margin: 0 auto; padding: 30px; color: #2c3e50; line-height: 1.75; }
+h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+h2 { color: #34495e; margin-top: 50px; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px; }
+h3 { color: #34495e; margin-top: 30px; }
+p { margin: 10px 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 4px 0; }
+code { background: #f4f6f7; padding: 1px 6px; border-radius: 3px; font-size: 13.5px;
+       font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: #c0392b; }
+pre { background: #2c3e50; color: #ecf0f1; padding: 16px 18px; border-radius: 6px;
+      overflow-x: auto; font-size: 13px; line-height: 1.55;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+pre code { background: transparent; color: inherit; padding: 0; }
+.meta { background: #ecf0f1; padding: 14px 20px; border-radius: 6px; margin: 15px 0;
+        line-height: 1.7; }
+.meta strong { color: #2c3e50; }
+.note { background: #fffbe6; border-left: 4px solid #f1c40f; padding: 12px 16px;
+        margin: 16px 0; font-size: 14.5px; color: #7d6608; border-radius: 4px; line-height: 1.75; }
+.callout { background: #eaf6ff; border-left: 4px solid #3498db; padding: 12px 16px;
+        margin: 16px 0; font-size: 14.5px; color: #21618c; border-radius: 4px; line-height: 1.75; }
+.danger { background: #fdecea; border-left: 4px solid #e74c3c; padding: 12px 16px;
+        margin: 16px 0; font-size: 14.5px; color: #922b21; border-radius: 4px; line-height: 1.75; }
+table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13.5px; }
+th { background: #34495e; color: white; padding: 9px 11px; text-align: left; font-weight: 600; }
+td { border-bottom: 1px solid #ecf0f1; padding: 8px 11px; vertical-align: top; }
+tr:hover td { background: #f8f9fa; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 3px;
+       font-size: 12px; font-weight: 600; margin-right: 4px; }
+.tag-must { background: #e74c3c; color: white; }
+.tag-good { background: #f39c12; color: white; }
+.tag-domain { background: #ecf0f1; color: #34495e; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+         gap: 12px; margin: 15px 0; }
+.card { background: #ecf0f1; padding: 14px 16px; border-radius: 6px; border-left: 4px solid #3498db; }
+.card-label { color: #7f8c8d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card-value { font-size: 18px; font-weight: 600; margin: 4px 0; color: #2c3e50; }
+.card-sub { color: #7f8c8d; font-size: 12.5px; line-height: 1.5; }
+.arch-diagram { background: #2c3e50; color: #ecf0f1; padding: 18px 22px; border-radius: 6px;
+       overflow-x: auto; font-size: 13px; line-height: 1.6;
+       font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+.disclaimer { color: #7f8c8d; font-size: 13px; margin: 20px 0; line-height: 1.7;
+       border-top: 1px dashed #bdc3c7; padding-top: 16px; }
+a { color: #2980b9; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.refs { font-size: 13px; }
+.refs li { margin: 3px 0; }
+hr { border: none; border-top: 1px solid #ecf0f1; margin: 30px 0; }
+</style>
+</head>
+<body>
+
+<h1>DFT Agent 架构调研：跨域 SOTA 模式提炼</h1>
+
+<div class="meta">
+<strong>背景</strong>：当前 solver 是"裸 ReAct"（单 agent + bash + submit），团队评估认为远低于 2026 年标准。
+本报告并行调研 4 个领域（DFT 专域 / 数学&形式化证明 / 通用 agent 架构 / 代码 agent 工程经验）的 SOTA 系统，
+提炼可借鉴模式并给出针对当前 solver 的改造方案。<br>
+<strong>调研日期</strong>：2026-05-13 ・ <strong>覆盖系统数</strong>：30+ ・ <strong>调研方式</strong>：4 路并行 web research subagent
+</div>
+
+<div class="callout">
+<strong>一句话结论</strong>：现在的 solver 是 2024 年水平。SOTA DFT agent（DREAMS / QUASAR / VASPilot）都在做
+<b>结构化工具 + 收敛专家子 agent + 程序级 verifier + 经验库 + stuck detection</b>。
+这五件事按 ROI 排序就是接下来的改造路线图。
+</div>
+
+<h2>一、对现状的诊断</h2>
+
+<p>当前 solver 在 2026 年标准下确实是"裸 ReAct"，有五个明显的洞，<b>SOTA DFT agent 已全部填上</b>：</p>
+
+<table>
+<thead><tr><th style="width:22%">现状</th><th style="width:38%">问题</th><th>SOTA 是怎么做的</th></tr></thead>
+<tbody>
+<tr><td>单 agent + bash + submit</td>
+    <td>和 ChemCrow（2024）一个水平，但 ChemCrow 还有 18 个细粒度工具</td>
+    <td>DREAMS 四层分层 / VASPilot Manager+3 Worker / QUASAR Strategist-Operator-Evaluator</td></tr>
+<tr><td>没有 planner</td>
+    <td>每次都靠 LLM 自己想"先 relax 还是先 bands"</td>
+    <td>显式 Planner-Executor 分离；DeepSeek-Prover V2 sketch-then-fill</td></tr>
+<tr><td>没有 verifier</td>
+    <td>bench audit 只检查 <code>JOB DONE.</code> + 1024B，<b>表面收敛但结构跑飞照样通过</b></td>
+    <td>VASPilot Result Validation Agent + 程序级物理 sanity check</td></tr>
+<tr><td>没有 memory</td>
+    <td>同一个 Si 跑 100 遍，第 101 次还是从零猜参数</td>
+    <td>ChemAgent 三分记忆 / MatClaw experience log / Voyager skill library</td></tr>
+<tr><td>没有 stuck detection</td>
+    <td>SCF 不收敛时反复改 input 直到 max_turns 烧光 GPU</td>
+    <td>Magentic-One progress ledger / QUASAR periodic check-in 主动 kill</td></tr>
+<tr><td>bash 太开放</td>
+    <td>LLM 用 cat/sed 改 namelist，错一个 <code>&amp;CONTROL</code> 就连环错</td>
+    <td>SWE-agent linter-gated edit / Anthropic poka-yoke tool design</td></tr>
+</tbody>
+</table>
+
+<h2>二、跨四领域的共识：所有 SOTA agent 都在做这 7 件事</h2>
+
+<p>四份独立调研报告<b>惊人地收敛</b>到同一组设计原则。独立来源指向相同结论，本身就是最强信号。</p>
+
+<table>
+<thead><tr><th>原则</th><th>DFT 域</th><th>数学/证明域</th><th>通用 agent</th><th>代码 agent</th></tr></thead>
+<tbody>
+<tr><td><b>结构化 tool 替代裸 shell</b></td>
+    <td>DREAMS 禁止直接文件操作</td><td>Lean 的 tactic 是结构化对象</td>
+    <td>Anthropic ACI 原则</td><td>SWE-agent linter-gated edit</td></tr>
+<tr><td><b>独立 verifier</b></td>
+    <td>VASPilot Result Validation Agent</td><td>Lean kernel</td>
+    <td>CRITIC 范式</td><td>SWE-agent 编辑后 lint</td></tr>
+<tr><td><b>结构化 memory / 经验库</b></td>
+    <td>ChemAgent 三分记忆、MatClaw experience log</td><td>Premise DB (ReProver)、tactic library</td>
+    <td>A-MEM、Voyager skill</td><td>Augment 语义索引</td></tr>
+<tr><td><b>Stuck detection / 主动 kill</b></td>
+    <td>QUASAR periodic check-in</td><td>MCTS 节点剪枝</td>
+    <td>Magentic-One progress ledger</td><td>SWE-agent max-steps</td></tr>
+<tr><td><b>Planner ≠ Executor</b></td>
+    <td>DREAMS 4 层架构</td><td>DeepSeek-Prover sketch+fill</td>
+    <td>Plan-and-Execute / LLMCompiler</td><td>Devin Plan/Act mode</td></tr>
+<tr><td><b>共享事实数据库</b></td>
+    <td>DREAMS Canvas、VASPilot RAG pool</td><td>AlphaGeometry2 SKEST shared facts</td>
+    <td>LangGraph state</td><td>Claude Code progress.json</td></tr>
+<tr><td><b>输出抽象（不直接看大文件）</b></td>
+    <td>VASPilot 只返回 calc_id</td><td>proof state 是 kernel 状态</td>
+    <td>Anthropic just-in-time loading</td><td>SWE-agent 100-line viewer</td></tr>
+</tbody>
+</table>
+
+<div class="danger">
+<strong>最反直觉的一条共识</strong>：所有 SOTA 系统都<b>不让 LLM 直接看大输出</b>。
+pw.x 输出动辄几 MB，当前 solver 让 Claude <code>cat</code> 它——这是 token 黑洞，也是幻觉来源。
+</div>
+
+<h2>三、按 ROI 排序的 TOP 10 招</h2>
+
+<h3>🔥 必做（高 ROI、低实现成本）</h3>
+
+<h4><span class="tag tag-must">1</span> 把 <code>bash</code> 拆成结构化工具集</h4>
+<p class="card-sub"><b>来源</b>：SWE-agent ACI + Anthropic tool design</p>
+<p>这是单点 ROI 最高的改动。SWE-agent 在 SWE-bench 上从 0% 跳到 12.5% 主要靠的就是这个。</p>
+<pre><code>write_qe_input(path, calculation, system={ecutwfc, ibrav, ...}, electrons, k_points, ...)
+  → 写入前 lint：未知字段 reject、pseudo 文件 existence、ibrav 与 CELL_PARAMETERS 冲突
+read_qe_output(run_id, view: Literal["summary","scf_steps","errors","forces","tail:N","grep:..."])
+  → 默认返回 30 行结构化 summary，永远不让 LLM 看完整 pw.out
+run_pw(input_path, ngpus, timeout) → 返回 run_id 而非 stdout
+verify_run(run_id)                 → 硬性 verifier：收敛 + 力 + 应力 + 警告关键字
+parse_structure(path)              → 解析 CELL_PARAMETERS + ATOMIC_POSITIONS</code></pre>
+<p>保留 <code>bash</code> 但只作为 escape hatch，不是默认路径。</p>
+
+<h4><span class="tag tag-must">2</span> 加 SCF Convergence Sub-Agent</h4>
+<p class="card-sub"><b>来源</b>：DREAMS / GENIUS</p>
+<p>DREAMS 在 Sol27LC 上 lattice MAPE &lt;1% 的关键设计：<b>SCF 不收敛时不让主 agent 自己想</b>，分派给一个专门 prompt 的子 agent，输入 = <code>(input, output, error)</code> 三件套，输出 = <code>(mixing_beta, smearing, mixing_mode, electron_maxstep)</code> 的具体调整。</p>
+<p><b>为什么有效</b>：主 agent 上下文里塞了一堆历史尝试已被污染；专家 sub-agent 拿干净 context 看本次失败，建议质量好得多。GENIUS 的实验显示，<b>失败后 context reset 比堆积历史更有效</b>——错误尝试反而误导后续生成。</p>
+
+<h4><span class="tag tag-must">3</span> 加 stuck detection + 强制 backtrack</h4>
+<p class="card-sub"><b>来源</b>：Magentic-One progress ledger</p>
+<p>当前 solver 大概率在同一个错误上反复打转直到 max_turns 烧完。Magentic-One 的核心是每个 inner loop tick 回答五个问题，其中之一是<b>"团队是否在原地打转？"</b>，&gt;2 就跳出 inner loop 让 orchestrator 重新规划。</p>
+<ul>
+  <li><b>检测</b>：连续 3 turn 没有新文件写入 + 没有新 error 类型 → 进入 <code>REMEDIATION_MODE</code></li>
+  <li><b>强制</b>：注入预定义 playbook（"按顺序尝试：mixing_beta↓ → smearing 加宽 → diag='cg' → ecut+20%，最多 3 次"）</li>
+  <li><b>兜底</b>：3 次还不行就 <code>submit_best_effort()</code> 强制退出，<b>别再烧 GPU 了</b></li>
+</ul>
+
+<h4><span class="tag tag-must">4</span> Experience / 教训库</h4>
+<p class="card-sub"><b>来源</b>：Reflexion + ChemAgent + Voyager</p>
+<p>已经跑了上百个 benchmark task，结果全是一次性的——巨大浪费。建一个 KV store：</p>
+<pre><code># 写入：每个成功 run
+key   = embedding(material_composition + calc_type + pseudo_family)
+value = {ecutwfc, k_grid, mixing_beta, occupations, success: True, walltime}
+
+# 读取：新任务开始时 top-5 检索
+prior = retrieve_similar(task, k=5)
+# 注入 system prompt: "类似系统的成功设参参考：ecut≈60, k-grid 8×8×8, mixing_beta=0.4"</code></pre>
+<p>这一招对 benchmark 场景尤其香——任务大量重复（不同金属、氧化物、半导体），prior 命中率会很高。
+ChemAgent 三分记忆映射到 DFT：<b>Planning Memory</b>（pipeline 范式）/ <b>Execution Memory</b>（材料→成功 input file）/ <b>Knowledge Memory</b>（QE 参数陷阱 lessons）。</p>
+
+<h4><span class="tag tag-must">5</span> 独立 verifier 工具 + submit 前强制调用</h4>
+<p class="card-sub"><b>来源</b>：CRITIC + SWE-agent linter-gated</p>
+<p>已经有 bench audit，但只查 "JOB DONE." 这种表面指标。需要的是<b>物理合理性的程序 verifier</b>：</p>
+<pre><code>verify_dft_run(run_id, task_type) → {
+  scf_converged:      bool,    # SCF iter 数 vs 阈值
+  forces_below_thr:   bool,    # max force < forc_conv_thr
+  stress_below_thr:   bool,    # vc-relax: stress < press_conv_thr
+  symmetry_preserved: bool,    # SpacegroupAnalyzer 前后对比
+  magnetic_sensible:  bool,    # 总磁矩 vs 预期
+  warnings_clean:     bool,    # 无 "negative charge" 等
+  cross_check_MP:     bool|None, # 可选：和 Materials Project 比 ±5%
+  verdict:            "pass" | "soft_fail" | "hard_fail",
+  reasoning:          str      # 给 agent 看的诊断
+}</code></pre>
+<p><b>关键</b>：不通过不让 submit，agent 拿到 verdict 必须修复或显式放弃。这是 MatClaw 强调的"silent quality failure"防御——表面收敛了但参数其实不够好的隐性问题，最容易蒙混过关。</p>
+
+<h3>🟡 值得做（高价值但实现复杂）</h3>
+
+<h4><span class="tag tag-good">6</span> Sketch-then-Fill 双层 LLM</h4>
+<p class="card-sub"><b>来源</b>：DeepSeek-Prover V2 / Plan-and-Execute</p>
+<p>让强模型（Opus）一次性写 high-level plan：</p>
+<pre><code>Plan for M1_T1_Si_vc_relax:
+  step 1: write vc-relax input with PBE PAW pseudo, ecutwfc=60, kgrid 8x8x8   [filler: haiku]
+  step 2: run pw.x, verify SCF converged                                       [filler: haiku]
+  step 3: check stress/force convergence, if not met → goto step 1 with new params  [filler: haiku]
+  step 4: parse final lattice constant, submit                                 [filler: haiku]</code></pre>
+<p>每个 step 由廉价模型（Haiku）独立填充，Plan 错只重 Plan、step 错只重 step。
+<b>长链 drift 被天然切断 + 省 80% Opus token</b>。</p>
+
+<h4><span class="tag tag-good">7</span> 共享事实数据库 / Canvas</h4>
+<p class="card-sub"><b>来源</b>：AlphaGeometry2 SKEST / DREAMS Canvas</p>
+<p>同一材料的 relax / bands / phonon 任务共享一个 KV store，存"已验证事实"（<b>结构化类型，不是文本日志</b>）：</p>
+<pre><code>canvas[material_id] = {
+  relaxed_lattice:     np.array(...),
+  converged_ecutwfc:   80.0,
+  fermi_energy:        6.23,
+  magnetic_moments:    [...],
+  warnings_seen:       ["pseudo unsupported in GBRV"],
+}</code></pre>
+<p>下游任务自动读取，不再重新猜参数。<b>Bench 里同一材料反复出现时，这一招直接省 GPU 小时</b>。</p>
+
+<h4><span class="tag tag-good">8</span> Periodic check-in 主动 kill</h4>
+<p class="card-sub"><b>来源</b>：QUASAR</p>
+<p>长 vc-relax 跑 30 分钟还没收敛？现在只能等 timeout。改成每 N 分钟读一次 intermediate output，
+发现"前 50 个 SCF iter 看趋势不会收敛"就主动 kill 并重启参数。<b>H100 这种贵 GPU 上省钱效果显著</b>。</p>
+
+<h4><span class="tag tag-good">9</span> Failure-as-Signal Backtracking</h4>
+<p class="card-sub"><b>来源</b>：ToT / Lean tactic prover</p>
+<p>当前 main loop 是 <code>try { run } catch { upraise }</code>。改成显式 search loop：</p>
+<pre><code>state = TryState(ecutwfc=50, k_grid=6, mixing_beta=0.7)
+while not done and depth < MAX:
+    result = run_pw(state)
+    if verify_run(result).verdict == "pass":
+        done = True
+    else:
+        tactic = pick_tactic(result.failure_reason)   # 来自 playbook
+        state = state.apply(tactic)                   # 显式 state transition
+        history.push((state, result, tactic))
+        # 失败到 dead-end 就回退到 history 里更早的 fork</code></pre>
+<p>形式化 + 可审计，远好于隐式 LLM 自己改。SCF 不收敛、力残差爆掉、NaN——都当作 <b>tactic 失败</b>而非 fatal error，触发 backtrack。</p>
+
+<h4><span class="tag tag-good">10</span> Self-Consistency / Multi-Path 投票</h4>
+<p class="card-sub"><b>来源</b>：数学推理域</p>
+<p>对最终 observable（如 bandgap）跑 2–3 条独立 setting 路径（不同 pseudo family、不同 ecut+kgrid 组合达到等价收敛精度），
+结果交叉验证。一致 → 高置信交付；分歧大 → 升级到深入诊断。<b>Bench 评分场景这相当于免费拿到 confidence score</b>。</p>
+
+<h2>四、推荐重构架构</h2>
+
+<div class="arch-diagram">solve.py (entry)
+  │
+  ├── <b>Orchestrator</b>  (workflow，<u>代码而非 LLM</u>)
+  │     按 task_type route → relax / bands / phonon / EOS recipe
+  │
+  ├── <b>Strategist</b>  (Opus, 1 次/任务)
+  │     读 task + prior_experience → 出 high-level Plan (JSON)
+  │     强制 second-pass review（QUASAR 招）
+  │
+  ├── <b>Executor Loop</b>  (Haiku, 主力)
+  │     工具集（不再有裸 bash 作为默认）：
+  │       - write_qe_input   (typed, linted)
+  │       - read_qe_output   (view-restricted, 默认 30 行 summary)
+  │       - run_pw           (returns run_id)
+  │       - verify_run       (mandatory before submit)
+  │       - parse_structure
+  │       - retrieve_similar (experience lookup)
+  │       - bash             (escape hatch)
+  │
+  ├── <b>Convergence Sub-Agent</b>  (Sonnet, 仅 SCF 不收敛时召唤)
+  │     干净 context + 失败三件套 → 出参数调整建议
+  │
+  ├── <b>Verifier</b>  (程序，<u>非 LLM</u>)
+  │     pw.out parser + 物理 sanity check + MP cross-check
+  │     submit 前强制调用
+  │
+  ├── <b>Stuck Detector</b>  (代码)
+  │     连续 N turn 无进展 → 强制 compact + replan
+  │     超 K 次 remediation → submit_best_effort 退出
+  │
+  └── <b>Shared State</b>
+        canvas.json     (材料级事实, structured)
+        progress.json   (任务级历史, structured, 跨 turn 持久化)
+        experience/     (跨任务 vector index, append on success)</div>
+
+<div class="callout">
+<strong>架构借鉴来源</strong>：DREAMS 的分层 + Magentic-One 的 stuck detector + Anthropic 的 just-in-time loading +
+SWE-agent 的 ACI + Reflexion 的 experience + DeepSeek-Prover 的 sketch-then-fill。
+</div>
+
+<h2>五、反直觉点（容易踩坑）</h2>
+
+<ol>
+<li><b>不要急着上 multi-agent。</b> Anthropic 自己说 multi-agent 用 <b>15× token</b>，且<b>显式点名 coding-like 任务不适合</b>（DFT 是 coding-like）。
+单 task 内别拆；cross-task（并行跑 benchmark 不同题）可以拆，但那只是 parallelization workflow，不是真正的 multi-agent。</li>
+<li><b>CRITIC 用工具不用 LLM。</b> 已经有 pw.x output 这个 ground truth 工具，<b>不要再叠一层 LLM critic</b>，
+直接写确定性 Python verifier 就够了。叠 LLM 反而引入新幻觉。</li>
+<li><b>Aider 的发现：edit format 选错比模型选错损失更大。</b>
+给 LLM 改 namelist 别用 <code>sed</code>，用 SEARCH/REPLACE 块（model 训练数据里见过的格式），鲁棒度高一个量级。</li>
+<li><b>MatClaw 警告：silent quality failure 是 DFT agent 最大隐患。</b>
+表面收敛了但参数不够好。这就是为什么 verifier 必须做到物理级（symmetry / force / stress），而不是看 "JOB DONE."。</li>
+<li><b>GENIUS 经验：失败后 context reset 比堆积历史强。</b>
+重试不是"在错误历史上续写"，是带着"教训摘要"重启。</li>
+<li><b>Example 目录优于 Vector RAG（对 QE 这种 namelist 语法）</b>。
+QUASAR / MatClaw 都验证：BM25 + AST chunking 检索现成 input file 比 embedding 准。</li>
+<li><b>Kimina-Prover 的反直觉发现</b>：足够强的 RL + verifier 信号下，<b>MCTS / PRM 都不是必须</b>。
+对早期版本，先把 verifier（pw.x + linter）做扎实，再考虑加搜索。</li>
+</ol>
+
+<h2>六、建议的两阶段路线图</h2>
+
+<div class="cards">
+  <div class="card">
+    <div class="card-label">Phase 1（1–2 周）</div>
+    <div class="card-value">把基本盘补齐</div>
+    <div class="card-sub">
+      ① 拆 5 个结构化工具（替代裸 bash）<br>
+      ② 加程序级 verifier<br>
+      ③ 加 stuck detector + remediation playbook<br>
+      <b>预期</b>：benchmark pass rate 显著上升，token 成本下降
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-label">Phase 2（2–4 周）</div>
+    <div class="card-value">加智能层</div>
+    <div class="card-sub">
+      ④ Experience 库（vector retrieval）<br>
+      ⑤ SCF Convergence Sub-Agent<br>
+      ⑥ Sketch-then-Fill（Opus 出 plan + Haiku 执行）<br>
+      <b>预期</b>：复杂任务（vc-relax 难材料、phonon、bands）pass rate 进一步上升
+    </div>
+  </div>
+</div>
+
+<h2>七、给老板的一句话总结</h2>
+
+<div class="callout">
+"现在的 solver 是 2024 年水平。SOTA DFT agent（DREAMS / QUASAR / VASPilot）已经在做
+<b>结构化工具 + 收敛专家子 agent + 程序级 verifier + 经验库 + stuck detection</b>。
+我打算分两阶段重构：先把 bash 换成 5 个结构化工具 + 加 verifier + 加 stuck detector（一周可见 benchmark 涨分），
+再加 experience 库和 SCF sub-agent（两周）。"
+</div>
+
+<h2>调研来源</h2>
+
+<h3>DFT / 计算材料 Agent</h3>
+<ul class="refs">
+<li><b>DREAMS</b> (2025-07) – hierarchical multi-agent + Convergence Child Agent + Canvas — <a href="https://arxiv.org/html/2507.14267v1">arXiv 2507.14267</a></li>
+<li><b>GENIUS</b> (2025-12) – FSM-driven, KG-encoded QE param dependencies, context reset on failure — <a href="https://arxiv.org/html/2512.06404v1">arXiv 2512.06404</a></li>
+<li><b>VASPilot</b> (2025-08) – Manager + 3 Worker, calc_id 数据隔离 — <a href="https://arxiv.org/html/2508.07035v1">arXiv 2508.07035</a></li>
+<li><b>QUASAR</b> (2026-02) – Strategist/Operator/Evaluator + periodic check-in kill — <a href="https://arxiv.org/html/2602.00185v1">arXiv 2602.00185</a></li>
+<li><b>MatClaw</b> (2026) – 单 agent code-first + 四层记忆 + AST 结构化 RAG — <a href="https://arxiv.org/html/2604.02688">arXiv 2604.02688</a></li>
+<li><b>El Agente Q</b> (Matter 2025) – per-agent context filtering — <a href="https://www.cell.com/matter/fulltext/S2590-2385(25)00306-6">Cell Matter</a></li>
+<li><b>LLaMP</b> (2024) – Materials Project API grounding — <a href="https://arxiv.org/abs/2401.17244">arXiv 2401.17244</a></li>
+<li><b>ChemCrow</b> – 18-tool ReAct, Nat Mach Intell 2024 — <a href="https://www.nature.com/articles/s42256-024-00832-8">Nature MI</a></li>
+<li><b>ChemAgent</b> (ICLR 2025) – Planning/Execution/Knowledge 三分记忆 — <a href="https://arxiv.org/abs/2501.06590">arXiv 2501.06590</a></li>
+</ul>
+
+<h3>数学 / 形式化证明 / 科学推理 Agent</h3>
+<ul class="refs">
+<li><b>AlphaProof</b> – Lean kernel as verifier + TTRL — <a href="https://www.nature.com/articles/s41586-025-09833-y">Nature 2025</a></li>
+<li><b>AlphaGeometry 2</b> – neural+symbolic, SKEST shared facts — <a href="https://arxiv.org/html/2502.03544v3">arXiv 2502.03544</a></li>
+<li><b>FunSearch / AlphaEvolve</b> – evolutionary program search — <a href="https://www.nature.com/articles/s41586-023-06924-6">Nature 2023</a> / <a href="https://arxiv.org/abs/2506.13131">arXiv 2506.13131</a></li>
+<li><b>DeepSeek-Prover V2</b> – recursive proof sketch + tactic filling — <a href="https://arxiv.org/abs/2504.21801">arXiv 2504.21801</a></li>
+<li><b>Kimina-Prover</b> – pure RL + Lean verifier, no MCTS — <a href="https://arxiv.org/abs/2504.11354">arXiv 2504.11354</a></li>
+<li><b>LeanAgent / ReProver</b> – premise retrieval, lifelong learning — <a href="https://arxiv.org/abs/2410.06209">arXiv 2410.06209</a></li>
+<li><b>Math-Shepherd / PRM</b> – process reward, no human labels — <a href="https://arxiv.org/pdf/2312.08935">arXiv 2312.08935</a></li>
+<li><b>Tree of Thoughts</b> – explicit search with backtracking — <a href="https://arxiv.org/pdf/2305.10601">arXiv 2305.10601</a></li>
+<li><b>SciAgent</b> – Coordinator/Worker/Sub-agent 三层 + Verify sub-agent — <a href="https://arxiv.org/abs/2511.08151">arXiv 2511.08151</a></li>
+</ul>
+
+<h3>通用 Agent 架构</h3>
+<ul class="refs">
+<li><b>Anthropic – Building effective agents</b> — <a href="https://www.anthropic.com/engineering/building-effective-agents">官方博客</a></li>
+<li><b>Anthropic – Multi-agent research system</b> — <a href="https://www.anthropic.com/engineering/multi-agent-research-system">官方博客</a></li>
+<li><b>Anthropic – Effective context engineering</b> — <a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">官方博客</a></li>
+<li><b>Reflexion</b> (NeurIPS 2023) – self-reflection + episodic memory — <a href="https://arxiv.org/abs/2303.11366">arXiv 2303.11366</a></li>
+<li><b>ReWOO</b> – decouple reasoning from observation — <a href="https://arxiv.org/abs/2305.18323">arXiv 2305.18323</a></li>
+<li><b>LLMCompiler</b> – DAG-based parallel tool calling — <a href="https://arxiv.org/abs/2312.04511">arXiv 2312.04511</a></li>
+<li><b>Magentic-One</b> (Microsoft 2024) – Orchestrator + Task/Progress ledger + stall detection — <a href="https://arxiv.org/abs/2411.04468">arXiv 2411.04468</a></li>
+<li><b>Self-Refine</b> (NeurIPS 2023) – generator/feedback/refiner — <a href="https://arxiv.org/abs/2303.17651">arXiv 2303.17651</a></li>
+<li><b>CRITIC</b> – tool-grounded self-correction — <a href="https://arxiv.org/abs/2305.11738">arXiv 2305.11738</a></li>
+<li><b>MemGPT / Letta</b> – OS-style memory hierarchy — <a href="https://arxiv.org/abs/2310.08560">arXiv 2310.08560</a></li>
+<li><b>A-MEM</b> (NeurIPS 2025) – Zettelkasten-style dynamic memory linking — <a href="https://arxiv.org/abs/2502.12110">arXiv 2502.12110</a></li>
+<li><b>Voyager</b> – Minecraft skill library — <a href="https://arxiv.org/abs/2305.16291">arXiv 2305.16291</a></li>
+</ul>
+
+<h3>代码 / 软件 Agent 工程</h3>
+<ul class="refs">
+<li><b>SWE-agent</b> (NeurIPS 2024) – ACI thesis — <a href="https://arxiv.org/abs/2405.15793">arXiv 2405.15793</a> / <a href="https://swe-agent.com/latest/background/aci/">ACI docs</a></li>
+<li><b>OpenHands</b> – minimal action space + IPython kernel + event-stream — <a href="https://arxiv.org/html/2407.16741v3">arXiv 2407.16741</a></li>
+<li><b>OpenHands V1 SDK</b> – LLMSummarizingCondenser, ~2× cost reduction — <a href="https://arxiv.org/html/2511.03690v1">arXiv 2511.03690</a></li>
+<li><b>Aider</b> – edit-format design space, unified diffs essay — <a href="https://aider.chat/docs/unified-diffs.html">aider.chat</a></li>
+<li><b>Agentless</b> – fixed 3-stage pipeline, 50.8% SWE-bench Verified — <a href="https://arxiv.org/abs/2407.01489">arXiv 2407.01489</a></li>
+<li><b>Cognition Devin</b> – SWE-bench technical report — <a href="https://cognition.ai/blog/swe-bench-technical-report">官方博客</a></li>
+<li><b>Augment Auggie</b> – semantic codebase index, 51.8% SWE-bench Pro — <a href="https://www.augmentcode.com/blog/auggie-tops-swe-bench-pro">官方博客</a></li>
+<li><b>CodeAct</b> – Python code as action space — <a href="https://arxiv.org/abs/2402.01030">arXiv 2402.01030</a></li>
+</ul>
+
+<p class="disclaimer">
+本报告由 Claude (Opus 4.7, 1M context) 并行调度 4 个 web research subagent 完成，
+覆盖 2024-01 至 2026-04 的公开文献与官方博客。报告整理人：shijie（DFT-Agent Benchmark 项目）。
+HTML self-contained，可独立离线阅读。
+</p>
+
+</body>
+</html>
