@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三版本 Solver Agent 设计讲解 · 入门教程 · 2026-05-13</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+         'Microsoft YaHei', sans-serif;
+         max-width: 920px; margin: 40px auto; padding: 0 28px; color: #2c3e50; line-height: 1.75; }
+  h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 12px; margin-top: 30px; }
+  h2 { color: #34495e; border-left: 5px solid #3498db; padding-left: 12px; margin-top: 50px; }
+  h3 { color: #2c3e50; margin-top: 30px; }
+  h4 { color: #34495e; margin-top: 22px; }
+  p { margin: 12px 0; }
+  a { color: #2980b9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+         background: #ecf0f1; padding: 2px 5px; border-radius: 3px; font-size: 90%; color: #c0392b; }
+  pre { background: #2c3e50; color: #ecf0f1; padding: 16px 20px; border-radius: 6px;
+        overflow-x: auto; font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 13px; line-height: 1.55; }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+  pre .c { color: #7f8c8d; }      /* 注释 */
+  pre .k { color: #f39c12; }      /* 关键词 */
+  pre .s { color: #2ecc71; }      /* 字符串 */
+  pre .n { color: #3498db; }      /* 数字 */
+  pre .hi { background: #e74c3c33; color: #fff; padding: 0 4px; border-radius: 2px; }
+
+  .meta { background: #ecf0f1; border-left: 4px solid #3498db; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .note { background: #fdf2e9; border-left: 4px solid #e67e22; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+
+  /* 💡 概念卡片 — 入门教程专用 */
+  .concept { background: #fef9e7; border: 1px solid #f4d03f; border-radius: 8px;
+             padding: 16px 20px; margin: 24px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .concept .lbl { display: inline-block; background: #f1c40f; color: #fff;
+                  font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+                  margin-right: 8px; }
+  .concept h4 { margin: 0 0 8px 0; display: inline; color: #7d6608; }
+  .concept p { margin: 8px 0 0 0; }
+  .concept .echo { color: #7d6608; font-style: italic; margin-top: 10px;
+                   font-size: 14px; border-top: 1px dashed #f1c40f; padding-top: 8px; }
+
+  /* 类比块 */
+  .analogy { background: #eaf2f8; border-left: 4px solid #5dade2;
+             padding: 12px 18px; margin: 18px 0; border-radius: 4px;
+             font-size: 15px; }
+  .analogy::before { content: "🌰 类比 · "; font-weight: 700; color: #21618c; }
+
+  /* 图标签 */
+  .diagram-caption { text-align: center; color: #7f8c8d; font-style: italic;
+                     font-size: 14px; margin: 6px 0 30px; }
+
+  /* 表格 */
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #d5dbdb; text-align: left;
+           vertical-align: top; }
+  th { background: #34495e; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  td code { font-size: 12px; }
+
+  /* TOC */
+  nav.toc { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 16px 24px; margin: 24px 0; }
+  nav.toc h3 { margin-top: 0; color: #34495e; }
+  nav.toc ol { padding-left: 24px; }
+  nav.toc li { padding: 3px 0; }
+
+  /* SVG 图框 */
+  .svg-wrap { text-align: center; margin: 24px 0 6px; padding: 16px;
+              background: #fafbfc; border-radius: 8px; border: 1px solid #ecf0f1; }
+  .svg-wrap svg { max-width: 100%; height: auto; }
+
+  /* 术语表 */
+  dl.glossary dt { font-weight: 700; color: #34495e; margin-top: 14px; }
+  dl.glossary dd { margin-left: 0; padding-left: 16px; border-left: 2px solid #d5dbdb;
+                   color: #2c3e50; }
+
+  /* 锚点缓冲（让超链跳过去时标题不被顶栏遮） */
+  h2[id], h3[id], .concept[id] { scroll-margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>三版本 Solver Agent 设计讲解 · 入门教程</h1>
+
+<div class="meta">
+你（这份报告的作者也是读者）在 <a href="https://github.com/wanweilin/dft-agent-bench">dft-agent-bench</a>
+项目里写了三个版本的 solver——<strong>v1-stable</strong>、<strong>v3</strong>、<strong>v5</strong>。
+每个版本都是一个 AI agent：让大模型自己动手跑 Quantum ESPRESSO 计算、自己交答案。
+本报告把三版的设计思路、用到的工具、工作流程一步步讲清楚。
+<br><br>
+<strong>读者预设</strong>：刚入门 agent 工程；懂一点 Python；DFT/QE 不懂也没关系，
+凡是物理细节都会用白话过掉。<br>
+<strong>报告生成时间</strong>：2026-05-13 ・ <strong>篇幅</strong>：约 1 小时阅读，可分段。
+</div>
+
+<nav class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">这份报告是给谁看的，怎么读</a></li>
+  <li><a href="#s2">什么是 agent，为什么 DFT 计算需要它</a></li>
+  <li><a href="#s3">通用前置：ReAct 循环 + 工具调用</a></li>
+  <li><a href="#s4">v1-stable 长啥样：最小可行 agent</a></li>
+  <li><a href="#s5">代码走读：v1 的启动顺序</a></li>
+  <li><a href="#s6">v1 会在哪些地方翻车</a></li>
+  <li><a href="#s7">v3 的核心思路：不扩工具，扩知识</a></li>
+  <li><a href="#s8">脚手架 1 · 377 行系统提示</a></li>
+  <li><a href="#s9">脚手架 2 · qe_tools.py 帮助库</a></li>
+  <li><a href="#s10">脚手架 3 · qe_input_lint 预处理钩子（重点）</a></li>
+  <li><a href="#s11">脚手架 4 · bash_guard 安全护栏</a></li>
+  <li><a href="#s12">附加 · Prompt Caching 3 个断点</a></li>
+  <li><a href="#s13">v3 修了 v1 哪些痛点（一表对照）</a></li>
+  <li><a href="#s14">v5 的两个新东西：MCP 工具 + 自动验证</a></li>
+  <li><a href="#s15">v5 的双路径：Claude 路 vs Legacy 路</a></li>
+  <li><a href="#s16">v5 三大新机制深挖</a></li>
+  <li><a href="#s17">三版本一表对照</a></li>
+  <li><a href="#s18">术语表</a></li>
+  <li><a href="#s19">延伸阅读</a></li>
+</ol>
+</nav>
+
+
+<!-- ════════════ §1 ════════════ -->
+<h2 id="s1">§1 这份报告是给谁看的，怎么读</h2>
+
+<p>这份文档把你已经写好的三个 solver 拆开讲：从最简单的 v1 开始，看它怎么"够用但脆弱"；
+然后 v3 在它身上加了一层"领域脚手架"；最后 v5 又把工具本身换成更结构化的形态，
+加了自动卡死检测和验证 gate。</p>
+
+<p>建议的读法：</p>
+<ul>
+<li>没接触过 agent 工程 → <strong>从 §2 开始顺读</strong>，§3 是通用前置必看</li>
+<li>已经写过简单 agent，想看具体技巧 → 可以跳到 <strong>§7 v3 部分</strong>（最多干货）</li>
+<li>想了解最新设计 → <strong>§14-16 v5 章节</strong></li>
+<li>只想快速对比 → 直接看 <strong>§17 一表对照</strong></li>
+</ul>
+
+<p>遇到生词不要慌——文档里所有重要概念第一次出现时都有 <strong>💡 概念卡片</strong>
+讲清楚，后面再用直接超链回去；<strong>§18 术语表</strong>也可以速查。</p>
+
+
+<!-- ════════════ §2 ════════════ -->
+<h2 id="s2">§2 什么是 agent，为什么 DFT 计算需要它</h2>
+
+<p>"Agent"这个词在 AI 圈里被滥用得厉害，先把它说清楚。</p>
+
+<div class="concept" id="c-agent">
+<span class="lbl">💡 概念</span><h4>Agent / LLM-as-agent</h4>
+<p>普通的聊天机器人是"问一句答一句"。<strong>Agent</strong> 是把大模型放进一个循环里：
+让它能<strong>调用工具</strong>（比如执行 shell 命令、读写文件、查数据库），
+看到工具结果后再决定下一步动作，直到任务完成或主动放弃。</p>
+<p>简单说：<em>能动手做事的 LLM 就叫 agent</em>。</p>
+<p class="echo">在本项目里：solver 是一个 agent；它收到 DFT 任务描述，自己写 QE 输入文件、
+自己执行 <code>pw.x</code>、自己读输出、自己交答案。整个过程没有人工介入。</p>
+</div>
+
+<p>为什么 DFT 计算特别需要 agent？三个原因：</p>
+
+<ol>
+<li><strong>试错型任务</strong>：跑一遍 QE 可能因为参数不对、收敛不上、对称性识别错而失败。
+失败不是终点，是新信息。聊天机器人无法消化这种"失败信号"，agent 可以。</li>
+<li><strong>多步骤工作流</strong>：T1 任务（结构优化）≈ 写输入 → 跑 pw.x → 读结果 → 看是否收敛 → 收敛则交，
+不收敛则改参数重跑。T2（能带 + 态密度）更长。手写 if-else 太死；让 LLM 当"决策中枢"更灵活。</li>
+<li><strong>领域知识密集</strong>：QE 的输入格式、k-mesh 怎么选、ecutwfc 怎么定、收敛阈值多少合适——这些是"会就会，不会就乱猜"的知识。
+LLM 看过很多 QE 教程，能复述这些知识，agent 框架让它能<em>把知识转成动作</em>。</li>
+</ol>
+
+<div class="analogy">
+你不在的时候，让一个懂物理的远程同事帮你跑题：他能查文档、写代码、看报错、修 bug、最后把结果给你。
+他不是事先写死一个 shell 脚本，而是<strong>边想边做</strong>。Agent 就是这种"远程同事"的程序化版本。
+</div>
+
+
+<!-- ════════════ §3 ════════════ -->
+<h2 id="s3">§3 通用前置：ReAct 循环 + 工具调用</h2>
+
+<p>所有 agent 框架的"主循环"长得都很像，叫 <strong>ReAct</strong>（Reason + Act 的缩写）。
+先把这个循环看明白，后面三版的差异就好懂了。</p>
+
+<div class="concept" id="c-react">
+<span class="lbl">💡 概念</span><h4>ReAct 循环</h4>
+<p>每一"轮"由 LLM 做<strong>一次推理</strong>，输出"我想做 X"，然后 agent 框架<strong>真的去做 X</strong>，把结果回喂给 LLM，进入下一轮。</p>
+<p>用一句口诀：<em>想一步 → 做一步 → 看结果 → 再想</em>，直到 LLM 说"我做完了"。</p>
+<p class="echo">在本项目里：v1、v3 都是经典的 ReAct；v5 的 Claude 路径是 ReAct 加强版（加了卡死检测和子 agent 调度）。</p>
+</div>
+
+<div class="svg-wrap">
+<svg width="780" height="320" viewBox="0 0 780 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3498db"/>
+    </marker>
+  </defs>
+  <!-- LLM 节点 -->
+  <rect x="320" y="20" width="140" height="60" rx="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+  <text x="390" y="48" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">LLM 推理</text>
+  <text x="390" y="68" text-anchor="middle" fill="#ecf0f1" font-size="11">"我要调用 bash 工具跑 pw.x"</text>
+
+  <!-- Tool call 节点 -->
+  <rect x="540" y="120" width="180" height="60" rx="8" fill="#f39c12" stroke="#d68910" stroke-width="2"/>
+  <text x="630" y="148" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">框架执行工具</text>
+  <text x="630" y="168" text-anchor="middle" fill="#fff" font-size="11">subprocess.run("pw.x &lt; in")</text>
+
+  <!-- Result 节点 -->
+  <rect x="320" y="220" width="140" height="60" rx="8" fill="#27ae60" stroke="#1e8449" stroke-width="2"/>
+  <text x="390" y="248" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">工具结果</text>
+  <text x="390" y="268" text-anchor="middle" fill="#fff" font-size="11">"stdout: JOB DONE."</text>
+
+  <!-- 起点 / 终点 -->
+  <rect x="60" y="120" width="140" height="60" rx="8" fill="#95a5a6" stroke="#7f8c8d" stroke-width="2"/>
+  <text x="130" y="148" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">起点</text>
+  <text x="130" y="168" text-anchor="middle" fill="#fff" font-size="11">系统提示 + 任务输入</text>
+
+  <!-- 箭头 -->
+  <line x1="200" y1="150" x2="320" y2="80" stroke="#3498db" stroke-width="2" marker-end="url(#ar1)"/>
+  <line x1="460" y1="60" x2="540" y2="140" stroke="#3498db" stroke-width="2" marker-end="url(#ar1)"/>
+  <line x1="540" y1="180" x2="460" y2="240" stroke="#3498db" stroke-width="2" marker-end="url(#ar1)"/>
+  <path d="M 320 250 C 250 250 250 100 320 60" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#ar1)" stroke-dasharray="6,3"/>
+
+  <!-- 标签 -->
+  <text x="270" y="115" font-size="12" fill="#7f8c8d">① 看到任务</text>
+  <text x="490" y="105" font-size="12" fill="#7f8c8d">② tool_call</text>
+  <text x="490" y="220" font-size="12" fill="#7f8c8d">③ tool_result</text>
+  <text x="195" y="170" font-size="12" fill="#7f8c8d">④ 喂回 LLM，再想一步…</text>
+
+  <!-- 终止条件 -->
+  <text x="630" y="260" font-size="12" fill="#7d6608">最后 LLM 调用</text>
+  <text x="630" y="276" font-size="12" fill="#7d6608" font-weight="700">submit 工具 → 结束</text>
+</svg>
+</div>
+<div class="diagram-caption">图 1 · ReAct 循环（Reason → Act → Observe → 重复）</div>
+
+<p>这个循环里有四个名词很重要：</p>
+
+<div class="concept" id="c-sysprompt">
+<span class="lbl">💡 概念</span><h4>System Prompt（系统提示）</h4>
+<p>给 LLM 看的"开场说明书"——告诉它<strong>你的角色是什么、能调用哪些工具、要遵守什么规则</strong>。
+它在对话最开头，每一轮 LLM 都能看到。</p>
+<p class="echo">在本项目里：v1 的系统提示 42 行（基本就是"你是 QE 专家"加工具列表），v3 写了 377 行，
+塞满了 QE 领域知识。所以同样的模型在两个版本下行为差异巨大。</p>
+</div>
+
+<div class="concept" id="c-tool">
+<span class="lbl">💡 概念</span><h4>Tool / Tool Call / Tool Result</h4>
+<p><strong>Tool</strong>（工具）= 你提前注册给 LLM 的一个函数，附带 JSON schema 描述参数。
+LLM 不能直接执行任何东西；它只能输出一个 <strong>tool_call</strong>（"我想用 bash 跑这条命令"）。
+你的 agent 框架收到 tool_call 后<strong>真的执行</strong>，把结果包装成 <strong>tool_result</strong> 回喂给 LLM。</p>
+<p>整个 agent 跟外界打交道的唯一通道就是工具。注册了几个工具，agent 就有几种动作；没注册的事它干不了。</p>
+<p class="echo">在本项目里：v1 和 v3 都只注册了 4 个工具（<code>bash / write_file / read_file / submit</code>）。
+v5 的 Claude 路径注册了 7 个（多了 5 个领域专用 MCP 工具）。</p>
+</div>
+
+
+<!-- ════════════ §4 ════════════ -->
+<h2 id="s4">§4 v1-stable 长啥样：最小可行 agent</h2>
+
+<p>v1 是这个项目的<strong>原点</strong>。它的设计哲学是"<em>能跑就行，别上花活</em>"。
+它的整个架构可以一图概括：</p>
+
+<div class="svg-wrap">
+<svg width="780" height="240" viewBox="0 0 780 240" xmlns="http://www.w3.org/2000/svg">
+  <!-- LLM 中央 -->
+  <rect x="320" y="80" width="140" height="80" rx="10" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+  <text x="390" y="115" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">LLM</text>
+  <text x="390" y="135" text-anchor="middle" fill="#ecf0f1" font-size="11">(claude / deepseek)</text>
+  <text x="390" y="151" text-anchor="middle" fill="#ecf0f1" font-size="11">42 行系统提示</text>
+
+  <!-- 4 工具 -->
+  <g font-size="12" font-weight="700" fill="#fff">
+    <rect x="60" y="40" width="160" height="40" rx="6" fill="#e67e22"/>
+    <text x="140" y="65" text-anchor="middle">bash(cmd, timeout)</text>
+
+    <rect x="60" y="100" width="160" height="40" rx="6" fill="#e67e22"/>
+    <text x="140" y="125" text-anchor="middle">write_file(path, content)</text>
+
+    <rect x="60" y="160" width="160" height="40" rx="6" fill="#e67e22"/>
+    <text x="140" y="185" text-anchor="middle">read_file(path)</text>
+
+    <rect x="560" y="100" width="160" height="40" rx="6" fill="#27ae60"/>
+    <text x="640" y="125" text-anchor="middle">submit(task_outputs)</text>
+  </g>
+
+  <!-- 连线 -->
+  <g stroke="#95a5a6" stroke-width="1.5" fill="none">
+    <line x1="220" y1="60" x2="320" y2="100"/>
+    <line x1="220" y1="120" x2="320" y2="120"/>
+    <line x1="220" y1="180" x2="320" y2="140"/>
+    <line x1="460" y1="120" x2="560" y2="120"/>
+  </g>
+
+  <text x="140" y="222" text-anchor="middle" fill="#7f8c8d" font-size="12">3 个"动手"工具</text>
+  <text x="640" y="170" text-anchor="middle" fill="#7f8c8d" font-size="12">1 个"交答案"工具</text>
+</svg>
+</div>
+<div class="diagram-caption">图 2 · v1-stable 架构（LLM + 4 工具的最小 ReAct）</div>
+
+<p>它的工具表面（tool surface，即 LLM 能调用的所有工具）就 4 个：</p>
+
+<table>
+  <thead>
+  <tr><th>工具</th><th>作用</th><th>签名简化版</th></tr>
+  </thead>
+  <tbody>
+  <tr><td><code>bash</code></td><td>跑一条 shell 命令</td><td><code>bash(cmd: str, timeout_s: int = 900) → {stdout, stderr, exit}</code></td></tr>
+  <tr><td><code>write_file</code></td><td>创建或覆盖文件</td><td><code>write_file(path: str, content: str) → {ok}</code></td></tr>
+  <tr><td><code>read_file</code></td><td>读文件（可分行切片）</td><td><code>read_file(path: str, offset=0, limit?) → {content}</code></td></tr>
+  <tr><td><code>submit</code></td><td>交答案、退出</td><td><code>submit(task_outputs: dict, notes?: str) → exit</code></td></tr>
+  </tbody>
+</table>
+
+<p>这 4 个工具的真实定义在 <code>v1-archive/agent/loop.py</code> 里：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/v1-archive/agent/loop.py · L28-44</span>
+TOOLS = [
+    {
+        <span class="s">"name"</span>: <span class="s">"bash"</span>,
+        <span class="s">"description"</span>: (
+            <span class="s">"Execute a bash command. Each call is a fresh subprocess. "</span>
+            <span class="s">"Bare `cd &lt;dir&gt;` updates the persistent cwd for subsequent calls; "</span>
+            <span class="s">"`cd &lt;dir&gt; && ...` does not."</span>
+        ),
+        <span class="s">"parameters"</span>: {
+            <span class="s">"type"</span>: <span class="s">"object"</span>,
+            <span class="s">"properties"</span>: {
+                <span class="s">"cmd"</span>: {<span class="s">"type"</span>: <span class="s">"string"</span>},
+                <span class="s">"timeout_s"</span>: {<span class="s">"type"</span>: <span class="s">"integer"</span>, <span class="s">"default"</span>: <span class="n">900</span>},
+            },
+            <span class="s">"required"</span>: [<span class="s">"cmd"</span>],
+        },
+    },
+    <span class="c"># write_file / read_file / submit 类似 ...</span>
+]
+</code></pre>
+
+<p>每个工具就是一个 JSON 对象，告诉 LLM "你可以叫我 <code>bash</code>，传 <code>cmd</code> 进来"。
+Anthropic SDK / OpenAI 都识别这种结构化描述。</p>
+
+<p>系统提示也短得离谱——总共 <strong>42 行</strong>，全文如下（截取核心 20 行）：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/v1-archive/agent/prompts/system.txt · L1-19</span>
+You are a DFT expert solving a benchmark task with Quantum ESPRESSO.
+
+Environment already set up for you:
+  - QE GPU binaries on PATH (pw.x, bands.x, dos.x) — wrapped via podman+NVHPC
+    Just invoke them normally; the wrapper handles container launch.
+  - Pseudopotentials at $PSEUDO_DIR (also symlinked into ./pseudos/).
+  - Python with seekpath, pymatgen available.
+  - Working directory has been set to your sandbox; relative paths are fine.
+
+Your tools:
+  - bash(cmd, timeout_s=900): run a shell command, get stdout/stderr/exit.
+  - write_file(path, content): write (or overwrite) a file, creating parents.
+  - read_file(path, offset=0, limit=None): read a file, optionally line-slice.
+  - submit(task_outputs, notes?): terminate and hand back paths.
+
+Workflow:
+  1. Read the task from ./task_prompt.txt
+  2. Plan your calculation, write QE input files, run pw.x (and friends)
+  3. Verify convergence and sanity-check outputs (e.g., `grep "JOB DONE."`)
+  4. Call submit with task_outputs keys as instructed
+</code></pre>
+
+<p>看完这段就明白 v1 的味道——"<strong>你是专家，环境给你了，工具给你了，自己看着办</strong>"。
+没有任何 QE 特定的参数建议、没有错误恢复指引、没有失败兜底。一切赌在大模型自己的训练数据里。</p>
+
+
+<!-- ════════════ §5 ════════════ -->
+<h2 id="s5">§5 代码走读：v1 的启动顺序</h2>
+
+<p>看 v1 的 <code>loop.py</code> 主循环代码（简化掉 transcript / 多 provider 适配的细节）：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/v1-archive/agent/loop.py · L96-186（简化版）</span>
+<span class="k">def</span> run_agent_loop(llm, system_prompt, task_prompt_path, workdir, out_path,
+                   max_turns, max_output_tokens):
+    task_prompt = Path(task_prompt_path).read_text()
+    messages = [{<span class="s">"role"</span>: <span class="s">"user"</span>, <span class="s">"content"</span>: task_prompt}]
+    cwd = workdir
+
+    <span class="k">for</span> turn <span class="k">in</span> range(max_turns):
+        <span class="c"># 1. 让 LLM 推理这一轮要干啥</span>
+        resp = llm.call(
+            messages=messages, system=system_prompt,
+            tools=TOOLS, max_output_tokens=max_output_tokens,
+        )
+
+        <span class="c"># 2. 把 assistant 的回复（含 tool_calls）写回对话历史</span>
+        messages.append({<span class="s">"role"</span>: <span class="s">"assistant"</span>, <span class="s">"content"</span>: resp.text,
+                         <span class="s">"tool_calls"</span>: resp.tool_calls})
+
+        <span class="c"># 3. 逐个执行 LLM 想调用的工具</span>
+        tool_results = []
+        <span class="k">for</span> tc <span class="k">in</span> resp.tool_calls:
+            <span class="k">if</span> tc.name == <span class="s">"submit"</span>:
+                write_result_json(out_path, dict(tc.input))
+                <span class="k">return</span> <span class="n">0</span>                              <span class="c"># 成功退出</span>
+            result, cwd = _dispatch_tool(tc, cwd, bash_log)  <span class="c"># 真跑工具</span>
+            tool_results.append({<span class="s">"role"</span>: <span class="s">"tool"</span>,
+                                 <span class="s">"tool_call_id"</span>: tc.id,
+                                 <span class="s">"content"</span>: json.dumps(result)})
+
+        <span class="c"># 4. 把工具结果喂回 LLM，进入下一轮</span>
+        messages.extend(tool_results)
+
+    <span class="c"># 5. 轮数耗尽还没 submit → 标记 incomplete 退出</span>
+    write_result_json(out_path, {<span class="s">"incomplete"</span>: <span class="k">True</span>,
+                                  <span class="s">"reason"</span>: <span class="s">"turn_budget_exceeded"</span>})
+    <span class="k">return</span> <span class="n">2</span>
+</code></pre>
+
+<p>就是一个 <code>for</code> 循环。<strong>每一轮做 5 件事</strong>：</p>
+<ol>
+<li>请求 LLM（带上完整对话历史 + 系统提示 + 工具列表）</li>
+<li>把 LLM 的回答（可能包含若干 tool_call）追加到对话历史</li>
+<li>逐个执行 tool_call（真跑！）</li>
+<li>把工具结果以 <code>role: "tool"</code> 消息也追加到历史</li>
+<li>进入下一轮——LLM 现在能看到完整的"我说过 → 我做过 → 结果如何"链条</li>
+</ol>
+
+<p>退出条件三种：</p>
+<ul>
+<li><strong>正常</strong>：LLM 调用了 <code>submit</code> 工具 → <code>exit 0</code></li>
+<li><strong>提前结束</strong>：LLM 既没 submit 也没调任何工具（"我不想干了"）→ <code>exit 2</code></li>
+<li><strong>预算耗尽</strong>：跑满 100 轮还没 submit → <code>exit 2</code> 标记 incomplete</li>
+</ul>
+
+<p>所有可移植的 agent loop 都长这样。<strong>这一节看明白，后面 v3 和 v5 都是在这个骨架上叠东西</strong>。</p>
+
+
+<!-- ════════════ §6 ════════════ -->
+<h2 id="s6">§6 v1 会在哪些地方翻车</h2>
+
+<p>v1 跑 baseline（148 题）的实测里，确实能跑完大部分，但<strong>失分集中在几类</strong>：</p>
+
+<h3>翻车 1：vc-relax 收敛阈值忘改 → 空间群被降级</h3>
+
+<p>QE 默认收敛阈值很松，结构松弛完毕后晶格会偏离对称几角度。pymatgen 用 <code>SpacegroupAnalyzer</code>
+对最终结构识别空间群时，松一点就把立方判成三方——评分系统看到空间群编号不对，直接扣 0.25 分。</p>
+
+<p>v1 的应对：在系统提示里<em>劝</em> LLM 用更严的阈值。
+但实测有 <strong>~25% 概率</strong> LLM（特别是 haiku 这种快但糙的模型）写输入时把这个细节漏掉了。
+劝不动。</p>
+
+<h3>翻车 2：SCF 不收敛卡死循环</h3>
+
+<p>SCF 算不出来，LLM 试着改 <code>mixing_beta</code>、改 k-mesh、改 smearing……试 10 次还不行，
+但它不会"主动放弃 + 交个不完美答案"，而是继续 retry，直到 <strong>4 小时上限被 harness reap</strong>，
+什么也没交上。</p>
+
+<p>这是 v1 一个典型痛点：<strong>没有"budget-aware termination"机制</strong>——agent 不知道自己还有多少时间预算，
+也不知道何时该认输。</p>
+
+<div class="concept" id="c-ctx">
+<span class="lbl">💡 概念</span><h4>Context Window（上下文窗口）</h4>
+<p>LLM 一次能"看"的对话历史是有上限的。Claude Opus 4.7 是 1M token，Sonnet 4.6 是 200K，
+DeepSeek-v4-pro 是 128K……token 是模型的"字符单位"，1K token ≈ 750 个英文单词或 400 个汉字。</p>
+<p>每一轮 ReAct 都把新消息追加到历史，对话越长，下一次请求的输入越大、越慢、越贵。
+而且一旦超过窗口大小，模型就看不到最早的内容了，可能"忘记"任务目标。</p>
+<p class="echo">在本项目里：v1 跑 SCF 死循环时，对话历史会膨胀到十几万 token，单轮调用变贵 5-10 倍。
+v5 用 <a href="#c-stuck">卡死检测</a> 来提前打断这种死循环。</p>
+</div>
+
+<h3>翻车 3：bash 调用网络命令被 audit 判违规</h3>
+
+<p>评测 bench 有条硬规则："agent 在沙盒里不准联网"——禁 <code>curl / wget / pip install / git clone</code> 等。
+但系统提示只是"告诉"LLM 不要这么干，并没有<strong>真的拦住</strong>。某些情况下 LLM 会调 <code>pip install pymatgen</code>
+来装包（其实包早就预装好了），一旦命中 bash.log 里有 <code>pip install</code> → 整道题判 0 分。</p>
+
+<p>这三类问题就是 v3 主要要解决的——下一节开始。</p>
+
+
+<!-- ════════════ §7 ════════════ -->
+<h2 id="s7">§7 v3 的核心思路：不扩工具，扩知识</h2>
+
+<p>v3 给自己定了一条规则：</p>
+
+<div class="note">
+<strong>工具表面不变</strong>——还是 <code>bash / write_file / read_file / submit</code> 这 4 个，
+LLM 看到的"我能做什么"跟 v1 一模一样。<br>
+<strong>变的是知识和护栏</strong>：把领域经验、收敛规则、安全限制以三种形式塞进框架：
+更长的系统提示、可被 import 的 Python 帮助库、bash 调用前后的 hook。
+</div>
+
+<p>这种设计哲学叫"<strong>scaffolding around the loop, not in it</strong>"——
+循环本身保持简单，把所有领域知识做成"脚手架"放在循环外。具体有 4 层脚手架：</p>
+
+<table>
+  <thead>
+  <tr><th>脚手架</th><th>形式</th><th>解决的 v1 问题</th></tr>
+  </thead>
+  <tbody>
+  <tr><td>§8 · 377 行系统提示</td><td>静态文本</td><td>LLM 漏写参数（靠"塞更多领域知识"）</td></tr>
+  <tr><td>§9 · <code>qe_tools.py</code> 帮助库</td><td>Python 模块</td><td>LLM 每次重写 Fortran namelist 容易出错</td></tr>
+  <tr><td>§10 · <code>qe_input_lint</code> 钩子</td><td>预处理拦截</td><td>收敛阈值漏改（自动修）</td></tr>
+  <tr><td>§11 · <code>bash_guard</code> 护栏</td><td>白名单 + 黑名单</td><td>bash 误调用网络 / 提权命令</td></tr>
+  </tbody>
+</table>
+
+
+<!-- ════════════ §8 ════════════ -->
+<h2 id="s8">§8 脚手架 1 · 377 行系统提示</h2>
+
+<p>v3 把系统提示从 42 行膨胀到 379 行。新增的部分基本都是 QE 领域知识。
+对比一下 v1 vs v3 的口吻：</p>
+
+<table>
+<thead>
+<tr><th>v1（42 行）</th><th>v3（379 行）</th></tr>
+</thead>
+<tbody>
+<tr>
+<td><em>"Use the QE binaries on PATH. Workflow: read task → run pw.x → submit."</em></td>
+<td><em>"⚠ CRITICAL: NO HALLUCINATION OF RESULTS. ALL numerical results MUST come from a real pw.x run YOU launch. The grader reads your QE .out files directly — bogus numbers hurt nothing but your score, and the audit will flag a too-fast solver as cheating (qe_wallclock_ok must hold: real QE wall / total wall ≥ 0.5%)..."</em></td>
+</tr>
+</tbody>
+</table>
+
+<p>v3 的系统提示是用 Python 函数<strong>动态生成</strong>的——根据当前是 GPU 还是 CPU 后端，
+渲染出不同的指引。这是 v1 没有的：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/current/agent/system_prompt.py · L26-49（简化）</span>
+<span class="k">if</span> qe_backend == <span class="s">"cpu"</span>:
+    mpirun = <span class="s">""</span>     <span class="c"># CPU 模式下不让 agent 加 mpirun 前缀</span>
+    parallelism_section = dedent(<span class="s">"""\
+        ## CPU parallelism — fixed at 8 cores (handled by wrapper)
+        The harness has already set QE_CPU_NP=8 on the wrapper,
+        so every pw.x invocation is transparently launched as
+        `mpirun -np 8 pw.x` for you.
+
+        **DO NOT prepend mpirun yourself.** Just call
+        `pw.x -in input.in > output.out` directly via the bash tool.
+        Prepending your own `mpirun -np N` would nest inside the
+        wrapper's mpirun and spawn 8×N processes — disastrous.
+        """</span>)
+<span class="k">else</span>:                 <span class="c"># GPU 模式</span>
+    mpirun = <span class="s">"mpirun --allow-run-as-root -np 1"</span>
+</code></pre>
+
+<p>377 行内容大致涵盖：</p>
+<ul>
+<li><strong>"不许编造结果"</strong>（带评分系统的 audit 解释——agent 知道 audit 会查它）</li>
+<li><strong>pseudo_dir 必须用相对路径</strong>（解释为什么默认路径会 fallback 到容器里不存在的位置）</li>
+<li><strong>CPU vs GPU 的 mpirun 差异</strong>（CPU 模式 wrapper 自动 mpirun，自己别再加；GPU 必须显式加）</li>
+<li><strong>vc-relax 推荐 ecutwfc / ecutrho / k-mesh / 收敛阈值的具体数值</strong></li>
+<li><strong>SCF + bands.x + dos.x 的完整流水线模板</strong>（写一遍给 LLM 抄）</li>
+<li><strong>常见 crash 的恢复指南</strong>（"如果 pw.x 在 5 秒内退出且没 JOB DONE，是 podman init 抖动，重试一次就好"）</li>
+<li><strong>显式 5 阶段工作流</strong>：Smoke → Plan → Execute → Verify → Submit</li>
+</ul>
+
+<p>这种"<strong>把领域专家写过的所有 tips 全塞进 system prompt</strong>"的做法看上去笨，
+但实测对 v3 这种"通用工具 + 领域 LLM"的组合效果很好——
+LLM 调用 bash 前不会再忘记 <code>pseudo_dir = './pseudos/'</code>，因为系统提示里写得明明白白。</p>
+
+
+<!-- ════════════ §9 ════════════ -->
+<h2 id="s9">§9 脚手架 2 · qe_tools.py 帮助库</h2>
+
+<p>v3 的工具列表跟 v1 一样只有 4 个，<strong>但</strong>它做了一件巧妙的事——
+在 solver 仓库根目录放一个 <code>qe_tools.py</code>，里面预先实现了 QE 常用操作：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/current/qe_tools.py · 摘要</span>
+<span class="k">from</span> qe_tools <span class="k">import</span> (
+    write_pw_input,         <span class="c"># 生成 pw.x 输入</span>
+    parse_pw_output,        <span class="c"># 解析 pw.x 输出</span>
+    write_pp_input,         <span class="c"># 生成 pp.x 输入（投影计算）</span>
+    write_dos_input,        <span class="c"># 生成 dos.x 输入</span>
+    write_bands_input,      <span class="c"># 生成 bands.x 输入</span>
+    fit_eos,                <span class="c"># 状态方程拟合</span>
+    plot_band_structure,    <span class="c"># 画能带</span>
+    plot_dos_data,          <span class="c"># 画 DOS</span>
+    render_structure_png,   <span class="c"># 渲染晶体结构图</span>
+)
+</code></pre>
+
+<p>LLM 调用方法很 hack——通过 bash 工具执行一个内嵌 Python heredoc：</p>
+
+<pre><code><span class="c"># LLM 通过 bash 工具实际发出的命令长这样：</span>
+python3 &lt;&lt;'EOF'
+<span class="k">from</span> qe_tools <span class="k">import</span> write_pw_input
+write_pw_input(
+    filename=<span class="s">"scf.in"</span>,
+    calc=<span class="s">"scf"</span>,
+    atoms=ase_atoms,
+    pseudo_map={<span class="s">"Si"</span>: <span class="s">"Si.upf"</span>},
+    ecutwfc=<span class="n">60</span>,
+    ecutrho=<span class="n">480</span>,
+    kpts=[<span class="n">8</span>,<span class="n">8</span>,<span class="n">8</span>],
+)
+EOF
+</code></pre>
+
+<p>这样 LLM 就<strong>不用从头默写 Fortran namelist 语法</strong>（QE 输入是出了名的难写——
+注释符是 <code>!</code> 不是 <code>#</code>，浮点数是 <code>1.0d-4</code> 不是 <code>1.0e-4</code>，
+布尔值是 <code>.true.</code> 不是 <code>True</code>）。</p>
+
+<p>这种 trick 本质上是<strong>用 Python 函数库当"隐藏工具"</strong>——工具表面还是 4 个，
+但 LLM 拥有一个完整的领域工具箱，只要通过 <code>bash</code> 中转。
+v5 把它升级成正经 MCP 工具（<a href="#s14">§14 见</a>）。</p>
+
+
+<!-- ════════════ §10 ════════════ -->
+<h2 id="s10">§10 脚手架 3 · qe_input_lint 预处理钩子（重点）</h2>
+
+<p>这是 v3 最聪明的设计，也是最有教学价值的一节。</p>
+
+<div class="concept" id="c-hook">
+<span class="lbl">💡 概念</span><h4>Hook（钩子）</h4>
+<p>"钩子"是工具调用<strong>前</strong>或<strong>后</strong>插一脚的代码——
+LLM 让框架做某件事时，框架先调你写的钩子，钩子可以检查、修改、甚至取消这次操作。</p>
+<p>常见两种：<strong>pre-tool hook</strong>（工具执行前——比如做安全检查、参数清洗）、
+<strong>post-tool hook</strong>（工具执行后——比如截断超长输出、改写错误信息）。</p>
+<p class="echo">在本项目里：v3 的 <code>qe_input_lint</code> 是经典 pre-tool hook——它截在 bash 工具运行前，
+检测到 LLM 要跑 <code>pw.x</code>，就翻开输入文件、自动收紧收敛阈值。</p>
+</div>
+
+<h3>问题回顾</h3>
+
+<p>v1 的痛点之一：LLM 写 vc-relax 输入时忘了写紧收敛阈值，松弛完毕空间群被降级，扣 0.25 分。
+解决思路两种：</p>
+<ul>
+<li><strong>消极方案</strong>：在系统提示里劝它写紧些。v1 就是这么干的——25% 漏写率。</li>
+<li><strong>积极方案</strong>：bash 工具收到 <code>pw.x</code> 命令时，<em>自动</em>读取它要用的输入文件，
+检测到 vc-relax 但阈值太松 → 直接改文件、把 diff 反馈给 LLM。这就是 v3 的 <code>qe_input_lint</code>。</li>
+</ul>
+
+<h3>时序图</h3>
+
+<div class="svg-wrap">
+<svg width="800" height="380" viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34495e"/>
+    </marker>
+  </defs>
+  <!-- 四列纵线（参与者） -->
+  <line x1="80"  y1="50" x2="80"  y2="360" stroke="#bdc3c7" stroke-width="1.5"/>
+  <line x1="290" y1="50" x2="290" y2="360" stroke="#bdc3c7" stroke-width="1.5"/>
+  <line x1="500" y1="50" x2="500" y2="360" stroke="#bdc3c7" stroke-width="1.5"/>
+  <line x1="710" y1="50" x2="710" y2="360" stroke="#bdc3c7" stroke-width="1.5"/>
+  <g font-size="13" font-weight="700" fill="#fff">
+    <rect x="20"  y="22" width="120" height="36" rx="6" fill="#3498db"/>
+    <text x="80"  y="46" text-anchor="middle">LLM</text>
+    <rect x="230" y="22" width="120" height="36" rx="6" fill="#9b59b6"/>
+    <text x="290" y="46" text-anchor="middle">BashTool</text>
+    <rect x="440" y="22" width="120" height="36" rx="6" fill="#e67e22"/>
+    <text x="500" y="46" text-anchor="middle">qe_input_lint</text>
+    <rect x="650" y="22" width="120" height="36" rx="6" fill="#27ae60"/>
+    <text x="710" y="46" text-anchor="middle">pw.x</text>
+  </g>
+
+  <!-- 消息箭头 -->
+  <g stroke="#34495e" stroke-width="1.5" fill="#34495e">
+    <line x1="80"  y1="100" x2="290" y2="100" marker-end="url(#ar2)"/>
+    <text x="185" y="93" text-anchor="middle" font-size="12">① tool_call bash(cmd="pw.x -in vc-relax.in &gt; out")</text>
+
+    <line x1="290" y1="140" x2="500" y2="140" marker-end="url(#ar2)"/>
+    <text x="395" y="133" text-anchor="middle" font-size="12">② 截获，调 lint</text>
+
+    <line x1="500" y1="180" x2="500" y2="200" stroke-dasharray="3,3"/>
+    <text x="500" y="170" text-anchor="middle" font-size="11" fill="#7f8c8d">读 vc-relax.in，发现阈值太松</text>
+
+    <line x1="500" y1="220" x2="500" y2="240" stroke-dasharray="3,3"/>
+    <text x="500" y="232" text-anchor="middle" font-size="11" fill="#7f8c8d">原地改文件，press_conv_thr 0.5→0.05</text>
+
+    <line x1="500" y1="270" x2="290" y2="270" marker-end="url(#ar2)"/>
+    <text x="395" y="263" text-anchor="middle" font-size="12">③ 返回 LintResult(diff="...")</text>
+
+    <line x1="290" y1="305" x2="710" y2="305" marker-end="url(#ar2)"/>
+    <text x="500" y="298" text-anchor="middle" font-size="12">④ subprocess.run(pw.x -in vc-relax.in)</text>
+
+    <line x1="710" y1="340" x2="80"  y2="340" marker-end="url(#ar2)"/>
+    <text x="395" y="333" text-anchor="middle" font-size="12">⑤ tool_result: stdout + "---- qe_input_lint patched ----" diff</text>
+  </g>
+</svg>
+</div>
+<div class="diagram-caption">图 3 · v3 lint 钩子时序：LLM 不知道阈值被改了，但能从结果里看到 diff</div>
+
+<p>关键代码：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/current/agent/tools/qe_input_lint.py · L22-43</span>
+_V3_TIGHT_DEFAULTS = {
+    <span class="s">"press_conv_thr"</span>: <span class="n">0.05</span>,     <span class="c"># kbar; QE 默认 0.5（10 倍松）</span>
+    <span class="s">"forc_conv_thr"</span>:  <span class="n">1.0e-4</span>,   <span class="c"># Ry/Bohr; QE 默认 1e-3（10 倍松）</span>
+    <span class="s">"etot_conv_thr"</span>:  <span class="n">1.0e-5</span>,   <span class="c"># Ry; QE 默认 1e-4（10 倍松）</span>
+}
+
+<span class="c"># 每个阈值属于 QE 的哪个 namelist</span>
+_NAMELIST_FOR = {
+    <span class="s">"press_conv_thr"</span>: <span class="s">"cell"</span>,
+    <span class="s">"forc_conv_thr"</span>:  <span class="s">"control"</span>,
+    <span class="s">"etot_conv_thr"</span>:  <span class="s">"control"</span>,
+}
+
+<span class="c"># 探测 pw.x 命令（正则匹配）：</span>
+_PW_X_RE = re.compile(<span class="s">r"(?:^|/|\s)pw\.x\b"</span>)
+</code></pre>
+
+<p>逻辑步骤（伪代码）：</p>
+
+<pre><code><span class="c"># BashTool.run() 内部，subprocess 启动前：</span>
+<span class="k">def</span> pre_run_hook(cmd: str):
+    <span class="k">if</span> not _PW_X_RE.search(cmd):
+        <span class="k">return</span>                                 <span class="c"># 跟 pw.x 无关，放过</span>
+    input_file = extract_input_filename(cmd)    <span class="c"># 从 "pw.x -in xxx.in" 抠出 xxx.in</span>
+    content = input_file.read_text()
+    namelists = parse_fortran_namelists(content)
+    <span class="k">if</span> namelists[<span class="s">"control"</span>].get(<span class="s">"calculation"</span>) != <span class="s">"vc-relax"</span>:
+        <span class="k">return</span>                                 <span class="c"># 不是 vc-relax，放过</span>
+
+    patched = False
+    <span class="k">for</span> key, default <span class="k">in</span> _V3_TIGHT_DEFAULTS.items():
+        nl = _NAMELIST_FOR[key]
+        cur = namelists[nl].get(key)
+        <span class="k">if</span> cur <span class="k">is</span> None <span class="k">or</span> float(cur) &gt; default:   <span class="c"># 没写或太松</span>
+            namelists[nl][key] = default        <span class="c"># 强制改成 v3 默认</span>
+            patched = True
+
+    <span class="k">if</span> patched:
+        input_file.write_text(serialize(namelists))
+        log_to_tool_result(<span class="s">"---- qe_input_lint patched ----"</span>, diff)
+</code></pre>
+
+<p>重要细节：</p>
+<ul>
+<li><strong>"取严不取松"</strong>：如果 LLM 写的阈值比默认更严，保留 LLM 的；只要更松，强制收紧。</li>
+<li><strong>diff 反馈给 LLM</strong>：tool_result 里追加一段 <code>--- qe_input_lint patched ---</code>，
+让 LLM 知道"你写的输入被我改了，新内容是这样"。这样下一轮如果 LLM 还要改这个文件，它能看到当前真实状态。</li>
+<li><strong>只针对 vc-relax</strong>：scf / nscf / bands 这些不需要收紧，照原样放过。</li>
+</ul>
+
+<p>实测效果：v1→v3 在能跑通的 cubic 材料任务上，分数从 ~0.75 提到 ~1.0（空间群不再被降级）。</p>
+
+
+<!-- ════════════ §11 ════════════ -->
+<h2 id="s11">§11 脚手架 4 · bash_guard 安全护栏</h2>
+
+<div class="concept" id="c-guard">
+<span class="lbl">💡 概念</span><h4>Guardrail / Safety filter（护栏）</h4>
+<p>跟 hook 类似——在工具调用前过一层"安检"，<strong>拒绝</strong>违反规则的调用。
+区别在于：hook 倾向"加工 / 改写"，guardrail 倾向"直接拒绝"。</p>
+<p>典型实现：白名单（只允许 ALLOWED 的程序）+ 黑名单（明确禁止 DENIED 的）+ 上下文规则（写文件必须在工作目录内）。</p>
+<p class="echo">在本项目里：<code>bash_guard.py</code> 用三层防护——程序白/黑名单、路径限制、Python 代码内容扫描——
+防止 LLM 误调用网络命令、装包命令、提权命令。</p>
+</div>
+
+<p>看 v3 的白名单一段：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/current/agent/tools/bash_guard.py · L28-63</span>
+ALLOWED_PROGRAMS = frozenset({
+    <span class="c"># 文件读</span>
+    <span class="s">"ls"</span>, <span class="s">"cat"</span>, <span class="s">"head"</span>, <span class="s">"tail"</span>, <span class="s">"wc"</span>, <span class="s">"grep"</span>, <span class="s">"awk"</span>, <span class="s">"sed"</span>, <span class="s">"find"</span>, ...
+    <span class="c"># 文件写</span>
+    <span class="s">"mkdir"</span>, <span class="s">"cp"</span>, <span class="s">"mv"</span>, <span class="s">"rm"</span>, <span class="s">"touch"</span>, <span class="s">"ln"</span>,
+    <span class="c"># MPI + QE 二进制</span>
+    <span class="s">"mpirun"</span>, <span class="s">"mpiexec"</span>,
+    <span class="s">"pw.x"</span>, <span class="s">"bands.x"</span>, <span class="s">"dos.x"</span>, <span class="s">"ph.x"</span>, <span class="s">"projwfc.x"</span>, ...
+    <span class="c"># python（内容会被扫描）</span>
+    <span class="s">"python"</span>, <span class="s">"python3"</span>,
+})
+</code></pre>
+
+<pre><code><span class="c"># /home/shijie/solvers/current/agent/tools/bash_guard.py · L65-80</span>
+DENIED_PROGRAMS = frozenset({
+    <span class="c"># 网络</span>
+    <span class="s">"curl"</span>, <span class="s">"wget"</span>, <span class="s">"nc"</span>, <span class="s">"telnet"</span>, <span class="s">"ssh"</span>, <span class="s">"scp"</span>, <span class="s">"rsync"</span>, ...
+    <span class="c"># 提权</span>
+    <span class="s">"sudo"</span>, <span class="s">"su"</span>, <span class="s">"doas"</span>, <span class="s">"chmod"</span>, <span class="s">"chown"</span>, ...
+    <span class="c"># 安装类（环境我们准备好了）</span>
+    <span class="s">"apt"</span>, <span class="s">"pip"</span>, <span class="s">"pip3"</span>, <span class="s">"conda"</span>, <span class="s">"mamba"</span>, <span class="s">"npm"</span>, ...
+    <span class="c"># shell 嵌套（防 white-list bypass）</span>
+    <span class="s">"bash"</span>, <span class="s">"sh"</span>, <span class="s">"zsh"</span>, <span class="s">"eval"</span>, <span class="s">"exec"</span>, <span class="s">"source"</span>, ...
+})
+</code></pre>
+
+<p>另外还有：</p>
+<ul>
+<li><strong>路径检查</strong>：<code>write_file</code> 目标必须在 cwd 子树内（防 <code>../../etc/passwd</code>）</li>
+<li><strong>敏感文件保护</strong>：即使是只读，<code>~/.ssh/</code> / <code>~/.aws/</code> / <code>.env</code> / <code>id_rsa</code> 也拒绝</li>
+<li><strong>Python 内容扫描</strong>：<code>python3 -c "..."</code> 调用前先扫一遍源码，
+<code>os.system</code> / <code>subprocess</code> / <code>socket</code> / <code>urllib</code> 等高危调用全拒</li>
+<li><strong>命令替换递归</strong>：<code>$(...)</code> / <code>`...`</code> 内的子命令也走一遍检查（防 white-bypass）</li>
+</ul>
+
+<p>这一层很重要——v1 时代曾经出过 LLM 真的去 <code>pip install pymatgen</code>（明明已经装好了）
+导致 audit 判违规的事故。bash_guard 之后，这种"无心之失"在源头就被拦住。</p>
+
+
+<!-- ════════════ §12 ════════════ -->
+<h2 id="s12">§12 附加 · Prompt Caching 3 个断点</h2>
+
+<div class="concept" id="c-cache">
+<span class="lbl">💡 概念</span><h4>Prompt Caching（提示缓存）</h4>
+<p>每次调 LLM 都要把整个对话历史 + 系统提示一起送上去。但<strong>系统提示和工具定义是不变的</strong>——
+每次都重新计算它的 token 既慢又贵。</p>
+<p>Anthropic / OpenAI 都支持在 prompt 里标"<strong>cache_control</strong>"断点——
+告诉服务端"从这里开始之前的内容是稳定前缀，缓存它"。后续请求命中缓存的 token，
+价格折扣 90% 左右，速度也快很多。</p>
+<p class="echo">在本项目里：v3 启用了 3 个 cache 断点（system / tools / user 任务描述），
+对 12 题 fast 测试集实测缓存命中率 <strong>97.4%</strong>——意味着每轮 LLM 调用只有 ~2.6% 的输入是"新算"的。</p>
+</div>
+
+<p>具体做法：在请求里给某些 message 加 <code>cache_control: {"type": "ephemeral"}</code>。
+例如 v3 用三层缓存：</p>
+
+<pre><code><span class="c"># 概念伪代码（实际在 v3 的 llm 适配层）</span>
+messages = [
+    {<span class="s">"role"</span>: <span class="s">"system"</span>, <span class="s">"content"</span>: <span class="s">"You are a QE expert..."</span>,
+     <span class="s">"cache_control"</span>: {<span class="s">"type"</span>: <span class="s">"ephemeral"</span>}},          <span class="c"># 缓存断点 ①：系统提示</span>
+    {<span class="s">"role"</span>: <span class="s">"user"</span>, <span class="s">"content"</span>: tool_defs_as_text,
+     <span class="s">"cache_control"</span>: {<span class="s">"type"</span>: <span class="s">"ephemeral"</span>}},          <span class="c"># ②：工具定义块</span>
+    {<span class="s">"role"</span>: <span class="s">"user"</span>, <span class="s">"content"</span>: task_prompt,
+     <span class="s">"cache_control"</span>: {<span class="s">"type"</span>: <span class="s">"ephemeral"</span>}},          <span class="c"># ③：任务描述</span>
+    <span class="c"># …后面动态变化的工具调用/回复，不缓存</span>
+]
+</code></pre>
+
+<p>三个断点的设计思路：</p>
+<ul>
+<li><strong>① 系统提示</strong>：377 行——一次任务里不变，多轮都能命中</li>
+<li><strong>② 工具定义</strong>：四个工具的 JSON schema——不变</li>
+<li><strong>③ 任务描述</strong>：本次跑的具体题目——单题内不变</li>
+</ul>
+
+<p>断点越多越好吗？不一定——Anthropic 最多支持 4 个断点，
+且每个断点至少要 1024 token 才值得缓存（不够长缓存失效成本更高）。三断点是经验最优。</p>
+
+
+<!-- ════════════ §13 ════════════ -->
+<h2 id="s13">§13 v3 修了 v1 哪些痛点（一表对照）</h2>
+
+<table>
+<thead>
+<tr><th>v1 痛点</th><th>v3 修复方式</th><th>属于哪层脚手架</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td>vc-relax 阈值漏写 → 空间群被降级</td>
+  <td>pre-tool hook 自动收紧</td>
+  <td>§10 qe_input_lint</td>
+</tr>
+<tr>
+  <td>QE namelist 语法每次重写错</td>
+  <td>提供 <code>write_pw_input(...)</code> 帮助函数</td>
+  <td>§9 qe_tools.py</td>
+</tr>
+<tr>
+  <td>LLM 误调 <code>pip install</code> 等网络命令</td>
+  <td>白名单 / 黑名单硬拦</td>
+  <td>§11 bash_guard</td>
+</tr>
+<tr>
+  <td>LLM 跑出 podman init race（5 秒退出无 JOB DONE）就乱试</td>
+  <td>系统提示明确说"重试同条命令就好"</td>
+  <td>§8 377 行 prompt</td>
+</tr>
+<tr>
+  <td>每轮请求带 377 行 prompt 太贵</td>
+  <td>3 断点 prompt caching（97.4% 命中率）</td>
+  <td>§12 caching</td>
+</tr>
+<tr>
+  <td><strong>但</strong>：SCF 不收敛死循环，仍会 4h 超时</td>
+  <td><em>v3 没修——留给 v5</em></td>
+  <td>—</td>
+</tr>
+<tr>
+  <td><strong>但</strong>：LLM 自己说 "It's done"，实际没真跑 QE</td>
+  <td><em>v3 没修——留给 v5</em></td>
+  <td>—</td>
+</tr>
+</tbody>
+</table>
+
+<p>简单说：v3 把<strong>"领域知识缺口"</strong>大部分填上了（参数怎么选、命令怎么写）；
+但<strong>"流程级缺口"</strong>（卡死、自验证）还没动——v5 来解决这个。</p>
+
+
+<!-- ════════════ §14 ════════════ -->
+<h2 id="s14">§14 v5 的两个新东西：MCP 工具 + 自动验证</h2>
+
+<p>v5 跟 v3 比有两个根本性的改变：</p>
+
+<ol>
+<li><strong>把通用 <code>bash</code> 拆成 7 个领域专用 MCP 工具</strong>——
+让 LLM 不再操心"shell 该怎么拼"，直接用 typed 接口表达意图</li>
+<li><strong>在 submit 前强制跑程序级 verifier</strong>——
+不再相信 LLM 自己说"我跑好了"，用 Python 重新检查一遍</li>
+</ol>
+
+<p>外加几个支撑设施：子 agent 调度、卡死信号检测、经验回放、双路径兼容老模型。
+后面三节细讲。</p>
+
+<div class="concept" id="c-mcp">
+<span class="lbl">💡 概念</span><h4>MCP（Model Context Protocol）</h4>
+<p><strong>MCP</strong> 是 Anthropic 牵头的协议，让 agent 工具用统一格式描述自己——
+跟 USB 一样，<em>插上就能用</em>，工具开发者和 agent 开发者解耦。</p>
+<p>跟 v3 那种 "我自己注册一个 JSON schema" 比，MCP 工具：
+(a) 支持 <code>async</code>，(b) 自带类型校验，(c) 跨 agent 复用更方便（一个 MCP server 可被多个 agent 引用），
+(d) Claude Agent SDK 原生支持。</p>
+<p class="echo">在本项目里：v5 用 <code>claude_agent_sdk.create_sdk_mcp_server</code> 注册了 7 个 MCP 工具，
+全部 <code>async def do_xxx(args, ctx)</code> 结构。</p>
+</div>
+
+<p>v5 的 7 个 MCP 工具一览：</p>
+
+<table>
+<thead>
+<tr><th>工具</th><th>替代 v3 哪个用法</th><th>做什么</th></tr>
+</thead>
+<tbody>
+<tr><td><code>write_qe_input</code></td><td>v3：通过 bash 调 <code>python -c "from qe_tools import write_pw_input..."</code></td><td>生成 pw.x 输入；自动跑 lint；返回 <code>calc_id</code></td></tr>
+<tr><td><code>run_pw</code></td><td>v3：bash 跑 <code>pw.x -in xxx.in > xxx.out</code></td><td>对 <code>calc_id</code> 跑 pw.x；返退出码 + 80 行尾</td></tr>
+<tr><td><code>read_qe_output</code></td><td>v3：bash 跑 <code>tail / grep / awk</code></td><td>窗口化读输出（tail/errors/forces/stress/scf_steps/grep:PATTERN）</td></tr>
+<tr><td><code>parse_structure</code></td><td>v3：bash 跑 pymatgen Python 脚本</td><td>用 pymatgen 抽出晶格 + 空间群</td></tr>
+<tr><td><code>verify_run</code></td><td>v3 没有</td><td>程序级 sanity check；返 <code>pass/soft_fail/hard_fail</code></td></tr>
+<tr><td><code>bash</code></td><td>v3：通用 bash</td><td>逃生口；只在 dos.x / bands.x 等没 wrapper 的工具时用</td></tr>
+<tr><td><code>submit</code></td><td>v3：直接 submit</td><td>submit 前 driver 跑 verifier gate</td></tr>
+</tbody>
+</table>
+
+<p>看一个真实的 MCP 工具注册：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/v5-dev/agent/tools/structured/server.py · L45-65</span>
+@tool(
+    <span class="s">"write_qe_input"</span>,
+    <span class="s">"Generate a Quantum ESPRESSO input file (.in) for one of "</span>
+    <span class="s">"{scf, nscf, bands, relax, vc-relax}. Returns calc_id + path. "</span>
+    <span class="s">"vc-relax thresholds are auto-tightened to bench defaults "</span>
+    <span class="s">"(press_conv_thr=0.05, forc_conv_thr=1e-4, etot_conv_thr=1e-5) "</span>
+    <span class="s">"to avoid losing the spacegroup audit (0.25 of T1 score)."</span>,
+    {
+        <span class="s">"calc"</span>: str, <span class="s">"prefix"</span>: str, <span class="s">"outdir"</span>: str,
+        <span class="s">"atoms"</span>: dict,         <span class="c"># {symbols, positions_frac, cell_angstrom}</span>
+        <span class="s">"pseudo_map"</span>: dict,    <span class="c"># {symbol: upf_path}</span>
+        <span class="s">"ecutwfc"</span>: float, <span class="s">"ecutrho"</span>: float,
+        <span class="s">"kpts"</span>: list,
+        <span class="s">"nspin"</span>: int, <span class="s">"starting_magnetization"</span>: dict,
+        <span class="s">"filename"</span>: str,
+    },
+)
+<span class="k">async def</span> _write_qe_input(args):
+    <span class="k">return</span> <span class="k">await</span> do_write_qe_input(args, ctx=ctx)
+</code></pre>
+
+<p>对比 v3 的 bash + heredoc 调用方式，区别一目了然：</p>
+
+<table>
+<thead><tr><th>v3 写法</th><th>v5 写法</th></tr></thead>
+<tbody>
+<tr>
+<td><pre style="margin:0;font-size:11px"><code>bash(cmd="""python3 &lt;&lt;'EOF'
+from qe_tools import write_pw_input
+write_pw_input(
+  filename="scf.in",
+  calc="scf",
+  atoms=...,
+  ecutwfc=60, ecutrho=480,
+  kpts=[8,8,8],
+)
+EOF""")</code></pre></td>
+<td><pre style="margin:0;font-size:11px"><code>write_qe_input(
+  calc="scf",
+  filename="scf.in",
+  atoms={
+    "symbols": ["Si","Si"],
+    "positions_frac": [[0,0,0],[.25,.25,.25]],
+    "cell_angstrom": [[5.43,0,0],...]
+  },
+  pseudo_map={"Si": "Si.upf"},
+  ecutwfc=60, ecutrho=480,
+  kpts=[8,8,8],
+)</code></pre></td>
+</tr>
+</tbody>
+</table>
+
+<p>v5 版本好处：</p>
+<ul>
+<li>LLM 不用拼 Python shell 字符串、不用考虑 EOF / 缩进 / 引号</li>
+<li>参数 JSON schema 强类型，LLM 写错（如 <code>"kpts": "8,8,8"</code> 而不是 list）会被 SDK 拒绝并返错</li>
+<li>工具返回结构化 JSON（<code>{calc_id, path, lint_diff}</code>），下次想跑这个输入文件只要传 <code>calc_id</code></li>
+</ul>
+
+
+<!-- ════════════ §15 ════════════ -->
+<h2 id="s15">§15 v5 的双路径：Claude 路 vs Legacy 路</h2>
+
+<p>v5 有个现实约束：<strong>claude-agent-sdk 只能跑 Claude 系列模型</strong>。
+但项目要兼容 deepseek-v4-pro（性价比高）、本地开源模型等。所以 v5 在 <code>solve.py</code> 入口分叉：</p>
+
+<div class="svg-wrap">
+<svg width="780" height="380" viewBox="0 0 780 380" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34495e"/>
+    </marker>
+  </defs>
+
+  <!-- 入口 -->
+  <rect x="320" y="20" width="140" height="50" rx="8" fill="#34495e"/>
+  <text x="390" y="42" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">solve.py 入口</text>
+  <text x="390" y="60" text-anchor="middle" fill="#ecf0f1" font-size="11">--model claude-... ?</text>
+
+  <!-- 分叉箭头 -->
+  <line x1="350" y1="70" x2="200" y2="120" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <text x="240" y="100" font-size="12" fill="#27ae60" font-weight="700">是 → Claude 路</text>
+
+  <line x1="430" y1="70" x2="580" y2="120" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <text x="490" y="100" font-size="12" fill="#e67e22" font-weight="700">否 → Legacy 路</text>
+
+  <!-- Claude 路盒子 -->
+  <rect x="50" y="130" width="320" height="220" rx="10" fill="#d5f4e6" stroke="#27ae60" stroke-width="2"/>
+  <text x="210" y="155" text-anchor="middle" font-size="14" font-weight="700" fill="#1e8449">Claude 路（v5 完整功能）</text>
+  <g font-size="12" fill="#1e8449">
+    <text x="70" y="180">• claude-agent-sdk Driver</text>
+    <text x="70" y="200">• 7 个 MCP 工具（write_qe_input 等）</text>
+    <text x="70" y="220">• ProgressLedger 卡死检测（7 信号）</text>
+    <text x="70" y="240">• 子 agent: convergence_fixer</text>
+    <text x="70" y="260">• 经验库 retrieve_for_task</text>
+    <text x="70" y="280">• verify_run gate + replay</text>
+    <text x="70" y="300">• PreToolUse / PostToolUse hooks</text>
+    <text x="70" y="328" font-style="italic">支持模型：claude-sonnet-4-6, opus-4-7, haiku-4-5</text>
+  </g>
+
+  <!-- Legacy 路盒子 -->
+  <rect x="410" y="130" width="320" height="220" rx="10" fill="#fdf2e9" stroke="#e67e22" stroke-width="2"/>
+  <text x="570" y="155" text-anchor="middle" font-size="14" font-weight="700" fill="#a04000">Legacy 路（沿用 v4 主循环）</text>
+  <g font-size="12" fill="#a04000">
+    <text x="430" y="180">• 自研 anthropic.messages.create 循环</text>
+    <text x="430" y="200">• 4 个 v3 工具（bash / write / read / submit）</text>
+    <text x="430" y="220">• qe_input_lint + bash_guard 继续生效</text>
+    <text x="430" y="240">• 无子 agent</text>
+    <text x="430" y="260">• 无 ledger 卡死检测</text>
+    <text x="430" y="280">• 无 verify gate</text>
+    <text x="430" y="300">&nbsp;</text>
+    <text x="430" y="328" font-style="italic">支持模型：deepseek-v4-pro, 其他</text>
+  </g>
+</svg>
+</div>
+<div class="diagram-caption">图 4 · v5 双路径：根据 <code>--model</code> 分叉</div>
+
+<p>分叉代码长这样（简化）：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/v5-dev/solve.py · 入口附近（简化）</span>
+<span class="k">def</span> main():
+    args = parse_args()
+    <span class="k">if</span> args.model.startswith(<span class="s">"claude-"</span>):
+        <span class="c"># 用 claude-agent-sdk Driver 路径</span>
+        <span class="k">return</span> asyncio.run(run_claude_sdk_driver(args))
+    <span class="k">else</span>:
+        <span class="c"># Fallback 到 v4 hand-rolled loop（兼容 deepseek）</span>
+        <span class="k">return</span> run_legacy_loop(args)
+</code></pre>
+
+<p>这种"双路径"是 agent 工程里常见的"<strong>能力 vs 兼容性</strong>"权衡——
+SDK 提供的高级功能（子 agent、ledger、hooks）通常绑死某个 LLM 厂商；
+而 hand-rolled loop 虽然功能少，但能跑任何能输出 tool_use 格式 JSON 的模型。
+v5 选择两边都留。</p>
+
+
+<!-- ════════════ §16 ════════════ -->
+<h2 id="s16">§16 v5 三大新机制深挖</h2>
+
+<h3 id="s16-subagent">16.1 SCF 收敛子 agent</h3>
+
+<div class="concept" id="c-subagent">
+<span class="lbl">💡 概念</span><h4>Sub-agent / Agent Delegation（子 agent / 任务委托）</h4>
+<p>主 agent 遇到某类特定子问题时，启一个"专精 agent"去处理。
+子 agent 有自己的系统提示、自己的工具子集、自己的轮数预算——做完了把结果还给主 agent。</p>
+<p>好处：(a) 主 agent 上下文不被这个子任务的"试错记录"塞满；
+(b) 子 agent 可以用更对症的提示和工具（比如只给它 <code>run_pw / read_qe_output</code>，不给 <code>bash</code>）；
+(c) 模块化，便于单独迭代和测试。</p>
+<p class="echo">在本项目里：v5 有个 <code>convergence_fixer</code> 子 agent，专门处理 SCF 不收敛——
+主 agent 看到 <code>run_pw</code> 返回 SCF failed，调 <code>Agent("convergence_fixer", calc_id=...)</code>，
+子 agent 按 6 条收敛 playbook（改 mixing_beta、改 smearing、改 k-mesh、改 ecutwfc...）逐条试。</p>
+</div>
+
+<p>子 agent 是怎么被声明的？在 Claude Agent SDK 里用 <code>AgentDefinition</code>：</p>
+
+<pre><code><span class="c"># 概念伪代码（v5 实际在 agent/subagents/build.py）</span>
+convergence_fixer = AgentDefinition(
+    name=<span class="s">"convergence_fixer"</span>,
+    description=<span class="s">"Fix SCF non-convergence for a given calc_id."</span>,
+    prompt=Path(<span class="s">"agent/prompts/convergence_subagent.md"</span>).read_text(),
+    tools=[<span class="s">"mcp__dft_qe__write_qe_input"</span>,
+           <span class="s">"mcp__dft_qe__run_pw"</span>,
+           <span class="s">"mcp__dft_qe__read_qe_output"</span>],   <span class="c"># 注意：不给 bash</span>
+    max_turns=<span class="n">15</span>,
+)
+</code></pre>
+
+<p>主 agent 在系统提示里被告知"SCF 失败别自己 retry，叫 convergence_fixer"：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/v5-dev/agent/prompts/executor.md · L32</span>
+| `Agent` (`convergence_fixer`) | When pw.x SCF fails: delegate. Don't retry inline. |
+</code></pre>
+
+<h3 id="s16-ledger">16.2 ProgressLedger 卡死检测（7 个信号）</h3>
+
+<div class="concept" id="c-stuck">
+<span class="lbl">💡 概念</span><h4>Stuck Detection（卡死检测）</h4>
+<p>Agent 跑久了会"卡住"——同一动作做 3 遍、同一错误反复出现、token 烧光还没进展。
+靠 LLM 自己意识到很难（它每次都觉得"再试一下应该就行"）。
+解决方法：<strong>程序级监控</strong>——记录每轮动作的 hash，检测重复模式、错误累计、超时进展，
+触发后<strong>主动告诉 LLM</strong>"你卡住了，去做 X 或 Y"。</p>
+<p class="echo">在本项目里：v5 的 <code>ProgressLedger</code> 实现了 7 类信号 S1-S7，
+任一触发就给 LLM 注入 "[ledger] You appear stuck (signal=Sx ...)" 消息，列出建议动作。</p>
+</div>
+
+<p>7 个信号是什么？看代码里的定义：</p>
+
+<table>
+<thead><tr><th>信号</th><th>触发条件</th><th>典型卡死场景</th></tr></thead>
+<tbody>
+<tr><td><strong>S1</strong></td><td>最近 6 轮里同一 (tool, payload_hash) 出现 ≥ 3 次</td><td>反复用同样参数调 <code>run_pw</code></td></tr>
+<tr><td><strong>S2</strong></td><td>最近 8 轮里 ≥ 6 次工具错误</td><td>各种参数都不对，错误堆积</td></tr>
+<tr><td><strong>S3</strong></td><td>过去 600s 内没有任何 <code>verify_run</code> 返 pass</td><td>10 分钟没拿到任何成功验证</td></tr>
+<tr><td><strong>S4</strong></td><td>最近 10 轮里同一 bash 命令（去掉 cd 前缀）出现 ≥ 3 次</td><td>同一 shell 命令反复 retry</td></tr>
+<tr><td><strong>S5</strong></td><td>LLM 文本里 "let me try again" / "still failing" 等"挫败语"≥ 3 次/最近 4 轮</td><td>LLM 自己都觉得卡了</td></tr>
+<tr><td><strong>S6</strong></td><td>最近 15 轮里没注册任何新 calc</td><td>光在读读写写，没真跑 QE</td></tr>
+<tr><td><strong>S7</strong></td><td>输入 token 用量 > 预算的 70% 且还没拿到 verify_ok</td><td>预算快烧光了</td></tr>
+</tbody>
+</table>
+
+<p>触发后给 LLM 注入的提示长这样：</p>
+
+<pre><code>[ledger] You appear stuck (signal=S4: identical bash cmd ≥3 in last 10 turns).
+Recent calc_ids: calc_v_001, calc_v_002
+Choices:
+  (a) delegate to convergence_fixer subagent for calc_v_002
+  (b) submit with incomplete=true and notes describing what you tried
+DO NOT repeat the same tool args.
+</code></pre>
+
+<p>关键设计：<strong>同一信号只触发一次</strong>（已经告诉过 LLM 就不再骚扰），且写入 <code>workdir/stuck.log</code>
+供事后复盘。</p>
+
+<h3 id="s16-verify">16.3 Verifier Gate + Replay 机制</h3>
+
+<div class="concept" id="c-verify">
+<span class="lbl">💡 概念</span><h4>Verifier Gate（验证 gate）</h4>
+<p>LLM 调 <code>submit</code> 不再直接结束。Driver 接管，<strong>用 Python 重新检查所有提交的输出文件</strong>：
+SCF 是否真收敛？力是否真低于阈值？空间群是否真没降级？JOB DONE 标记是否真的在文件尾？
+任何一项 hard_fail，给 LLM 反馈"你这个 submit 不达标，原因是 X，请修复"，
+重新进入循环最多 N 轮（默认 2）。</p>
+<p>本质上是把"自评"换成"他评"——LLM 自己说"done" 不算数，<em>程序说 done 才算</em>。</p>
+<p class="echo">在本项目里：v5 的 <code>verify_vc_relax</code> / <code>verify_bands_dos</code> 是真实 Python 函数，
+检查清单包括 "JOB DONE 出现"、"final force &lt; 1e-4 Ry/Bohr"、"lattice drift &lt; 0.5%"、
+"space group 跟初始一致" 等。</p>
+</div>
+
+<p>Verifier 的位置如下图：</p>
+
+<div class="svg-wrap">
+<svg width="780" height="280" viewBox="0 0 780 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34495e"/>
+    </marker>
+  </defs>
+  <rect x="40" y="100" width="140" height="60" rx="8" fill="#3498db"/>
+  <text x="110" y="130" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">LLM</text>
+  <text x="110" y="148" text-anchor="middle" fill="#ecf0f1" font-size="11">submit(paths={...})</text>
+
+  <rect x="280" y="100" width="180" height="60" rx="8" fill="#9b59b6"/>
+  <text x="370" y="125" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Driver gate</text>
+  <text x="370" y="145" text-anchor="middle" fill="#fff" font-size="11">verify_vc_relax(...)</text>
+
+  <rect x="560" y="40" width="200" height="60" rx="8" fill="#27ae60"/>
+  <text x="660" y="65" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">verdict = pass</text>
+  <text x="660" y="83" text-anchor="middle" fill="#fff" font-size="11">→ 写 result.json，exit 0</text>
+
+  <rect x="560" y="180" width="200" height="60" rx="8" fill="#e74c3c"/>
+  <text x="660" y="205" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">verdict = hard_fail</text>
+  <text x="660" y="223" text-anchor="middle" fill="#fff" font-size="11">→ replay（最多 2 次）</text>
+
+  <line x1="180" y1="130" x2="280" y2="130" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar4)"/>
+  <line x1="460" y1="115" x2="560" y2="80" stroke="#27ae60" stroke-width="1.5" marker-end="url(#ar4)"/>
+  <line x1="460" y1="145" x2="560" y2="200" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#ar4)"/>
+  <path d="M 660 240 C 660 270 110 270 110 165" stroke="#e74c3c" stroke-width="1.5" fill="none" marker-end="url(#ar4)" stroke-dasharray="5,3"/>
+  <text x="380" y="263" font-size="11" fill="#7f8c8d">复活：把 verdict 的 fail 原因作为新 user message 喂回 LLM</text>
+</svg>
+</div>
+<div class="diagram-caption">图 5 · v5 verify gate：submit → 程序级检查 → pass 落地 / hard_fail 复活</div>
+
+<p>code 摘要：</p>
+
+<pre><code><span class="c"># /home/shijie/solvers/v5-dev/solve.py · 入参</span>
+ap.add_argument(<span class="s">"--max-verifier-replays"</span>, type=int, default=<span class="n">2</span>,
+                help=<span class="s">"If verifier hard_fails, replay the SDK loop up to N times"</span>)
+</code></pre>
+
+<p>这个机制的关键好处是<strong>消除 LLM 自欺欺人</strong>——
+v3 时代有不少题是 LLM 输出 "I have successfully completed the calculation" + submit，
+但实际文件不完整或没 JOB DONE。v5 这种"程序裁判"直接绝杀。</p>
+
+<h3 id="s16-experience">16.4（彩蛋）Experience 经验库</h3>
+
+<div class="concept" id="c-exp">
+<span class="lbl">💡 概念</span><h4>Experience Replay / RAG-for-agent</h4>
+<p>之前跑过的成功任务记录下来，下次遇到相似任务时，把当时的成功操作摘要喂进系统提示——
+让 agent "<strong>看着历史成功案例办事</strong>"，少走弯路。</p>
+<p>实现常用 embedding 相似度检索（Sentence Transformers MiniLM-L6-v2 等小模型）+ 阈值过滤。</p>
+<p class="echo">在本项目里：v5 的 <code>retrieve_for_task</code> 把当前 task_prompt 编码 → 跟历史成功案例的 prompt embedding 比对 →
+top-K 且分数 ≥ 0.7 的塞进 system prompt 的特殊 section。可用 <code>--no-experience</code> 关掉做 A/B 对比。</p>
+</div>
+
+
+<!-- ════════════ §17 ════════════ -->
+<h2 id="s17">§17 三版本一表对照</h2>
+
+<table>
+<thead>
+<tr><th>维度</th><th>v1-stable</th><th>v3 (current)</th><th>v5 (latest)</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>工具数</strong></td><td>4</td><td>4（同）</td><td>Claude 路 7；Legacy 路 4</td></tr>
+<tr><td><strong>工具协议</strong></td><td>自定义 JSON schema</td><td>同 v1</td><td>MCP（Claude 路）+ 旧 schema（Legacy 路）</td></tr>
+<tr><td><strong>系统提示行数</strong></td><td>42（静态）</td><td>379（动态生成）</td><td>~80（executor.md，把细节移到工具描述里）</td></tr>
+<tr><td><strong>pre-tool hook</strong></td><td>无</td><td>qe_input_lint + bash_guard</td><td>同 v3（在 Legacy 路）；Claude 路用 SDK PreToolUse</td></tr>
+<tr><td><strong>prompt caching</strong></td><td>无</td><td>3 断点</td><td>SDK 内置（细节托管）</td></tr>
+<tr><td><strong>子 agent</strong></td><td>无</td><td>无</td><td>convergence_fixer（仅 Claude 路）</td></tr>
+<tr><td><strong>卡死检测</strong></td><td>无（只能等 turn 耗尽）</td><td>无</td><td>ProgressLedger 7 信号</td></tr>
+<tr><td><strong>验证机制</strong></td><td>无（信 LLM）</td><td>无</td><td>verify_run gate + replay</td></tr>
+<tr><td><strong>经验库</strong></td><td>无</td><td>无</td><td>有（embedding 检索）</td></tr>
+<tr><td><strong>支持模型</strong></td><td>任意（OpenAI shape）</td><td>任意</td><td>Claude（完整）/ 其他（降级到 v3 风格）</td></tr>
+<tr><td><strong>max_turns 默认</strong></td><td>100</td><td>80</td><td>60</td></tr>
+<tr><td><strong>max_output_tokens 默认</strong></td><td>16384</td><td>8192</td><td>8192</td></tr>
+<tr><td><strong>solver_timeout 默认</strong></td><td>7200s（2h）</td><td>7200s</td><td>7200-14400s（按 backend）</td></tr>
+<tr><td><strong>主要解决的痛点</strong></td><td>—（基线）</td><td>领域知识缺口</td><td>流程级缺口（卡死、自验证）</td></tr>
+<tr><td><strong>什么时候用</strong></td><td>跨 provider 对照基线</td><td>非 Claude 模型（如 deepseek）日常生产</td><td>Claude 模型上的最强组合</td></tr>
+</tbody>
+</table>
+
+
+<!-- ════════════ §18 ════════════ -->
+<h2 id="s18">§18 术语表</h2>
+
+<dl class="glossary">
+<dt>Agent</dt>
+<dd>能调用工具、看结果、自主决定下一步的 LLM 系统。<a href="#c-agent">详见 §2</a>。</dd>
+
+<dt>ReAct</dt>
+<dd>"Reason + Act"的简写。最朴素的 agent 主循环——LLM 推理 → 调工具 → 看结果 → 再推理。<a href="#c-react">详见 §3</a>。</dd>
+
+<dt>System Prompt</dt>
+<dd>对话最开头给 LLM 看的"说明书"——角色、可用工具、规则。<a href="#c-sysprompt">详见 §3</a>。</dd>
+
+<dt>Tool / Tool Call / Tool Result</dt>
+<dd>注册给 LLM 的函数 / LLM 想调它发出的请求 / 框架真跑完返回的结果。<a href="#c-tool">详见 §3</a>。</dd>
+
+<dt>Hook</dt>
+<dd>工具调用前 (pre) 或后 (post) 插一脚的代码。可改写参数 / 改写结果 / 拒绝执行。<a href="#c-hook">详见 §10</a>。</dd>
+
+<dt>Guardrail</dt>
+<dd>护栏——比 hook 更倾向"拒绝"。白名单 + 黑名单 + 路径检查等。<a href="#c-guard">详见 §11</a>。</dd>
+
+<dt>Prompt Caching</dt>
+<dd>把不变的前缀（系统提示、工具定义）缓存在服务端，后续命中折扣 90%。<a href="#c-cache">详见 §12</a>。</dd>
+
+<dt>MCP（Model Context Protocol）</dt>
+<dd>工具的标准化接口协议，类比 USB——agent 和工具开发解耦。<a href="#c-mcp">详见 §14</a>。</dd>
+
+<dt>Sub-agent</dt>
+<dd>主 agent 调用的专精 agent，有自己的提示、工具子集、轮数。<a href="#c-subagent">详见 §16.1</a>。</dd>
+
+<dt>Stuck Detection</dt>
+<dd>程序级检测 agent 是否"卡住"——重复动作、错误累计、token 耗尽。<a href="#c-stuck">详见 §16.2</a>。</dd>
+
+<dt>Verifier Gate</dt>
+<dd>submit 前用 Python 重新验证输出，hard_fail 时 replay 让 LLM 修。<a href="#c-verify">详见 §16.3</a>。</dd>
+
+<dt>Experience Replay</dt>
+<dd>把历史成功案例 embedding 化，新任务来了检索 top-K 喂进 system prompt。<a href="#c-exp">详见 §16.4</a>。</dd>
+
+<dt>Context Window</dt>
+<dd>LLM 一次能"看"的最大 token 数。<a href="#c-ctx">详见 §6</a>。</dd>
+</dl>
+
+
+<!-- ════════════ §19 ════════════ -->
+<h2 id="s19">§19 延伸阅读</h2>
+
+<h4>本仓内其他报告</h4>
+<ul>
+<li><a href="solverv3-vs-baseline-2026-05-11.html">Solver v3 + DeepSeek-v4-pro · 12 题快速档 vs baseline</a>
+    — 含 paper §3 style 的 v3 设计描述（学术口吻版），可作为本教程的"严肃配套读物"</li>
+<li><a href="standard27-solverv3-vs-baseline-2026-05-12.html">Solver v3 + DeepSeek-v4-pro · 27 题标准档 vs baseline</a>
+    — 标准档 27 题完整跑分对照</li>
+<li><a href="baseline-2026-05-10.html">Baseline (warpagent-qe-v1 + DeepSeek-v4-pro) · 148 题全量</a>
+    — v1 的资源消耗基线</li>
+<li><a href="agent-design-survey-2026-05-13.html">DFT Agent 架构调研 · 跨域 SOTA 模式提炼</a>
+    — 跨四领域（DFT / 数学证明 / 通用 / 代码 agent）SOTA 系统的方法论提炼，看完本教程后建议读这份</li>
+</ul>
+
+<h4>本项目代码入口</h4>
+<ul>
+<li><code>/home/shijie/solvers/v1-archive/</code> · <code>main</code> 分支 · 上游 wanweilin/dft-agent-bench</li>
+<li><code>/home/shijie/solvers/current/</code> · <code>dev</code> 分支 · Pluto235/dft-bench-solver</li>
+<li><code>/home/shijie/solvers/v5-dev/</code> · <code>v5</code> 分支 · 同一 remote 的 worktree</li>
+</ul>
+
+<h4>外部资料</h4>
+<ul>
+<li><a href="https://docs.anthropic.com/en/docs/claude-code/claude-agent-sdk">Claude Agent SDK 官方文档</a>
+    — 看完本教程后实际写 v5 风格 agent 的入门资料</li>
+<li><a href="https://modelcontextprotocol.io/">Model Context Protocol 官网</a> — MCP 协议规范</li>
+<li><a href="https://www.anthropic.com/news/prompt-caching">Anthropic Prompt Caching 介绍</a> — 缓存机制官方说明</li>
+</ul>
+
+<div class="note" style="margin-top: 40px;">
+<strong>读完了下一步</strong>：如果你想动手改 solver——
+推荐先在 v3 (<code>solvers/current/</code>) 上加新 hook 练手（影响面小、Legacy 路也用得到）；
+v5 的子 agent 和 verifier 适合在你对 Claude SDK 比较熟之后再玩。
+任何时候遇到 "不知道这个名词什么意思"——回 §18 术语表查。
+</div>
+
+</body>
+</html>
