@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DFT / QE 传统工作流入门 · 给 agent 工程师补习 · 2026-05-15</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+         'Microsoft YaHei', sans-serif;
+         max-width: 920px; margin: 40px auto; padding: 0 28px; color: #2c3e50; line-height: 1.75; }
+  h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 12px; margin-top: 30px; }
+  h2 { color: #34495e; border-left: 5px solid #3498db; padding-left: 12px; margin-top: 50px; }
+  h3 { color: #2c3e50; margin-top: 28px; }
+  h4 { color: #34495e; margin-top: 20px; }
+  p { margin: 12px 0; }
+  a { color: #2980b9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+         background: #ecf0f1; padding: 2px 5px; border-radius: 3px;
+         font-size: 90%; color: #c0392b; }
+  pre { background: #2c3e50; color: #ecf0f1; padding: 16px 20px; border-radius: 6px;
+        overflow-x: auto; font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 12.5px; line-height: 1.55; }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+  pre .c { color: #95a5a6; }      /* 注释 */
+  pre .k { color: #f39c12; }      /* namelist / 关键字 */
+  pre .s { color: #2ecc71; }      /* 字符串 / 值 */
+  pre .n { color: #5dade2; }      /* 数字 */
+  pre .hi { background: #c0392b66; padding: 0 4px; border-radius: 2px; }
+
+  .meta { background: #ecf0f1; border-left: 4px solid #3498db; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .note { background: #fdf2e9; border-left: 4px solid #e67e22; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+
+  /* 💡 概念卡片 */
+  .concept { background: #fef9e7; border: 1px solid #f4d03f; border-radius: 8px;
+             padding: 16px 20px; margin: 22px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .concept .lbl { display: inline-block; background: #f1c40f; color: #fff;
+                  font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+                  margin-right: 8px; }
+  .concept h4 { margin: 0 0 8px 0; display: inline; color: #7d6608; }
+  .concept p { margin: 8px 0 0 0; }
+  .concept .echo { color: #7d6608; font-style: italic; margin-top: 10px;
+                   font-size: 14px; border-top: 1px dashed #f1c40f; padding-top: 8px; }
+
+  /* 🤖 agent 视角对照 */
+  .agent-callout { background: #eaf2f8; border: 1px solid #5dade2; border-radius: 8px;
+                   padding: 14px 18px; margin: 20px 0; }
+  .agent-callout::before { content: "🤖  Agent 视角对照"; display: block;
+                           font-weight: 700; color: #21618c; margin-bottom: 6px;
+                           font-size: 14px; }
+
+  /* 🌰 类比 */
+  .analogy { background: #f4ecf7; border-left: 4px solid #8e44ad;
+             padding: 12px 18px; margin: 18px 0; border-radius: 4px;
+             font-size: 15px; }
+  .analogy::before { content: "🌰 类比 · "; font-weight: 700; color: #6c3483; }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid #d5dbdb; text-align: left;
+           vertical-align: top; }
+  th { background: #34495e; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  td code { font-size: 12px; }
+
+  nav.toc { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 14px 22px; margin: 22px 0; }
+  nav.toc h3 { margin-top: 0; color: #34495e; }
+  nav.toc ol { padding-left: 22px; margin: 6px 0; }
+  nav.toc li { padding: 2px 0; }
+
+  .svg-wrap { text-align: center; margin: 22px 0 6px; padding: 14px;
+              background: #fafbfc; border-radius: 8px; border: 1px solid #ecf0f1; }
+  .diagram-caption { text-align: center; color: #7f8c8d; font-style: italic;
+                     font-size: 14px; margin: 6px 0 28px; }
+
+  .file-meta { color: #7f8c8d; font-size: 12px; margin: -8px 0 8px;
+               font-family: 'SF Mono', 'Consolas', monospace; }
+
+  h2[id], h3[id], .concept[id] { scroll-margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>DFT / QE 传统工作流入门 · 给 agent 工程师补习</h1>
+
+<div class="meta">
+<strong>给谁看</strong>：这份文档是写给你（这份报告的作者）自己看的。你在写 dft-agent-bench——
+让 LLM 自己跑 Quantum ESPRESSO 算 DFT 任务——但你是 DFT 领域的新人。本文档要做的事：
+把<strong>人类研究员做 DFT 项目的传统工作流</strong>系统讲一遍，沿着你 bench 里的两类题（<code>T1 vc_relax</code> /
+<code>T2 bands_dos</code>）用 Si 单晶贯穿到底，让你看清"agent 自动做的每一步、人类原本是怎么做的、
+人类在哪些细节用经验绕开了坑"。<br><br>
+<strong>读法</strong>：§2 §3 给 high-level 概念；§4 是整张大图；§5 把所有要懂的术语收进 12 张💡卡片；
+§6-§9 是 Si bulk 全套实例（T1 + T2 一气呵成）；§10-§11 是"怎么读输出 + 哪些会翻车"；
+§12 把 bench 评分字段映回每步 QE 输出；§13-§15 进阶 / 给 agent 工程师的建议 / 延伸阅读。<br><br>
+<strong>生成日期</strong>：2026-05-15 · <strong>篇幅</strong>：~1 小时阅读量，可分两次读完。
+</div>
+
+<nav class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">这份文档是给谁看的</a></li>
+  <li><a href="#s2">DFT 是什么、能算什么</a></li>
+  <li><a href="#s3">Quantum ESPRESSO 是谁</a></li>
+  <li><a href="#s4">一个完整 DFT 项目的工作流（全景）</a></li>
+  <li><a href="#s5">关键概念入门集（12 张卡片）</a></li>
+  <li><a href="#s6">Si bulk 贯穿 · 准备阶段</a></li>
+  <li><a href="#s7">Si bulk vc-relax（对应 T1）</a></li>
+  <li><a href="#s8">Si bulk SCF + bands（T2 第一段）</a></li>
+  <li><a href="#s9">Si bulk DOS（T2 第二段）</a></li>
+  <li><a href="#s10">怎么"读"QE 输出文件</a></li>
+  <li><a href="#s11">常见失败模式 / 人类怎么绕开</a></li>
+  <li><a href="#s12">Bench 题目评分字段全对照</a></li>
+  <li><a href="#s13">进阶主题（点到为止）</a></li>
+  <li><a href="#s14">给 agent 工程师的建议</a></li>
+  <li><a href="#s15">延伸阅读</a></li>
+</ol>
+</nav>
+
+
+<!-- ════════════ §1 ════════════ -->
+<h2 id="s1">§1 这份文档是给谁看的</h2>
+
+<p>"DFT" 三个字母在材料 / 化学 / 凝聚态物理里出现频率极高，但跟 "AI" 一样，圈外人听了点头、内行人懒得展开。
+你现在的处境刚好相反——<strong>做 agent 工程的内行、做 DFT 的外行</strong>。你给 agent 提供了
+<code>bash</code> 工具，agent 真的会去跑 <code>pw.x</code>；你看到它打印 <code>"JOB DONE."</code> 就知道这一题
+"通了"；你看到分数低了知道它"算错了"。但你想知道：</p>
+
+<ul>
+<li><strong>传统人类研究员</strong>做这种计算，工作流到底长啥样？</li>
+<li>那些 QE 输入文件里的 <code>ecutwfc = 60</code>、<code>K_POINTS</code>、<code>occupations = 'smearing'</code>，是<strong>什么物理量、为什么这么填</strong>？</li>
+<li><strong>哪些环节是机械的、agent 完全能搞定</strong>？哪些环节其实人类研究员用了大量经验绕开了坑——agent 现在做得未必好？</li>
+</ul>
+
+<p>读完这份文档你应该能：① 看一个 QE 输入文件知道每一行在干啥；② 看一个 QE 输出文件知道哪行重要、哪行可以跳过；
+③ 沿 Si bulk 这个最经典的例子，把"结构优化 → 能带 → 态密度"全套跑过一遍；
+④ 对你 bench 里 T1 / T2 题目的<strong>评分字段</strong>建立直觉——它们其实对应人类研究员每天看的几个核心物理量。</p>
+
+<p>每个"做事"的小节末尾我都会附一块 <strong>🤖 Agent 视角对照</strong>，告诉你：</p>
+<ul>
+<li>这一步传统人类怎么做（拍脑袋 / 看经验 / 查表 / 多次试）</li>
+<li>agent 在这里容易翻车的点</li>
+<li>你 solver v3 / v5 已经做了哪些自动化、还有哪些没补上</li>
+</ul>
+
+
+<!-- ════════════ §2 ════════════ -->
+<h2 id="s2">§2 DFT 是什么、能算什么</h2>
+
+<p>DFT = Density Functional Theory（密度泛函理论），一句话讲清楚：</p>
+
+<div class="meta">
+<strong>DFT 是一种从第一性原理（量子力学）出发，预测<u>原子排好之后电子云怎么排</u>的计算方法</strong>。
+你给它一组原子的位置（"金刚石结构的 Si"），它给你回算：体系总能量、电子云分布、原子受力、
+晶体光学和电子学性质（能带、态密度、磁性、介电常数...）。
+</div>
+
+<p>更具体地，DFT 把<strong>多电子薛定谔方程</strong>（精确但跑不动）转换成一个<strong>等价的单电子问题</strong>
+（Kohn-Sham 方程），代价是引入一个叫"交换关联泛函"的近似（见 <a href="#c-xc">§5 XC functional 卡片</a>）。
+"近似"是这个领域 60 年来争论的核心——LDA / PBE / SCAN / HSE 是不同的近似策略。</p>
+
+<div class="analogy">
+你可以把 DFT 想成<strong>一个超精确的物理模拟器</strong>：输入原子怎么排，输出"假如这些原子按薛定谔方程演化、达到稳态后会长啥样"。
+跟分子动力学（MD）不同，DFT 算的是<strong>电子结构</strong>本身，不是原子怎么动；但有了电子的能量曲面，
+原子的力就自然能算出来，进而能做结构优化、声子分析、热力学。
+</div>
+
+<h3>DFT 能算出来的物理量（不完全列表）</h3>
+
+<table>
+<thead><tr><th>物理量</th><th>研究员关心它干啥</th><th>QE 工具</th></tr></thead>
+<tbody>
+<tr><td>总能量 (total energy)</td><td>比较两个结构哪个更稳定（最低能即最稳）</td><td><code>pw.x scf</code></td></tr>
+<tr><td>原子受力 (forces)</td><td>结构优化的依据；非零 → 原子还想动</td><td><code>pw.x scf, relax, vc-relax</code></td></tr>
+<tr><td>应力张量 (stress)</td><td>晶胞优化的依据；非零 → 晶胞还想变形</td><td><code>pw.x vc-relax</code></td></tr>
+<tr><td>电子能带 (band structure)</td><td>判半导体 / 金属 / 绝缘体；能隙多大</td><td><code>pw.x bands</code> + <code>bands.x</code></td></tr>
+<tr><td>态密度 (DOS)</td><td>每能量上有多少电子态；Fermi 附近的形状决定电学性质</td><td><code>pw.x nscf</code> + <code>dos.x</code></td></tr>
+<tr><td>电荷密度 (charge density)</td><td>键合性质 / 极性 / 电荷转移</td><td><code>pp.x</code> 后处理</td></tr>
+<tr><td>声子谱 (phonons)</td><td>晶体动力学稳定性 / 振动光谱</td><td><code>ph.x</code></td></tr>
+<tr><td>磁矩 (magnetic moments)</td><td>磁有序状态、磁性材料设计</td><td><code>pw.x nspin=2</code></td></tr>
+</tbody>
+</table>
+
+<p>你 bench 里目前涵盖的是<strong>前 5 类</strong>——T1 关心总能量+力+应力（→ 优化好结构 → 量晶格常数 → 验证空间群），
+T2 关心能带 + DOS。声子 / 磁性 / 高级泛函 / TDDFT 都还没涉及。</p>
+
+
+<!-- ════════════ §3 ════════════ -->
+<h2 id="s3">§3 Quantum ESPRESSO 是谁</h2>
+
+<p>Quantum ESPRESSO（简称 QE）是一个<strong>开源、平面波 + 赝势</strong>的 DFT 软件套件，主要由意大利
+SISSA / CNR 团队维护，Fortran 写的，跑在 HPC 集群上。它是 DFT 软件生态里使用最广的几个之一：</p>
+
+<table>
+<thead><tr><th>软件</th><th>商业 / 开源</th><th>基组类型</th><th>典型用途</th></tr></thead>
+<tbody>
+<tr><td><strong>Quantum ESPRESSO</strong></td><td>开源 (GPL)</td><td>平面波 + 赝势</td><td>周期晶体、能带、声子、磁性</td></tr>
+<tr><td>VASP</td><td>商业（贵）</td><td>平面波 + PAW</td><td>同上，工业界主流</td></tr>
+<tr><td>ABINIT</td><td>开源 (GPL)</td><td>平面波 + 赝势</td><td>同上，欧洲学术圈</td></tr>
+<tr><td>GPAW</td><td>开源 (GPL)</td><td>real-space grid / PAW</td><td>跟 ASE 集成好</td></tr>
+<tr><td>FHI-aims</td><td>商业 / 学术免费</td><td>numeric atomic orbitals</td><td>分子 + 晶体、全电子</td></tr>
+<tr><td>Gaussian / NWChem</td><td>商业 / 开源</td><td>高斯轨道</td><td>分子化学，不是晶体首选</td></tr>
+</tbody>
+</table>
+
+<p>本项目用 QE，几个具体原因：开源、HPC 友好、平面波适合周期晶体、社区教程多、有 GPU 加速版（NVIDIA HPC SDK）。</p>
+
+<p>你只需要关心 QE 套件里这几个二进制：</p>
+
+<table>
+<thead><tr><th>二进制</th><th>干啥的</th><th>对应 bench 题</th></tr></thead>
+<tbody>
+<tr><td><code>pw.x</code></td><td>核心 — 跑 SCF / NSCF / 结构优化 / vc-relax</td><td>T1 + T2 都用</td></tr>
+<tr><td><code>bands.x</code></td><td>把 NSCF 在 high-symmetry path 上跑出的本征值整理成绘图友好的 <code>bands.dat</code></td><td>T2</td></tr>
+<tr><td><code>dos.x</code></td><td>把 NSCF on dense k-mesh 的结果积分成态密度 <code>dos.dat</code></td><td>T2</td></tr>
+<tr><td><code>pp.x</code></td><td>后处理（电荷密度、电势、ELF 等）画图用</td><td>—（暂不涉及）</td></tr>
+<tr><td><code>ph.x</code></td><td>声子计算</td><td>—（暂不涉及）</td></tr>
+</tbody>
+</table>
+
+
+<!-- ════════════ §4 ════════════ -->
+<h2 id="s4">§4 一个完整 DFT 项目的工作流（全景）</h2>
+
+<p>下面这张图是<strong>研究员从零开始做一个 DFT 项目</strong>的完整流程。你 bench 的 T1 / T2 是其中"中间核心几步"——
+前置选材料 / pseudo 是手工 + 经验，后端出图 + 分析也是。</p>
+
+<div class="svg-wrap">
+<svg width="880" height="420" viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34495e"/>
+    </marker>
+  </defs>
+
+  <!-- Step 0 -->
+  <rect x="30" y="20" width="200" height="60" rx="8" fill="#95a5a6"/>
+  <text x="130" y="44" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Step 0 · 选材料 + 拿结构</text>
+  <text x="130" y="64" text-anchor="middle" fill="#ecf0f1" font-size="11">Materials Project / 实验文献</text>
+
+  <line x1="130" y1="80" x2="130" y2="100" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <!-- Step 1 -->
+  <rect x="30" y="100" width="200" height="60" rx="8" fill="#7f8c8d"/>
+  <text x="130" y="124" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Step 1 · 选 pseudo + functional</text>
+  <text x="130" y="144" text-anchor="middle" fill="#ecf0f1" font-size="11">GBRV USPP + PBE（默认）</text>
+
+  <line x1="130" y1="160" x2="130" y2="180" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <!-- Step 2 -->
+  <rect x="30" y="180" width="200" height="60" rx="8" fill="#7f8c8d"/>
+  <text x="130" y="204" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Step 2 · 收敛测试</text>
+  <text x="130" y="224" text-anchor="middle" fill="#ecf0f1" font-size="11">ecutwfc / k-mesh 扫描</text>
+
+  <line x1="230" y1="210" x2="280" y2="210" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <!-- Step 3 (T1) -->
+  <rect x="280" y="180" width="200" height="60" rx="8" fill="#3498db"/>
+  <text x="380" y="204" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Step 3 · 结构优化</text>
+  <text x="380" y="222" text-anchor="middle" fill="#ecf0f1" font-size="11">vc-relax（即 T1 任务）</text>
+  <text x="380" y="237" text-anchor="middle" fill="#ecf0f1" font-size="10">→ 优化好的晶格 + 空间群</text>
+
+  <line x1="480" y1="210" x2="530" y2="210" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <!-- Step 4 (T2) -->
+  <rect x="530" y="160" width="320" height="100" rx="8" fill="#3498db"/>
+  <text x="690" y="186" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Step 4 · 性质计算（即 T2 任务）</text>
+  <text x="690" y="208" text-anchor="middle" fill="#ecf0f1" font-size="12">a. SCF on uniform k-mesh（自洽态密度）</text>
+  <text x="690" y="225" text-anchor="middle" fill="#ecf0f1" font-size="12">b. NSCF on high-symmetry path → bands.x</text>
+  <text x="690" y="241" text-anchor="middle" fill="#ecf0f1" font-size="12">c. NSCF on dense k-mesh → dos.x</text>
+
+  <line x1="690" y1="260" x2="690" y2="280" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <!-- Step 5 -->
+  <rect x="530" y="280" width="320" height="60" rx="8" fill="#27ae60"/>
+  <text x="690" y="304" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Step 5 · 分析 + 出图</text>
+  <text x="690" y="324" text-anchor="middle" fill="#ecf0f1" font-size="11">band gap / VBM / CBM / Fermi / 出 PDF</text>
+
+  <!-- Optional advanced branches -->
+  <rect x="30" y="340" width="200" height="60" rx="8" fill="#f39c12" opacity="0.7"/>
+  <text x="130" y="364" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">进阶：声子 / DFT+U</text>
+  <text x="130" y="382" text-anchor="middle" fill="#fff" font-size="11">磁性 / TDDFT（不在 bench）</text>
+
+  <line x1="130" y1="240" x2="130" y2="340" stroke="#34495e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ar)"/>
+</svg>
+</div>
+<div class="diagram-caption">图 1 · DFT 项目全流程。蓝色框是你 bench 评测的两类任务（T1 + T2）；灰色框是前置（人手 + 经验）；橙色框是进阶分支</div>
+
+<p>关键 takeaway：</p>
+<ol>
+<li><strong>每个真实的 DFT 项目都得过这 6 步</strong>，缺一不可（除非你拿别人现成的结构跳过 Step 0-3）</li>
+<li>你 bench 实际上只测 <strong>Step 3 (T1) 和 Step 4 (T2)</strong>——但这正是计算量最大、最容易出错的环节</li>
+<li>真正的人类研究员在 Step 0-2 也花掉很多时间（选 pseudo / 试 ecutwfc / 收敛测试），bench 帮 agent 把这些<strong>外部化</strong>了：pseudo 路径在 system prompt 里给好、ecutwfc 推荐值也写好</li>
+</ol>
+
+
+<!-- ════════════ §5 ════════════ -->
+<h2 id="s5">§5 关键概念入门集（12 张卡片）</h2>
+
+<p>不用一次记住所有术语——后面 §6-§9 用到哪个你回来查哪个。每张卡片底部都有"在 Si 例子里它长啥样"的回扣。</p>
+
+<div class="concept" id="c-pw">
+<span class="lbl">💡 1/12</span><h4>Plane-wave basis · ecutwfc · ecutrho</h4>
+<p>QE 把电子的波函数展开成<strong>平面波</strong>（傅里叶级数）的叠加。平面波数量由<code>ecutwfc</code>（波函数截断能，单位 Ry）控制，
+越大越精确越慢。<code>ecutrho</code> 是<strong>电荷密度</strong>用的截断（一般是 ecutwfc 的 4×，<strong>USPP / PAW 要 8-12×</strong>）。
+</p>
+<p class="echo">Si 用 <code>ecutwfc = 60</code>、<code>ecutrho = 480</code>（8×）。如果你换成 norm-conserving pseudo，
+4× 就够（240）；用 USPP 不到 8× 会精度差。</p>
+</div>
+
+<div class="concept" id="c-pseudo">
+<span class="lbl">💡 2/12</span><h4>Pseudopotential（赝势）</h4>
+<p>原子内层电子离原子核近、几乎不参与化学键合，但数值上波函数振荡剧烈，会让平面波数量爆炸。
+解决方案：把核 + 内层电子用一个"<strong>赝势</strong>"打包替换掉，只对外层（价）电子算。</p>
+<p>三种主流赝势：<strong>NC (norm-conserving)</strong> — 最严格、要 ecutwfc 高；
+<strong>USPP (ultrasoft)</strong> — 更省截断、需要 8-12× ecutrho；
+<strong>PAW (projector augmented wave)</strong> — 兼顾精度和效率，VASP 主流。</p>
+<p class="echo">本项目用 <strong>GBRV USPP（PBE 版）</strong>——开源、有完整周期表覆盖、社区基准成熟。
+Si 的赝势文件叫 <code>si_pbe_v1.uspp.F.UPF</code>。</p>
+</div>
+
+<div class="concept" id="c-xc">
+<span class="lbl">💡 3/12</span><h4>Exchange-Correlation Functional（XC 泛函）</h4>
+<p>Kohn-Sham 方程里有个"<strong>交换关联泛函</strong>"项是没法精确写出的，必须用近似。
+近似有几个层级（"Jacob's ladder"）：<strong>LDA</strong>（局域密度）→ <strong>GGA</strong>（PBE 最常用）→
+<strong>meta-GGA</strong>（SCAN）→ <strong>hybrid</strong>（HSE）→ <strong>random phase approximation</strong>。
+越高级越准但越慢（HSE 比 PBE 慢 10-100 倍）。</p>
+<p class="echo">本项目默认 <strong>PBE</strong>（写在 pseudo 的 <code>_pbe_</code> 后缀里）。PBE 对半导体能隙
+预测偏小 30%-50%；想精确算能隙得用 HSE。你 bench 的 ground truth 用 PBE 算的所以可以直接比。</p>
+</div>
+
+<div class="concept" id="c-kmesh">
+<span class="lbl">💡 4/12</span><h4>k-mesh · Brillouin Zone · Monkhorst-Pack</h4>
+<p>周期晶体的电子态由<strong>布里渊区</strong>（Brillouin zone, BZ，倒空间的原胞）里的 k-vector 标记。
+积分 BZ 用<strong>有限 k-mesh 离散化</strong>近似——这就是 <code>K_POINTS automatic 8 8 8</code> 里的 8×8×8 网格
+（Monkhorst-Pack 是网格生成方案）。</p>
+<p>金属需要密 k-mesh（16×16×16+）因为 Fermi 面要细化；绝缘体粗一点（6×6×6）够了；
+单胞大的（4+ 原子）k-mesh 可以稀疏。<strong>k-mesh × 晶格常数 ≈ 常数</strong> 是个经验法则。</p>
+<p class="echo">Si bulk 用 8×8×8 ok；nscf for DOS 一般再加密到 16×16×16；nscf for bands 是<strong>路径</strong>而不是网格（见 §8）。</p>
+</div>
+
+<div class="concept" id="c-scf">
+<span class="lbl">💡 5/12</span><h4>SCF 自洽循环 · mixing_beta</h4>
+<p>Kohn-Sham 方程的解是个鸡生蛋——电子密度依赖势场、势场又依赖电子密度。
+解法：<strong>自洽迭代</strong>（Self-Consistent Field, SCF）：猜个初始密度 → 算势场 → 解方程 → 得新密度 →
+跟旧密度<strong>混合</strong>（mixing_beta 控制比例，默认 0.7）→ 重复，直到密度收敛（<code>conv_thr</code>）。</p>
+<p>"不收敛"是 DFT 第一大常见错误：mixing_beta 太大会震荡，太小会慢；
+金属需要小 mixing_beta + smearing；磁性体系需要好的 <code>starting_magnetization</code>。</p>
+<p class="echo">Si bulk 4 次 SCF 就收敛（绝缘体好脾气）。但 v3 lint hook 会在 SCF 失败时记录到 <code>lint.log</code> 提示重试，
+v5 直接调子 agent <code>convergence_fixer</code> 处理这种情况。</p>
+</div>
+
+<div class="concept" id="c-smearing">
+<span class="lbl">💡 6/12</span><h4>Smearing（占据数光滑化）</h4>
+<p>原本电子按 Fermi-Dirac 分布占据能级——零温下能级要么 0% 要么 100% 占据，
+不连续会让金属的 Fermi 能积分难收敛。<strong>Smearing</strong> 就是人为加点温度（<code>degauss=0.01 Ry</code>）
+让占据数变光滑——SCF 才能收敛。</p>
+<p>常用 smearing 类型：<code>gaussian</code>（最简单）、<code>mv</code>（Marzari-Vanderbilt 冷涂法 - 推荐金属）、
+<code>fd</code>（真 Fermi-Dirac）、<code>mp</code>（Methfessel-Paxton）。</p>
+<p class="echo">Si 是半导体本来不需要 smearing，但放 <code>degauss=0.01</code> + <code>'gaussian'</code> 也 OK，不会影响精度。
+真正金属（Al, Cu）用 <code>'mv'</code> + <code>degauss=0.02</code>。</p>
+</div>
+
+<div class="concept" id="c-vcrelax">
+<span class="lbl">💡 7/12</span><h4>vc-relax · 结构优化</h4>
+<p><strong>vc-relax</strong> = variable-cell relaxation。同时优化<strong>原子位置</strong>（让 forces 趋零）
+和<strong>晶胞</strong>（让 stress 趋零），直到达到收敛条件：<code>forc_conv_thr</code>（默认 1e-3 Ry/Bohr，
+本项目严到 1e-4）和 <code>press_conv_thr</code>（kbar，本项目 0.05）。</p>
+<p>另一种 <code>relax</code> 只优化原子位置不动晶胞，用于有衬底或界面体系。</p>
+<p class="echo">T1 题目就是 vc-relax。v3 的 <code>qe_input_lint</code> 自动收紧阈值 → 防止松弛完了空间群被 pymatgen 降级。</p>
+</div>
+
+<div class="concept" id="c-bz">
+<span class="lbl">💡 8/12</span><h4>Brillouin Zone path · seekpath · k-label</h4>
+<p>能带图横轴是 BZ 里的一条<strong>高对称路径</strong>——Γ → X → W → L → Γ → K 之类。每个空间群有"标准 path"，
+人类查表或用 <strong>seekpath</strong>（Python 库）自动给。每个端点叫 <strong>k-label</strong>（Γ / X / L / K / W 等）。</p>
+<p class="echo">Si (fcc, 空间群 227) 的标准 path 用 seekpath 自动出来，一般是 Γ → X → U → K → Γ → L → W → X。
+T2 评分会查 VBM / CBM 落在哪个 k-label 上——Si 是<strong>间接 gap</strong>（VBM at Γ, CBM not on path）。</p>
+</div>
+
+<div class="concept" id="c-bandgap">
+<span class="lbl">💡 9/12</span><h4>Band Gap · VBM · CBM · direct/indirect</h4>
+<p><strong>VBM</strong> = Valence Band Maximum（价带顶 / 最高占据态）；
+<strong>CBM</strong> = Conduction Band Minimum（导带底 / 最低空态）；
+<strong>band gap</strong> = CBM − VBM 能量差。<br>
+如果 VBM 和 CBM 在<strong>同一个 k 点</strong>，叫 <strong>direct gap</strong>（光跃迁直接）；
+不在同一 k 点叫 <strong>indirect gap</strong>（需要声子辅助才能跃迁）。</p>
+<p class="echo">Si 是经典 indirect gap：VBM 在 Γ，CBM 在 BZ 内部 k = (0.85, 0, 0.85)（OFF_PATH——不在标准 high-symmetry path 上！）。
+T2 评分要 agent 报对 <code>vbm_k_label="GAMMA"</code> + <code>cbm_k_label="OFF_PATH"</code>。</p>
+</div>
+
+<div class="concept" id="c-dos">
+<span class="lbl">💡 10/12</span><h4>Density of States · Fermi energy</h4>
+<p><strong>DOS(E)</strong>：每能量 <code>E</code> 上有多少电子态——一条曲线。从 SCF 后的另一次 NSCF on dense k-mesh 算出来。<br>
+<strong>Fermi energy</strong>（<code>e_fermi</code>）：零温下电子的最高占据能量。绝缘体的 Fermi 落在 gap 中（DOS=0），
+金属的 Fermi 落在 DOS≠0 处。</p>
+<p class="echo">T2 评分查 <code>dos_e_fermi</code> + 整条 <code>dos_curve</code>（在 Fermi 附近 ±5 eV 范围里跟 ground truth 做 L2 距离）。
+Si 的 Fermi 是 6.25 eV（PBE 计算值）。</p>
+</div>
+
+<div class="concept" id="c-symmetry">
+<span class="lbl">💡 11/12</span><h4>空间群（Space Group） · pymatgen 怎么判</h4>
+<p>晶体有 <strong>230 个空间群</strong>，描述晶体的对称性。算空间群编号需要：晶胞 + 原子位置 +
+对称容差（<code>symprec</code>，默认 0.01 Å）。</p>
+<p><strong>pymatgen 的 <code>SpacegroupAnalyzer</code></strong> 是事实标准——给它 Atoms 对象，
+返回空间群编号、点群、晶系（cubic / hexagonal / ...）。</p>
+<p class="echo">Si 的空间群是 <strong>227 (Fd-3m)</strong>——金刚石结构。T1 评分查 a/b/c/α/β/γ + space_group_number。
+**这里有个陷阱**：vc-relax 阈值太松，最终 cell 会偏离对称 ≥ 0.5°，pymatgen 在 symprec=0.01 下识别为<u>低对称</u>
+（如三方 166 而不是立方 227），→ 直接扣 0.25 分。v3 的 lint hook 就是为这个出生的。</p>
+</div>
+
+<div class="concept" id="c-iobinp">
+<span class="lbl">💡 12/12</span><h4>QE input 文件结构</h4>
+<p>QE 的输入文件用<strong>Fortran namelist 格式</strong>。一个 pw.x 输入文件长这样：</p>
+<pre style="margin-top:8px;background:#1c2833;font-size:11.5px;"><code>&amp;CONTROL
+  calculation = 'scf'    <span class="c">! 算啥：scf / nscf / bands / relax / vc-relax</span>
+  prefix = 'si'          <span class="c">! 临时文件前缀</span>
+  outdir = './out'       <span class="c">! 临时文件放哪</span>
+  pseudo_dir = './pseudos'
+/
+&amp;SYSTEM
+  ibrav = 0              <span class="c">! 0 表示用下面的 CELL_PARAMETERS</span>
+  ecutwfc = 60           <span class="c">! Ry</span>
+  nat = 2 ntyp = 1
+/
+&amp;ELECTRONS
+  conv_thr = 1.0d-8      <span class="c">! SCF 收敛阈值</span>
+/
+ATOMIC_SPECIES
+  Si  28.086  si_pbe_v1.uspp.F.UPF
+ATOMIC_POSITIONS crystal
+  Si  0.00  0.00  0.00
+  Si  0.25  0.25  0.25
+CELL_PARAMETERS angstrom
+  0.0  2.72 2.72
+  2.72 0.0  2.72
+  2.72 2.72 0.0
+K_POINTS automatic
+  8 8 8  0 0 0
+</code></pre>
+<p>四个必填 namelist（<code>&amp;CONTROL</code>、<code>&amp;SYSTEM</code>、<code>&amp;ELECTRONS</code>、<code>&amp;CELL</code> + 几个 card 块（<code>ATOMIC_SPECIES</code>、<code>ATOMIC_POSITIONS</code>、<code>CELL_PARAMETERS</code>、<code>K_POINTS</code>）。</p>
+<p class="echo">注释符是 <code>!</code>（不是 <code>#</code>）；浮点用 <code>1.0d-4</code>（不是 <code>1.0e-4</code>，d 是 double）；布尔用 <code>.true.</code> / <code>.false.</code>。
+这些小坑就是 LLM 第一次写 QE input 最容易翻的。v3 的 <code>qe_tools.py</code> 直接给函数封装这些细节。</p>
+</div>
+
+
+<!-- ════════════ §6 ════════════ -->
+<h2 id="s6">§6 Si bulk 贯穿 · 准备阶段</h2>
+
+<p>从现在开始我们用 <strong>Si 单晶（金刚石结构）</strong>把全套流程跑一遍。Si 是 DFT 的 "Hello World"——
+半导体经典材料、空间群 227 (Fd-3m)、间接 gap、参数都背得滚瓜烂熟。</p>
+
+<h3>6.1 拿初始结构</h3>
+
+<p>研究员一般从 <a href="https://next-gen.materialsproject.org/">Materials Project</a> 拿（Si 的 entry 是 <code>mp-149</code>）。
+里面有实验测好的晶格常数 a = 5.43 Å，原子位置 Si in 8a Wyckoff position。
+在 bench 里这个结构由 task_prompt 给好，agent 直接读。</p>
+
+<h3>6.2 写第一个 scf.in</h3>
+
+<p>下面是 Si T2 题里 agent 真的写出来的 SCF 输入文件（已加中文注释）：</p>
+
+<pre><code><span class="c">! 这是 Si bulk SCF 的实际输入（来自 bench T2 题成功跑）</span>
+<span class="k">&amp;CONTROL</span>
+   calculation      = <span class="s">'scf'</span>          <span class="c">! 自洽场计算（不动结构）</span>
+   verbosity        = <span class="s">'high'</span>         <span class="c">! 输出详细些方便诊断</span>
+   tstress          = .true.         <span class="c">! 算应力（vc-relax 需要）</span>
+   tprnfor          = .true.         <span class="c">! 算原子力</span>
+   outdir           = <span class="s">'./out_scf'</span>     <span class="c">! 中间临时文件放这</span>
+   prefix           = <span class="s">'si'</span>           <span class="c">! 临时文件前缀</span>
+   pseudo_dir       = <span class="s">'./pseudos'</span>     <span class="c">! UPF 文件在这</span>
+<span class="k">/</span>
+<span class="k">&amp;SYSTEM</span>
+   ecutwfc          = <span class="n">60.0</span>           <span class="c">! 波函数平面波截断 (Ry)</span>
+   ecutrho          = <span class="n">480.0</span>          <span class="c">! 电荷密度截断；USPP 取 8×</span>
+   occupations      = <span class="s">'smearing'</span>     <span class="c">! 用 smearing 让数值稳</span>
+   degauss          = <span class="n">0.01</span>           <span class="c">! smearing 宽度 (Ry)</span>
+   smearing         = <span class="s">'gaussian'</span>     <span class="c">! 类型：高斯（Si 是半导体宽不严格）</span>
+   nspin            = <span class="n">1</span>              <span class="c">! 1 = 非自旋极化（Si 没磁性）</span>
+   ntyp             = <span class="n">1</span>              <span class="c">! 元素种类数</span>
+   nat              = <span class="n">2</span>              <span class="c">! 原子总数（金刚石原胞 2 个 Si）</span>
+   ibrav            = <span class="n">0</span>              <span class="c">! 0 = 用下面 CELL_PARAMETERS</span>
+<span class="k">/</span>
+<span class="k">&amp;ELECTRONS</span>
+<span class="k">/</span>
+ATOMIC_SPECIES
+Si <span class="n">28.085</span> si_pbe_v1.uspp.F.UPF
+K_POINTS automatic
+<span class="n">8 8 8</span>  <span class="n">0 0 0</span>                <span class="c">! 8×8×8 Monkhorst-Pack 网格，无偏移</span>
+CELL_PARAMETERS angstrom            <span class="c">! 金刚石 fcc 原胞向量</span>
+<span class="n">0.0  2.7217 2.7217</span>
+<span class="n">2.7217  0.0  2.7217</span>
+<span class="n">2.7217  2.7217  0.0</span>
+ATOMIC_POSITIONS angstrom
+Si <span class="n">1.361  1.361  1.361</span>            <span class="c">! Si 占 (1/4,1/4,1/4) 分数坐标</span>
+Si <span class="n">0.0   0.0   0.0</span>
+</code></pre>
+
+<h3>6.3 跑、看收敛</h3>
+
+<p>跑命令很简单：<code>pw.x -in scf.in &gt; scf.out</code>。Si bulk 8 核 CPU 约 30 秒跑完。
+看 <code>scf.out</code> 关键几行（取自真实输出）：</p>
+
+<pre><code>     <span class="hi">total energy              =     -19.19052547 Ry</span>      <span class="c">! 第 1 轮 SCF</span>
+     <span class="hi">total energy              =     -19.19289405 Ry</span>      <span class="c">! 第 2 轮（在收敛）</span>
+     <span class="hi">total energy              =     -19.19303975 Ry</span>      <span class="c">! 第 3 轮</span>
+     the Fermi energy is     6.4266 ev
+!    <span class="hi">total energy              =     -19.19308046 Ry</span>      <span class="c">! 第 4 轮（! 前缀=收敛后的最终值）</span>
+     convergence has been achieved in   4 iterations
+</code></pre>
+
+<p>4 次迭代就收敛了——绝缘体 SCF 一般 5-10 次。"<strong>convergence has been achieved</strong>" 这行没有意味着失败。</p>
+
+<div class="agent-callout">
+传统人类：先猜 ecutwfc，从低到高扫一遍（30 → 40 → 50 → 60 → 80），看总能差小于 1 mRy 就停——这就是
+"<strong>收敛测试</strong>"。同样地扫 k-mesh：4×4×4 → 6×6×6 → 8×8×8。一个新材料这一步要 1-2 天。
+<br><br>
+Agent：bench 把 ecutwfc=60 / k=8×8×8 直接写进 v3 的 system prompt（"Si 类材料用这个值"），
+跳过收敛测试。<strong>这是有代价的</strong>——agent 不知道这个值对 W、Hf 等过渡金属是否够；
+v5 的下一步是加 "automatic convergence test" 子 agent，自己扫一遍。
+</div>
+
+
+<!-- ════════════ §7 ════════════ -->
+<h2 id="s7">§7 Si bulk vc-relax（对应 T1）</h2>
+
+<h3>7.1 vc-relax 跟 SCF 的差异</h3>
+
+<p>SCF 是<strong>固定结构</strong>算电子态。vc-relax 是在<strong>SCF 外面套一个优化循环</strong>——
+每个 SCF 跑完后看 forces 和 stress，调整原子位置 + 晶胞，再跑下一轮 SCF。直到 force / stress 都低于阈值。</p>
+
+<p>对应 input 的差异：<code>&amp;CONTROL</code> 里 <code>calculation = 'vc-relax'</code>，
+然后<strong>新增三个 namelist</strong>：</p>
+
+<pre><code><span class="k">&amp;IONS</span>
+   ion_dynamics     = <span class="s">'bfgs'</span>           <span class="c">! 原子位置优化算法（BFGS 拟牛顿）</span>
+<span class="k">/</span>
+<span class="k">&amp;CELL</span>
+   cell_dynamics    = <span class="s">'bfgs'</span>           <span class="c">! 晶胞优化算法</span>
+   <span class="hi">press_conv_thr   = 0.05</span>            <span class="c">! 压力收敛阈值 (kbar) — v3 lint 严的默认</span>
+<span class="k">/</span>
+
+<span class="c">! 同时在 &CONTROL 里加：</span>
+   etot_conv_thr    = <span class="n">1e-05</span>           <span class="c">! 能量收敛阈值 (Ry)</span>
+   forc_conv_thr    = <span class="n">0.0001</span>          <span class="c">! 力收敛阈值 (Ry/Bohr) — 严</span>
+   nstep            = <span class="n">100</span>             <span class="c">! 最多 100 轮优化</span>
+</code></pre>
+
+<p><strong>三个阈值</strong>（<code>etot_conv_thr</code> / <code>forc_conv_thr</code> / <code>press_conv_thr</code>）就是 v3 lint hook 会自动收紧的那三个。
+QE 默认值都松一个数量级，松弛完结构会偏离对称导致空间群降级。</p>
+
+<h3>7.2 跑完看输出</h3>
+
+<p>真实输出里关键几段：</p>
+
+<pre><code><span class="c">! 一次 vc-relax 里 SCF + 几何步骤交替进行：</span>
+<span class="c">! 第 1 个 BFGS 步——SCF 收敛后报告 forces / stress / 新 cell</span>
+     ...
+     convergence has been achieved in   8 iterations
+     total energy              =     -19.18904 Ry
+     <span class="hi">Total force =     0.000003     Total SCF correction =     0.000000</span>
+     <span class="hi">total   stress  (Ry/bohr**3)   ...  =    1.78 kbar</span>      <span class="c">! 应力还有 1.78 kbar</span>
+
+CELL_PARAMETERS (angstrom)                                    <span class="c">! 新晶胞</span>
+   0.000000  2.72381  2.72381
+   2.72381   0.000000 2.72381
+   2.72381   2.72381  0.000000
+
+<span class="c">! ... 几个 BFGS 步之后 ...</span>
+
+     <span class="hi">Final enthalpy           =     -19.1932157117 Ry</span>     <span class="c">! 最终能量</span>
+CELL_PARAMETERS (angstrom)                                    <span class="c">! 优化好的晶胞</span>
+   0.000000  2.73329  2.73329                                 <span class="c">! a = √2 × 2.7333 = 3.866 Å (T1 评分对照值)</span>
+   2.73329   0.000000 2.73329
+   2.73329   2.73329  0.000000
+
+     Final scf calculation at the relaxed structure.          <span class="c">! 最后再 SCF 一次确认</span>
+     ...
+   JOB DONE.                                                  <span class="c">! 成功结束标记</span>
+</code></pre>
+
+<h3>7.3 验证：把最终结构丢给 pymatgen 算空间群</h3>
+
+<p>agent 拿到 <code>CELL_PARAMETERS</code> + <code>ATOMIC_POSITIONS</code> 后，用 pymatgen 这样验证：</p>
+
+<pre><code><span class="k">from</span> pymatgen.core <span class="k">import</span> Structure
+<span class="k">from</span> pymatgen.symmetry.analyzer <span class="k">import</span> SpacegroupAnalyzer
+
+s = Structure(lattice=cell, species=symbols, coords=positions)
+sga = SpacegroupAnalyzer(s, symprec=<span class="n">0.01</span>)            <span class="c">! 容差 0.01 Å</span>
+print(sga.get_space_group_number())                <span class="c"># 期待 227 (Si fcc)</span>
+print(sga.get_point_group_symbol())                <span class="c"># 期待 m-3m</span>
+print(sga.get_crystal_system())                    <span class="c"># 期待 cubic</span>
+</code></pre>
+
+<p>T1 的 ground truth 字段（来自 <code>M1_T1_Si_vc_relax.json</code>）：</p>
+
+<table>
+<thead><tr><th>字段</th><th>期望值</th><th>容差</th></tr></thead>
+<tbody>
+<tr><td><code>a</code></td><td>3.866 Å</td><td>±1% relative</td></tr>
+<tr><td><code>b</code></td><td>3.866 Å</td><td>±1% relative</td></tr>
+<tr><td><code>c</code></td><td>3.866 Å</td><td>±1% relative</td></tr>
+<tr><td><code>alpha / beta / gamma</code></td><td>60.0°</td><td>±1° absolute</td></tr>
+<tr><td><code>space_group_number</code></td><td>227</td><td>exact match</td></tr>
+<tr><td><code>point_group</code></td><td>m-3m</td><td>exact match</td></tr>
+<tr><td><code>crystal_system</code></td><td>cubic</td><td>exact match</td></tr>
+</tbody>
+</table>
+
+<p>注意：这里的 a / b / c = <strong>原胞向量长度</strong>（3.866 Å），不是常说的"Si 晶格常数 5.43 Å"——后者是<strong>常规胞</strong>
+（conventional cell）的边长。原胞是 fcc，原胞向量长度 = 5.43 / √2 ≈ 3.84 Å（PBE 算出来稍大些）。</p>
+
+<div class="agent-callout">
+传统人类：看 <code>Final enthalpy</code> + 最后一段 <code>CELL_PARAMETERS</code>，复制到 ASE / pymatgen 验证空间群——
+是熟练老手 30 秒内的事。<br><br>
+Agent 的脆弱点：
+<ol>
+<li><strong>阈值没收紧</strong>（QE 默认松一个数量级）→ 力还没真正收敛就停 → 晶胞偏对称几度 →
+pymatgen 在 symprec=0.01 下识别为低对称（如三方 166）→ 扣 0.25 分。<br>
+    <strong>已修</strong>：v3 的 <code>qe_input_lint</code> 在 bash 调 pw.x 前自动改 input 文件把三个阈值收紧到 v3 默认。</li>
+<li><strong>跑完忘了用 pymatgen 验证</strong>：agent 只看到 "JOB DONE" 就 submit，没看空间群是不是对——审计才发现降级。<br>
+    <strong>v5 修</strong>：MCP <code>parse_structure</code> + <code>verify_run</code> 工具强制做这步并 fail 掉。</li>
+<li><strong>nstep=100 不够用</strong>：复杂体系（CsPbI3 / HfO2）几十步还在抖，bfgs 没收敛就被 nstep 截断。<br>
+    <strong>未修</strong>：v5 加 budget-aware termination 后能在 timeout 前提交"现有最好结果"。</li>
+</ol>
+</div>
+
+
+<!-- ════════════ §8 ════════════ -->
+<h2 id="s8">§8 Si bulk SCF + bands（T2 第一段）</h2>
+
+<p>能带计算<strong>分两步</strong>——这是 QE 跟其他软件区别最大的地方之一。</p>
+
+<h3>8.1 Step A · SCF on uniform k-mesh（建电荷密度）</h3>
+
+<p>用 §6 的 <code>scf.in</code>（同 8×8×8 网格）跑一次，得到自洽的电子密度。
+关键产物：<code>out_scf/si.save/charge-density.dat</code>（电荷密度二进制）。</p>
+
+<h3>8.2 Step B · NSCF along BZ path（在路径上求本征值）</h3>
+
+<p>"<strong>NSCF</strong>" = Non-Self-Consistent Field：固定上一步得到的电荷密度，<strong>不再自洽迭代</strong>，
+只在新的 k 点列表上求本征值。这能省时间。</p>
+
+<p>k-list 由 <strong>seekpath</strong> 自动给——对 fcc 空间群 227，得到一条
+Γ → X → U → K → Γ → L → W → X 的路径，每段插值出 ~30 个 k 点，总共 ~240 个 k 点：</p>
+
+<pre><code><span class="c">! bands_nscf.in 关键片段（取自 Si T2 真实运行）</span>
+<span class="k">&amp;CONTROL</span>
+  calculation = <span class="s">'bands'</span>            <span class="c">! 注意是 'bands' 不是 'nscf'——QE 的 quirk</span>
+  prefix = <span class="s">'si'</span>
+  outdir = <span class="s">'./out_scf'</span>              <span class="c">! 复用 SCF 的 out 目录（读 charge density）</span>
+<span class="k">/</span>
+<span class="k">&amp;SYSTEM</span>
+  ibrav = <span class="n">0</span>
+  ecutwfc = <span class="n">60</span>
+  ecutrho = <span class="n">480</span>
+  <span class="hi">nbnd = 16</span>                       <span class="c">! 算多少个能带（默认只算占据态，bands 要多算空态）</span>
+<span class="k">/</span>
+<span class="k">&amp;ELECTRONS</span>
+  conv_thr = <span class="n">1.0d-8</span>
+<span class="k">/</span>
+...
+K_POINTS crystal
+  <span class="n">241</span>                              <span class="c">! 241 个 k 点（沿 BZ path）</span>
+  0.00000000  0.00000000  0.00000000  1.0
+  0.01250000  0.00000000  0.01250000  1.0
+  0.02500000  0.00000000  0.02500000  1.0
+  ... (240 more)
+</code></pre>
+
+<p><strong>nbnd</strong> 是这里特别要小心的：QE 默认只算占据态（Si 8 个价电子 / 原胞 = 4 个能带），
+但能带图需要看到 Fermi 以上的空态。一般 <code>nbnd = 2 × occupied_bands + 几个 buffer</code>——
+Si 至少 8、稳妥 16。少了导带画不全，多了浪费 CPU。</p>
+
+<h3>8.3 Step C · 用 bands.x 把 NSCF 结果整理成 bands.dat</h3>
+
+<p>NSCF 结束后 <code>out_scf/si.bands.dat</code> 还是 QE 内部格式。<code>bands.x</code> 是后处理工具，
+把 241 个 k 点 × 16 个能带的本征值整理成画图友好的格式。输入文件很简单：</p>
+
+<pre><code><span class="k">&amp;BANDS</span>
+  prefix = <span class="s">'si'</span>
+  outdir = <span class="s">'./out_scf'</span>
+  filband = <span class="s">'bands.dat'</span>             <span class="c">! 输出文件名</span>
+  lsym = .false.                  <span class="c">! 不做对称性 unfold</span>
+<span class="k">/</span>
+</code></pre>
+
+<p>跑 <code>bands.x &lt; bands_pp.in &gt; bands_pp.out</code>，产出 <code>bands.dat</code>（每行：k_distance + 16 个能带能量）。
+拿这个文件直接画图：横轴 k 路径、纵轴能量、16 条曲线就是能带。</p>
+
+<h3>8.4 拿能带数据找 VBM / CBM</h3>
+
+<p>对 Si（8 价电子，4 个占据能带）：</p>
+<ol>
+<li>每个 k 点的能带按能量升序排，前 4 个是占据带（valence），后 12 个是空带（conduction）</li>
+<li>VBM = max over k 点 of 第 4 个能带能量 → 找到 VBM 在哪个 k 点（Si 是 Γ）</li>
+<li>CBM = min over k 点 of 第 5 个能带能量 → 找到 CBM 在哪个 k 点
+（Si 在 BZ 内部约 (0.85, 0, 0.85)，不在 high-symmetry path 上 → label = <code>OFF_PATH</code>）</li>
+<li>Band gap = CBM − VBM = 0.62 eV（PBE 算出来，实验值 1.12 eV——PBE 低估）</li>
+<li>Gap type = indirect（VBM 和 CBM 不同 k 点）</li>
+</ol>
+
+<p>T2 的 ground truth 字段（来自 <code>M1_T2_Si_bands_dos.json</code>）：</p>
+
+<table>
+<thead><tr><th>字段</th><th>期望值</th><th>容差</th></tr></thead>
+<tbody>
+<tr><td><code>band_gap_ev</code></td><td>0.621</td><td>±0.1 eV</td></tr>
+<tr><td><code>gap_type</code></td><td>indirect</td><td>exact</td></tr>
+<tr><td><code>vbm_k_label</code></td><td>GAMMA</td><td>exact</td></tr>
+<tr><td><code>cbm_k_label</code></td><td>OFF_PATH</td><td>exact</td></tr>
+</tbody>
+</table>
+
+<div class="agent-callout">
+传统人类：跑 bands → 在 python 里读 <code>bands.dat</code> → matplotlib 画图 → 肉眼找 VBM / CBM 的 k 位置。
+熟练老手用 ASE-bandstructure 一行命令出图。<br><br>
+Agent 的脆弱点：
+<ol>
+<li><strong>NSCF 误用 <code>'nscf'</code> 而不是 <code>'bands'</code></strong>：QE 里要做 band-structure NSCF 一定要写
+<code>calculation = 'bands'</code>，写 <code>'nscf'</code> 算出来 k 点对不上。<br>
+    v5 的 MCP <code>write_qe_input(calc="bands", ...)</code> 强制 calc 字段必须是合法的几个值之一。</li>
+<li><strong>nbnd 选少了</strong>：默认 occupied_only=4，agent 把这数写进去 → 导带就 0 条 → CBM 找不到。<br>
+    v3 system prompt 写了 "<code>nbnd = 2× occupied + buffer</code>"，v5 工具描述里也强调。</li>
+<li><strong>VBM / CBM 的 k 标签算错</strong>：Si CBM 在内部 OFF_PATH 而不在 X / L 等标准点上——
+agent 容易把"距离最近的标准 k 点"误报。<br>
+    没现成自动化——需要后处理脚本判 "最近 high-symmetry k 距离 &lt; tolerance 才报 label，否则 OFF_PATH"。</li>
+<li><strong>忘了先跑 SCF，直接跑 NSCF</strong>：bands.x 读 <code>out_scf/si.save/</code> 里的 charge density，
+没 SCF 这步就没有。<br>
+    v3 system prompt 显式列出 5 阶段；v5 的 verify_run 强制检查 SCF 输出存在才放过。</li>
+</ol>
+</div>
+
+
+<!-- ════════════ §9 ════════════ -->
+<h2 id="s9">§9 Si bulk DOS（T2 第二段）</h2>
+
+<p>态密度（DOS）需要的 k-mesh 跟 bands 完全不同——bands 是<strong>沿路径稀疏采样</strong>，
+DOS 是<strong>整个 BZ 均匀采样</strong>越密越准。所以又得跑一次 NSCF，参数不一样。</p>
+
+<h3>9.1 NSCF on dense k-mesh</h3>
+
+<pre><code><span class="c">! dos_nscf.in 关键差异</span>
+<span class="k">&amp;CONTROL</span>
+  calculation = <span class="s">'nscf'</span>             <span class="c">! 这次写 'nscf'（不是 'bands'）</span>
+  ...
+<span class="k">/</span>
+<span class="k">&amp;SYSTEM</span>
+  ...
+  occupations = <span class="s">'tetrahedra'</span>       <span class="c">! tetrahedra 法适合金属 DOS 积分；半导体也能用</span>
+  <span class="hi">nbnd = 16</span>
+<span class="k">/</span>
+K_POINTS automatic
+  <span class="hi">24 24 24  0 0 0</span>                <span class="c">! 比 SCF 的 8×8×8 密 3 倍（24×24×24 / 8×8×8 ≈ 27 倍 k 点）</span>
+</code></pre>
+
+<h3>9.2 用 dos.x 后处理</h3>
+
+<pre><code><span class="k">&amp;DOS</span>
+  prefix = <span class="s">'si'</span>
+  outdir = <span class="s">'./out_scf'</span>
+  fildos = <span class="s">'dos.dat'</span>               <span class="c">! 输出文件名</span>
+  Emin = <span class="n">1.19</span>                     <span class="c">! 能量积分范围下限 (eV，Fermi - 5)</span>
+  Emax = <span class="n">11.19</span>                    <span class="c">! 上限 (Fermi + 5)</span>
+  DeltaE = <span class="n">0.01</span>                   <span class="c">! 能量步长</span>
+<span class="k">/</span>
+</code></pre>
+
+<p>跑 <code>dos.x &lt; dos.in &gt; dos.out</code>，产出 <code>dos.dat</code>（两列：能量 + DOS 值）。
+顶部一行会有 Fermi energy（如 <code>"# E (eV)   dos (states/eV)   ... # EFermi =  6.2538 eV"</code>）。</p>
+
+<p>T2 的 ground truth 字段：</p>
+
+<table>
+<thead><tr><th>字段</th><th>期望值</th><th>容差</th></tr></thead>
+<tbody>
+<tr><td><code>dos_e_fermi</code></td><td>6.254 eV</td><td>±0.1 eV</td></tr>
+<tr><td><code>dos_curve</code></td><td>整条曲线（Fermi ±5 eV 范围）</td><td>L2 距离 ≤ 0.1</td></tr>
+</tbody>
+</table>
+
+<div class="agent-callout">
+传统人类：从 scf.out / dos.out 里 grep "Fermi energy" 一行就有 e_fermi。画图 / 跟实验对照看 DOS 形状是不是合理。<br><br>
+Agent 的脆弱点：
+<ol>
+<li><strong>DOS k-mesh 不够密</strong>：拿 8×8×8 直接跑 dos.x → 曲线锯齿严重 → L2 距离过大扣分。<br>
+    v3 system prompt 推荐 16-24× 密；v5 的 <code>write_qe_input</code> 检测 calc='nscf' 且用途是 DOS 时给建议值。</li>
+<li><strong>忘了跑 dos.x</strong>：只跑 nscf 就 submit，导致 <code>dos.dat</code> 不存在 → 评分系统找不到 → 0 分。
+"忘了跑后处理"是真实出现的错误模式。<br>
+    v3 用 system prompt 反复强调 "5 阶段必须走完"；v5 的 verify_run 强制查文件存在。</li>
+<li><strong>Fermi 能量读错位置</strong>：scf.out 和 dos.dat 各有一份 Fermi，应优先用 dos.dat 头部的（因为 dos.x
+重新计算了一次）。agent 容易报错版本。</li>
+<li><strong>Emin / Emax 设错</strong>：agent 不知道当前 Fermi 大致在哪 → Emin = 0 / Emax = 30 等 → 浪费时间且 dos.dat 太长。
+v3 prompt 让 agent 先看 scf.out 拿到 Fermi 再设。</li>
+</ol>
+</div>
+
+
+<!-- ════════════ §10 ════════════ -->
+<h2 id="s10">§10 怎么"读"QE 输出文件</h2>
+
+<p>QE 的 <code>.out</code> 是纯文本，长但有规律。学会用 grep 找几个关键 marker 就够了。</p>
+
+<h3>10.1 典型 .out 文件结构</h3>
+
+<pre><code>     <span class="c">! ========= 文件头：版本、引用、并行配置 =========</span>
+     Program PWSCF v.7.4 starts on 14May2026 at  0:36:57
+     Parallel version (MPI), running on     4 processors
+
+     <span class="c">! ========= 输入回显：QE 重复打印你写的 input =========</span>
+     Reading input from si_vcrelax.in
+     Current dimensions of program PWSCF are:
+     ...
+
+     <span class="c">! ========= 几何 / 对称性分析 =========</span>
+     bravais-lattice index     =            0
+     lattice parameter (alat)  =       7.2628  a.u.
+     unit-cell volume          =          83.4 (a.u.)^3
+     space group =      ...
+
+     <span class="c">! ========= 赝势信息 =========</span>
+     PseudoPot. # 1 for Si read from file:
+     ...
+
+     <span class="c">! ========= SCF 迭代开始 =========</span>
+     Self-consistent Calculation
+     iteration #  1     ecut=    60.00 Ry
+     total cpu time spent up to now is     0.5 secs
+     total energy              =     -19.18 Ry
+     ...
+
+     <span class="hi">convergence has been achieved in   4 iterations</span>      <span class="c">! ★ 关键：是否收敛</span>
+     <span class="hi">!    total energy              =     -19.193 Ry</span>           <span class="c">! ★ ! 前缀=最终值</span>
+     <span class="hi">the Fermi energy is     6.4266 ev</span>                       <span class="c">! ★ Fermi 能量</span>
+
+     <span class="c">! ========= 性能统计 =========</span>
+     PWSCF       :   2m29.80s CPU   8m20.60s WALL
+
+     <span class="c">! ========= 结束标记 =========</span>
+     <span class="hi">JOB DONE.</span>                                                <span class="c">! ★ 没这行=异常退出</span>
+</code></pre>
+
+<h3>10.2 关键 marker（grep 一遍就懂）</h3>
+
+<table>
+<thead><tr><th>marker</th><th>意思</th></tr></thead>
+<tbody>
+<tr><td><code>JOB DONE.</code></td><td>程序正常结束。<strong>缺这个 → 程序崩了 / 被 kill 了</strong>。</td></tr>
+<tr><td><code>convergence has been achieved in N iterations</code></td><td>SCF 收敛了。</td></tr>
+<tr><td><code>convergence NOT achieved after N iterations</code></td><td>SCF 没收敛——常见错误（见 §11）。</td></tr>
+<tr><td><code>!    total energy</code></td><td>前缀 <code>!</code> 表示是最终（收敛后）能量。</td></tr>
+<tr><td><code>the Fermi energy is</code></td><td>本次 SCF 的 Fermi 能量。</td></tr>
+<tr><td><code>highest occupied, lowest unoccupied level</code></td><td>绝缘体 SCF 报这个（VBM / CBM 候选）。</td></tr>
+<tr><td><code>Final enthalpy</code></td><td>vc-relax 优化完毕的最终能量。</td></tr>
+<tr><td><code>Total force =</code></td><td>BFGS 步的力大小。</td></tr>
+<tr><td><code>total   stress</code></td><td>应力张量 + kbar 值。</td></tr>
+<tr><td><code>CELL_PARAMETERS</code> / <code>ATOMIC_POSITIONS</code></td><td>vc-relax 每个 BFGS 步都重打一次。最后一组是优化结果。</td></tr>
+<tr><td><code>Error in routine</code> / <code>%%%</code></td><td>QE 抛出的错误。</td></tr>
+</tbody>
+</table>
+
+
+<!-- ════════════ §11 ════════════ -->
+<h2 id="s11">§11 常见失败模式 / 人类怎么绕开</h2>
+
+<table>
+<thead><tr><th>症状</th><th>典型原因</th><th>人类经验绕开方法</th><th>对应 agent 设计</th></tr></thead>
+<tbody>
+<tr>
+  <td>SCF 不收敛（震荡）</td>
+  <td>金属 / 磁性体系 mixing_beta 太大</td>
+  <td>降到 0.3-0.4；加大 smearing degauss；改 <code>mixing_mode = 'local-TF'</code></td>
+  <td>v5 子 agent <code>convergence_fixer</code> 自动尝试这些</td>
+</tr>
+<tr>
+  <td>SCF 不收敛（缓慢漂移）</td>
+  <td>k-mesh 不够密；ecutwfc 不够；起始密度差</td>
+  <td>加密 k-mesh / 调高 ecut；用前一个相似体系的 charge density 作为起始</td>
+  <td>v5 经验库（experience replay）+ 子 agent 的 6 条 playbook</td>
+</tr>
+<tr>
+  <td>vc-relax 完了空间群从 227 降到 166</td>
+  <td>力 / 应力阈值太松，cell 偏离对称几度</td>
+  <td>用更严的 <code>press_conv_thr=0.05</code> / <code>forc_conv_thr=1e-4</code></td>
+  <td>v3 <code>qe_input_lint</code> 钩子自动收紧</td>
+</tr>
+<tr>
+  <td>vc-relax 跑了 100 步还没收敛</td>
+  <td>初始结构离平衡远；阈值过严</td>
+  <td>先用粗 k-mesh 跑一遍粗优化、再换密 k-mesh 精修</td>
+  <td>v5 尚未实现两段式优化</td>
+</tr>
+<tr>
+  <td>磁性体系算出来无磁矩</td>
+  <td>没设 <code>starting_magnetization</code></td>
+  <td>显式给初始磁矩 +1 / -1 之类强行打破对称</td>
+  <td>v3 system prompt 提；v5 没自动判磁性</td>
+</tr>
+<tr>
+  <td>pw.x 抱怨 "S_psi NaN" / "negative rho"</td>
+  <td>ecutrho 太低（USPP 需要 8-12×）；pseudo 损坏</td>
+  <td>调高 ecutrho；换 pseudo</td>
+  <td>v3 prompt 警告 USPP 要 8×</td>
+</tr>
+<tr>
+  <td>NSCF 之后 bands.x 找不到文件</td>
+  <td>SCF / NSCF 用了不同 outdir 或 prefix</td>
+  <td>统一三者的 outdir + prefix</td>
+  <td>v5 MCP <code>run_pw</code> 用 calc_id 绑定路径</td>
+</tr>
+<tr>
+  <td>DOS 曲线锯齿严重</td>
+  <td>NSCF k-mesh 太稀疏（&lt; 16×16×16）</td>
+  <td>加密到 24×24×24</td>
+  <td>v5 工具描述里建议值</td>
+</tr>
+<tr>
+  <td>pw.x 提交后 5 秒退出无 "JOB DONE"</td>
+  <td>GPU podman init race（基础设施抖动）</td>
+  <td>重试同条命令一遍就好</td>
+  <td>v3 system prompt 写明：retry 而不是 fallback CPU</td>
+</tr>
+</tbody>
+</table>
+
+
+<!-- ════════════ §12 ════════════ -->
+<h2 id="s12">§12 Bench 题目评分字段全对照</h2>
+
+<p>把 §7 / §8 / §9 的所有评分字段汇总——每一项都告诉你 QE 哪一个工具产出、agent 该怎么提取。</p>
+
+<table>
+<thead><tr><th>评分字段</th><th>属于</th><th>QE 工具</th><th>从哪个文件读</th><th>怎么提取</th></tr></thead>
+<tbody>
+<tr><td><code>a, b, c</code></td><td>T1</td><td><code>pw.x vc-relax</code></td><td><code>*.out</code> 末尾 <code>CELL_PARAMETERS</code></td><td>抠 3 个 cell vector，算 norm</td></tr>
+<tr><td><code>alpha, beta, gamma</code></td><td>T1</td><td>同上</td><td>同上</td><td>3 对 cell vector 求 cos<sup>-1</sup></td></tr>
+<tr><td><code>space_group_number</code></td><td>T1</td><td>同上</td><td>同上 + pymatgen</td><td><code>SpacegroupAnalyzer(s).get_space_group_number()</code></td></tr>
+<tr><td><code>point_group</code></td><td>T1</td><td>同上</td><td>同上</td><td><code>SpacegroupAnalyzer(s).get_point_group_symbol()</code></td></tr>
+<tr><td><code>crystal_system</code></td><td>T1</td><td>同上</td><td>同上</td><td><code>SpacegroupAnalyzer(s).get_crystal_system()</code></td></tr>
+<tr><td><code>band_gap_ev</code></td><td>T2</td><td><code>pw.x bands</code> + <code>bands.x</code></td><td><code>bands.dat</code></td><td>CBM (min over k of band[N+1]) − VBM (max over k of band[N])</td></tr>
+<tr><td><code>gap_type</code></td><td>T2</td><td>同上</td><td>同上</td><td>VBM k 跟 CBM k 同点 = direct，否则 indirect</td></tr>
+<tr><td><code>vbm_k_label</code></td><td>T2</td><td>同上</td><td>同上 + seekpath</td><td>找 VBM 所在 k 点，匹配 seekpath 给的高对称点 label</td></tr>
+<tr><td><code>cbm_k_label</code></td><td>T2</td><td>同上</td><td>同上</td><td>同 VBM；不在 high-symmetry path 上的报 <code>OFF_PATH</code></td></tr>
+<tr><td><code>dos_e_fermi</code></td><td>T2</td><td><code>pw.x nscf</code> + <code>dos.x</code></td><td><code>dos.dat</code> 头部 或 <code>dos.out</code></td><td>grep <code>"EFermi"</code></td></tr>
+<tr><td><code>dos_curve</code></td><td>T2</td><td>同上</td><td><code>dos.dat</code></td><td>读两列 (E, DOS)，截 Fermi ±5 eV 区间</td></tr>
+</tbody>
+</table>
+
+
+<!-- ════════════ §13 ════════════ -->
+<h2 id="s13">§13 进阶主题（点到为止）</h2>
+
+<p>你 bench 暂时不涉及这些，但实际研究 / 未来 bench 扩展时绕不开。每个主题给关键词，你想深挖时往这查。</p>
+
+<dl>
+<dt><strong>Phonons（声子）</strong></dt>
+<dd>晶体的振动模式。QE 用 <code>ph.x</code> 算（密度泛函微扰理论 DFPT）。能给你声子色散、声速、热导、动力学稳定性
+（虚频 = 结构不稳）。计算量大、k-mesh 更密。</dd>
+
+<dt><strong>DFT+U</strong></dt>
+<dd>过渡金属氧化物的 d / f 电子，纯 DFT 算出来太离域（band gap 偏小 / 磁矩不对）。加一个 Hubbard U 修正
+（<code>Hubbard_U(1) = 4.0</code>）就能 fix。U 值靠经验或线性响应法定。</dd>
+
+<dt><strong>磁性 / Spin-polarized DFT</strong></dt>
+<dd>设 <code>nspin = 2</code> + <code>starting_magnetization</code>。能算铁磁 / 反铁磁。
+更复杂的 spin-orbit / non-collinear 用 <code>nspin = 4</code>。</dd>
+
+<dt><strong>Hybrid functionals (HSE)</strong></dt>
+<dd>PBE 混入一部分 Hartree-Fock 精确交换。半导体 band gap 准很多，但慢 10-100 倍。</dd>
+
+<dt><strong>热力学 / 相变</strong></dt>
+<dd>能量 + 声子 → 自由能；不同温度 / 压力下哪个相稳。要做的就是声子算多次 + Quasi-Harmonic Approximation。</dd>
+
+<dt><strong>TDDFT / 激发态</strong></dt>
+<dd>含时密度泛函，算光吸收谱。<code>turbo_lanczos.x</code> / <code>tddfpt</code>。准确度有限——
+高精度激发态要 GW + BSE（QE 配 BerkeleyGW 或 yambo）。</dd>
+
+<dt><strong>ML potentials</strong></dt>
+<dd>把 DFT 力训练成神经网络（NEP / DeepMD / MACE）。一次 DFT 计算 = 1000 个 MD step 的数据。
+未来 agent 工作流可能不是"跑 DFT"，而是"跑 ML potential，DFT 只用作 ground truth"。</dd>
+</dl>
+
+
+<!-- ════════════ §14 ════════════ -->
+<h2 id="s14">§14 给 agent 工程师的建议</h2>
+
+<p>读完这份文档你应该对"DFT agent 该自动化什么"有更清晰的判断了。我把这几个观点给你：</p>
+
+<h3>14.1 哪些环节适合 agent 自动化</h3>
+
+<ul>
+<li><strong>结构 → input 文件的代码生成</strong>：Fortran namelist 是机械翻译，没有创造性。v3 的 <code>write_pw_input</code> 已经做了；
+v5 的 <code>write_qe_input</code> MCP 工具进一步把它结构化。</li>
+<li><strong>输出文件的 grep + parse</strong>：JOB DONE / 总能量 / Fermi / cell / 收敛标记都是字符串匹配。
+v5 的 <code>read_qe_output</code> 用 window 函数（tail / errors / forces / scf_steps）取代盲打 grep，让 LLM 不需要重新发明搜索词。</li>
+<li><strong>SCF / vc-relax 收敛阈值的自动收紧</strong>：固定规则（v3 默认值就那三个），可以 lint。
+不用让 LLM 决定，pre-spawn hook 直接改。</li>
+<li><strong>提交前的程序级 sanity check</strong>：JOB DONE 在不在、文件大小够不够、空间群有没有降级——
+机械检查，比让 LLM 自查可靠。v5 verify gate 做这个。</li>
+</ul>
+
+<h3>14.2 哪些环节还需要"人"判断</h3>
+
+<ul>
+<li><strong>选 pseudo</strong>：是用 USPP / NC / PAW？哪个数据集（GBRV / PSlibrary / SSSP）？
+是否需要 semi-core 电子？这些问题没有死规则，靠经验。bench 目前规避——pseudo 路径已经写死。</li>
+<li><strong>判断材料是否有磁性 / spin-orbit / DFT+U</strong>：3d/4f 元素的初值磁矩、Hubbard U 值——
+凭经验。bench 暂时只放无磁性体系绕开。</li>
+<li><strong>定义 "正确" 的 k-mesh / ecutwfc</strong>：传统人类做收敛测试得到。bench 把这些值写死在 prompt 里，
+agent 跳过收敛测试——<strong>对未见过的元素有风险</strong>。</li>
+<li><strong>当 SCF 怎么试都不收敛时，知道是放弃还是换 functional / 换初值</strong>：
+v5 子 agent 实现了 6 条 playbook 但更"创意性"的解决方案还是要人。</li>
+</ul>
+
+<h3>14.3 你 solver 三版本回顾</h3>
+
+<p>结合你已经写过的 v1 / v3 / v5（详见 <a href="solver-versions-explained-2026-05-13.html">三版本设计讲解</a>）：</p>
+
+<table>
+<thead><tr><th>v1 没做但很重要的事</th><th>v3 怎么解决</th><th>v5 怎么进一步</th></tr></thead>
+<tbody>
+<tr><td>QE 语法每次 LLM 自己默写</td><td><code>qe_tools.py</code> 帮助库</td><td>MCP <code>write_qe_input</code> 结构化</td></tr>
+<tr><td>收敛阈值漏写</td><td><code>qe_input_lint</code> 钩子</td><td>同 v3，集成进 MCP 工具</td></tr>
+<tr><td>QE 工具流程乱（先 SCF 还是先 bands）</td><td>377 行 system prompt</td><td>5 个领域 MCP 工具替代 bash，按 calc_id 链式</td></tr>
+<tr><td>提交前不验证空间群</td><td>提示但不强制</td><td><code>verify_run</code> gate 强制查</td></tr>
+<tr><td>SCF 不收敛死循环</td><td>无解</td><td>子 agent <code>convergence_fixer</code></td></tr>
+<tr><td>不知道自己卡了</td><td>无解</td><td>ProgressLedger 7 信号</td></tr>
+</tbody>
+</table>
+
+<h3>14.4 还能继续做的事</h3>
+
+<ol>
+<li><strong>收敛测试自动化</strong>：让 agent 在跑大计算前先扫 ecutwfc / k-mesh 2 个点确认收敛。10 分钟成本，省后续大头。</li>
+<li><strong>用 ASE 当中间层</strong>：不让 LLM 直接拼 QE input，而是先生成 ASE Atoms + 配置字典，再让 ASE export 成 QE format。
+减少 Fortran namelist 错误。</li>
+<li><strong>磁性检测</strong>：根据元素表自动判定 3d/4f 元素 → 是否需要 spin-polarized + DFT+U。一段简单查表逻辑。</li>
+<li><strong>把 baseline 跑分数据反哺 prompt</strong>：v5 的 experience 库已经做了 embedding 检索，但目前只是单向"借鉴"。
+未来可以让 agent 把"哪些 prompt 在 Cd / WO3 上稳定 work"主动总结成新规则注入。</li>
+<li><strong>多 agent 协作</strong>：一个 agent 负责 vc-relax（结构优化）、一个负责 bands（电子结构）、一个负责验证。
+v5 子 agent 是第一步但只对 SCF convergence 用了。</li>
+</ol>
+
+
+<!-- ════════════ §15 ════════════ -->
+<h2 id="s15">§15 延伸阅读</h2>
+
+<h4>权威教程</h4>
+<ul>
+<li><a href="https://www.quantum-espresso.org/Doc/user_guide/">Quantum ESPRESSO User Guide</a>
+    — 官方手册，重点看 INPUT_PW.html（pw.x 所有输入参数）</li>
+<li><a href="https://www.quantum-espresso.org/resources/tutorials">QE 官方 tutorials</a>
+    — Si / graphene / 各种典型材料的 hands-on</li>
+<li>Stefaan Cottenier, <em>"DFT and the family of (L)APW methods: a step-by-step introduction"</em>
+    — 免费 PDF，DFT 数学基础的入门书</li>
+</ul>
+
+<h4>结构数据库</h4>
+<ul>
+<li><a href="https://next-gen.materialsproject.org/">Materials Project</a> — 拿初始结构</li>
+<li><a href="https://oqmd.org/">OQMD</a> / <a href="https://aflowlib.org/">AFLOW</a> — 同上，竞品</li>
+<li><a href="https://www.crystallography.net/cod/">COD</a> — 实验晶体结构数据库</li>
+</ul>
+
+<h4>Python 工具链</h4>
+<ul>
+<li><a href="https://wiki.fysik.dtu.dk/ase/">ASE (Atomic Simulation Environment)</a> — Atoms 对象 + 多 DFT 软件 export 接口</li>
+<li><a href="https://pymatgen.org/">pymatgen</a> — 空间群分析、结构匹配、能带 / DOS 分析</li>
+<li><a href="https://github.com/aiidateam/aiida-quantumespresso">AiiDA + AiiDA-QE</a> — workflow 自动化框架（学术圈最主流的"非 LLM agent" 自动化方案）</li>
+</ul>
+
+<h4>本项目内的相关报告</h4>
+<ul>
+<li><a href="solver-versions-explained-2026-05-13.html">三版本 Solver Agent 设计讲解</a> — agent 框架本身</li>
+<li><a href="agent-design-survey-2026-05-13.html">DFT Agent 架构调研 · 跨域 SOTA 模式提炼</a> — 未来方向</li>
+<li><a href="baseline-2026-05-10.html">Baseline 148 题报告</a> — 实测 v1 跑的结果</li>
+<li><a href="standard27-solverv3-vs-baseline-2026-05-12.html">solverv3 vs baseline 27 题对照</a> — v3 实测</li>
+</ul>
+
+
+<div class="note" style="margin-top: 40px;">
+<strong>读完了下一步</strong>：手痒可以装个 QE（<code>conda install -c conda-forge qe</code>），按 §6-§9 把 Si 跑一遍——
+跑通的瞬间 DFT 就不再抽象了。或者直接看一个 bench 题的真实 run（<code>~/bench/runs_local/&lt;...Si...&gt;/workdir/</code>），
+对照 §6-§9 的 input/output snippet 看一遍。
+</div>
+
+</body>
+</html>
