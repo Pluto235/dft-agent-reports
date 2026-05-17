@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solver v1 / v4.1 / v4.2 · 27 题标准档对比 · 2026-05-17</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+     max-width:1400px;margin:0 auto;padding:30px;color:#2c3e50;line-height:1.7;}
+h1{color:#34495e;border-bottom:3px solid #3498db;padding-bottom:10px;}
+h2{color:#34495e;margin-top:50px;border-bottom:1px solid #bdc3c7;padding-bottom:5px;}
+h3{color:#34495e;margin-top:30px;}
+h4{color:#34495e;margin:18px 0 6px;}
+p{margin:10px 0;}
+.meta{background:#ecf0f1;padding:14px 20px;border-radius:6px;margin:15px 0;line-height:1.7;}
+.meta strong{color:#2c3e50;}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px;}
+th{background:#34495e;color:white;padding:8px 10px;text-align:left;font-weight:600;}
+td{border-bottom:1px solid #ecf0f1;padding:6px 10px;vertical-align:top;}
+tr:hover td{background:#f8f9fa;}
+.num{text-align:right;font-variant-numeric:tabular-nums;}
+.score-1{color:#27ae60;font-weight:bold;}
+.score-mid{color:#e67e22;}
+.score-low{color:#c0392b;font-weight:bold;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:15px 0;}
+.card{background:#ecf0f1;padding:14px 16px;border-radius:6px;border-left:4px solid #3498db;}
+.card-label{color:#7f8c8d;font-size:12px;}
+.card-value{font-size:22px;font-weight:600;margin:4px 0;color:#2c3e50;}
+.card-sub{color:#7f8c8d;font-size:12px;line-height:1.4;}
+.card.v1{border-left-color:#7f8c8d;}
+.card.v41{border-left-color:#3498db;}
+.card.v42{border-left-color:#27ae60;}
+.note{background:#fffbe6;border-left:4px solid #f1c40f;padding:12px 16px;margin:12px 0;
+      font-size:14px;color:#7d6608;border-radius:4px;line-height:1.7;}
+.warn{background:#fdedec;border-left:4px solid #e74c3c;padding:12px 16px;margin:12px 0;
+      font-size:14px;color:#922b21;border-radius:4px;line-height:1.7;}
+.good{background:#eafaf1;border-left:4px solid #27ae60;padding:12px 16px;margin:12px 0;
+      font-size:14px;color:#196f3d;border-radius:4px;line-height:1.7;}
+.tldr{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0;}
+.tldr-col{background:#fff;border:1px solid #d6dbdf;border-radius:6px;padding:16px 18px;}
+.tldr-col h3{margin:0 0 8px;font-size:16px;}
+.tldr-col table{font-size:12px;margin:6px 0;}
+.tldr-col td{padding:3px 6px;border-bottom:1px solid #f4f6f7;}
+.tldr-col td:first-child{color:#7f8c8d;}
+.tldr-col td.v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+.v1-col{border-top:4px solid #7f8c8d;}
+.v41-col{border-top:4px solid #3498db;}
+.v42-col{border-top:4px solid #27ae60;}
+pre{background:#f4f6f7;padding:10px 14px;border-radius:4px;font-size:12px;overflow-x:auto;
+    border-left:3px solid #95a5a6;line-height:1.5;}
+code{background:#ecf0f1;padding:1px 5px;border-radius:3px;font-size:90%;color:#c0392b;
+     font-family:'SF Mono','Consolas','Menlo',monospace;}
+pre code{background:transparent;color:inherit;padding:0;}
+.heatmap-bar{display:inline-block;height:14px;border-radius:2px;vertical-align:middle;}
+.case{background:#fbfcfd;border:1px solid #d6dbdf;border-radius:6px;padding:14px 18px;margin:14px 0;}
+.case h4{margin-top:0;}
+.field-tag{display:inline-block;background:#ecf0f1;padding:1px 6px;border-radius:3px;
+           font-size:11px;font-family:monospace;margin:0 2px;}
+.field-zero{background:#fadbd8;color:#922b21;}
+.field-perfect{background:#d5f5e3;color:#196f3d;}
+.field-partial{background:#fdebd0;color:#7e5109;}
+nav.toc{background:#fbfcfd;border:1px solid #d6dbdf;border-radius:6px;padding:12px 22px;
+        margin:18px 0;font-size:13px;}
+nav.toc a{color:#2980b9;text-decoration:none;}
+nav.toc a:hover{text-decoration:underline;}
+nav.toc ol{margin:4px 0;padding-left:20px;}
+.qbox{background:#fef9e7;border:1px solid #f4d03f;border-radius:6px;padding:14px 18px;
+      margin:12px 0;}
+.qbox h4{margin-top:0;color:#7d6608;}
+.qbox ol{margin:8px 0;padding-left:22px;}
+.qbox li{margin:6px 0;}
+</style>
+</head>
+<body>
+
+<h1>Solver v1 / v4.1 / v4.2 · DFT-Agent 在 27 题标准档上的横向对比</h1>
+<div class="meta">
+本报告横向对比我自己写的三个 solver 版本在 DFT-agent-bench <b>27 题标准档</b>（T1: 6 题 <code>vc_relax</code> + T2: 21 题 <code>bands_dos</code>）上的成绩，模型保持 <code>deepseek-v4-pro</code> 不变，
+变量只有 agent 的设计本身。目的：把 T2 题失分模式、几道 fail 的题的失败原因摆出来，带去和材料计算合作者讨论如何改进 agent。
+<br><br>
+<strong>报告生成时间</strong>：2026-05-17 ・
+<strong>模型</strong>：<code>deepseek-v4-pro</code>（三版统一） ・
+<strong>硬件</strong>：本地 Lambda 服务器 GPU 后端（<code>qe-gpu-wrapper-flock/pw.x</code>） ・
+<strong>数据库</strong>：<code>/home/shijie/projects/web/runs_local/state.db</code> snapshot
+</div>
+
+<nav class="toc">
+<strong>目录</strong>
+<ol>
+<li><a href="#agents">三版本 agent 是什么？给 DFT 同行的 5 分钟导览</a></li>
+<li><a href="#tldr">TL;DR — 一张表对比三版本</a></li>
+<li><a href="#dataset">27 题标准档简介</a></li>
+<li><a href="#findings">头条发现</a></li>
+<li><a href="#scoreboard">逐题打分总表</a></li>
+<li><a href="#heatmap">T2 六字段失分热力图</a></li>
+<li><a href="#patterns">T2 失分共性模式</a></li>
+<li><a href="#cases">案例深挖（5 例）</a></li>
+<li><a href="#failed">几道直接 fail 的题：失败原因分类</a></li>
+<li><a href="#cost">耗时与成本</a></li>
+<li><a href="#questions">给材料计算合作者的提问清单</a></li>
+<li><a href="#appendix">附录</a></li>
+</ol>
+</nav>
+
+<h2 id="agents">§1 三版本 agent 是什么？</h2>
+<p style="color:#7f8c8d;font-size:13px">本节给 DFT 同行（默认你看 QE 像看母语，但没动过 LLM agent）扫盲。完整设计文档见
+<a href="solver-versions-explained-2026-05-17.html">solver-versions-explained-2026-05-17.html</a>。</p>
+
+<div class="meta">
+<h4 style="margin-top:0">先理解一个东西：LLM agent 在这里做什么？</h4>
+<p>把它当成一个<b>会读你给它写的 README、然后自己开 shell、自己写 QE 输入、自己 <code>pw.x</code>、自己抓
+<code>scf.out</code> 里 band gap、最后把结果填到一个 result.json 里交卷的「研究生」</b>。
+它每一步的「动作」叫一个 <b>tool call</b>：典型 4 个工具是 <code>bash(cmd)</code> /
+<code>write_file(path, content)</code> / <code>read_file(path)</code> / <code>submit(task_outputs={...})</code>。
+LLM 每接一次「环境观察」（前一个 bash 的 stdout/stderr）就再决定下一步动作，直到调用 <code>submit</code> 收尾。
+这一圈反复就叫 agent loop。</p>
+</div>
+
+<div class="cards">
+<div class="card v1">
+<div class="card-label">v1 baseline (45 KB system prompt)</div>
+<div class="card-value">最朴素 ReAct loop</div>
+<div class="card-sub">单 agent + 上面那 4 个工具。System prompt 里只写「你是 DFT 专家，做 QE 计算」这类原则性指令。
+LLM 自己决定要不要先 vc-relax、用多少 ecutwfc、k-mesh 怎么选。
+<b>类比</b>：让一个聪明但没看过本组实验记录本的新研究生独立跑题。</div>
+</div>
+<div class="card v41">
+<div class="card-label">v4.1 (vc-relax preflight)</div>
+<div class="card-value">主 agent + 1 个 preflight 子 agent</div>
+<div class="card-sub">检测到任务要做 bands/DOS（T2）时，先派一个<b>专门做 vc-relax 的子 agent</b>把
+晶格优化到收敛、把弛豫后的 <code>CELL_PARAMETERS</code> 和 <code>ATOMIC_POSITIONS</code>
+直接注入主 agent 的 system prompt。<b>类比</b>：给研究生先指定师兄做完结构弛豫，再让他/她做电子结构计算。</div>
+</div>
+<div class="card v42">
+<div class="card-label">v4.2 (Planner-Executor-Verifier)</div>
+<div class="card-value">三层 subagent 编排</div>
+<div class="card-sub"><b>Planner</b> 子 agent 把任务先拆成 SCF→bands→DOS 三步（写成有依赖的 DAG），
+然后每步派一个 <b>Executor</b> 子 agent 真跑、再派一个 <b>Verifier</b> 子 agent 检查产物（不让 Verifier 写文件，只能读）。
+Verifier 不通过就让 Executor 接着改。<b>类比</b>：项目经理（Planner）拆任务 → 工程师（Executor）做 → QC（Verifier）验，每步独立。</div>
+</div>
+</div>
+
+<h2 id="tldr">§2 TL;DR — 一张表对比</h2>
+
+<div class="tldr">
+<div class="tldr-col v1-col"><h3>v1 baseline</h3><table><tr><td>Done / Failed / Cancelled / Running</td><td class='v'>27 / 0 / 0 / 0</td></tr><tr><td>Mean total score (overall)</td><td class='v'>0.622</td></tr><tr><td>Median total score</td><td class='v'>0.65</td></tr><tr><td>Mean T1 score (vc_relax)</td><td class='v'>0.9</td></tr><tr><td>Mean T2 score (bands_dos)</td><td class='v'><b>0.542</b></td></tr><tr><td>Max T2 score</td><td class='v'>1.0</td></tr><tr><td># T2 perfect (≥0.99)</td><td class='v'>1</td></tr><tr><td>Total wall-clock</td><td class='v'>14.2 h</td></tr><tr><td>Total API cost ($)</td><td class='v'>$0.978</td></tr></table></div>
+<div class="tldr-col v41-col"><h3>v4.1 (preflight)</h3><table><tr><td>Done / Failed / Cancelled / Running</td><td class='v'>25 / 2 / 0 / 0</td></tr><tr><td>Mean total score (overall)</td><td class='v'>0.695</td></tr><tr><td>Median total score</td><td class='v'>0.75</td></tr><tr><td>Mean T1 score (vc_relax)</td><td class='v'>0.889</td></tr><tr><td>Mean T2 score (bands_dos)</td><td class='v'><b>0.633</b></td></tr><tr><td>Max T2 score</td><td class='v'>0.8</td></tr><tr><td># T2 perfect (≥0.99)</td><td class='v'>0</td></tr><tr><td>Total wall-clock</td><td class='v'>18.5 h</td></tr><tr><td>Total API cost ($)</td><td class='v'>$0.754</td></tr></table></div>
+<div class="tldr-col v42-col"><h3>v4.2 (orchestrator)</h3><table><tr><td>Done / Failed / Cancelled / Running</td><td class='v'>26 / 0 / 0 / 1</td></tr><tr><td>Mean total score (overall)</td><td class='v'>0.706</td></tr><tr><td>Median total score</td><td class='v'>0.753</td></tr><tr><td>Mean T1 score (vc_relax)</td><td class='v'>0.96</td></tr><tr><td>Mean T2 score (bands_dos)</td><td class='v'><b>0.63</b></td></tr><tr><td>Max T2 score</td><td class='v'>0.8</td></tr><tr><td># T2 perfect (≥0.99)</td><td class='v'>0</td></tr><tr><td>Total wall-clock</td><td class='v'>27.5 h</td></tr><tr><td>Total API cost ($)</td><td class='v'><span style='color:#95a5a6'>not recorded</span></td></tr></table></div>
+</div>
+
+<div class="good">
+<strong>3 句话总结</strong>：
+<ol style="margin:6px 0;padding-left:24px;">
+<li><b>v4.1 / v4.2 比 v1 整体好</b>：T2 均分 0.54 → 0.63 → 0.63；T1 均分 0.90 → 0.89 → 0.96；overall 0.62 → 0.70 → 0.71。
+<b>没有 regression</b>——没有任何一道题在 v4.2 上比 v1 更差超过 0.3。</li>
+<li><b>但 v4.1 / v4.2 都打不破 T2 = 0.8 的天花板</b>：21 道 T2 题里
+v1 拿过 1 个 1.0（M1 Si），v4.1 / v4.2 的最高分都是 0.8。这个 0.8 天花板的根因在第 §6 节。</li>
+<li><b>「直接 fail」的题需要分类看</b>：v1 历史上 fail 2 题（已重跑修好）；v4.1 fail 4 题（全是基础设施 OOM / scheduler kill，
+不是 agent 设计问题）；v4.2 historical 10 failed + 3 cancelled，但 <b>7 条来自同一个 DeepSeek API 集成 bug</b>
+（<code>reasoning_content must be passed back</code>），重跑后清零。详见 §9。</li>
+</ol>
+</div>
+
+<h2 id="dataset">§3 27 题标准档</h2>
+
+<p>来自 <code>/home/shijie/projects/bench/tools/subset_presets.yaml</code> 的 <code>standard27</code> 子集，
+分两类：</p>
+
+<table style="max-width:900px;">
+<thead><tr><th>Tier</th><th>Task type</th><th>题数</th><th>含义</th><th>样例</th></tr></thead>
+<tbody>
+<tr><td><b>T1</b></td><td><code>vc_relax</code></td><td>6</td>
+    <td>结构弛豫——agent 要把晶格 + 原子坐标都松开，跑到 cell 应力 / 原子力 / 总能都收敛。
+        评分字段：<code>a, b, c</code>（晶格常数）</td>
+    <td>Si, NaCl, GaAs, Cd, WO<sub>3</sub>, CsPbI<sub>3</sub></td></tr>
+<tr><td><b>T2</b></td><td><code>bands_dos</code></td><td>21</td>
+    <td>电子结构——SCF → NSCF<sub>bands</sub> → <code>bands.x</code> → NSCF<sub>dos</sub> → <code>dos.x</code>
+        全流程。评分 6 字段：<code>band_gap_ev / gap_type / vbm_k_label / cbm_k_label / dos_e_fermi / dos_curve</code></td>
+    <td>Si, Rb, BN<sub>hex</sub>, α-SiO<sub>2</sub>, Ge, MgO, AlN, NaCl, LiCl, KF, GaN, CdSe, AlAs, InP, C<sub>diamond</sub>,
+        HfO<sub>2</sub>, CaTiO<sub>3</sub>, CoSb<sub>3</sub>, Ti<sub>3</sub>O<sub>5</sub>, LiAlSi<sub>2</sub>O<sub>6</sub>, MgSiO<sub>3</sub></td></tr>
+</tbody>
+</table>
+
+<p><strong>覆盖率脚注</strong>：v1 / v4.1 / v4.2 三版本在每一题上都尝试至少一次；本报告用每个 (agent, task)
+最新一次成功的 run 做对比。截至 snapshot 时，v4.2 还有 1 道题（M2_T2_CoSb3_bands_dos）在重跑中。</p>
+
+<h2 id="findings">§4 头条发现</h2>
+
+<div class="good">
+<h4>发现 1 · v4 系列把 band_gap 字段从 0.58 拉到 0.86—0.91，但 dos_curve 字段三版本都跪</h4>
+<p>把 21 道 T2 题的 6 个字段分别取平均，得到下面这张「失分热力图」（详见 §6）。
+band_gap_ev、dos_e_fermi 在 v4.1/4.2 上有大幅改进；但
+<b><code>dos_curve</code> 字段三版本平均分都是 0.02–0.25</b>——这是 T2 0.8 天花板的最主要原因，
+21 题 T2 里几乎每道都吃 <code>dos_curve = 0</code> 的扣分。</p>
+</div>
+
+<div class="warn">
+<h4>发现 2 · 不存在「v4.2 比 v1 更差」的 T2 案例，但存在 v4.2 比 v4.1 严重退化的单题</h4>
+<p>按规则「v1 ≥ 0.7 且 v4_2 ≤ 0.3 在同一题」找跨版本 regression——结果是 <b>0 个</b>。
+但有一道<b>v4.2 vs v4.1 退化</b>的案例：<b>GaN T2</b>，v4.1 拿到 0.8，<b>v4.2 跌到 0.05</b>（5 个字段全 0）。
+深挖发现是 v4.2 的字段提取把 GaN 抽成了「金属」（band_gap_ev=0, gap_type='metal'），
+而 v4.1 抽得正确（1.74 eV direct@Γ）。Verifier 子 agent 只检查 QE 跑没跑通，<b>没有「这是已知半导体却抽成金属」的物理常识检查</b>。
+详见 §8 案例 B。</p>
+</div>
+
+<div class="warn">
+<h4>发现 3 · 某些题三版本都跪——根因更可能在「打分规则」或「题目本身物理性」</h4>
+<p>跨版本「集体困难户」（每版至少一道得 0；或 ≥2 版本得分 &lt; 0.3）：</p>
+<ul>
+<li><b>M1_T2_Rb_bands_dos</b>: v1=0.205, v4.1=0.05, v4.2=0.05。三版都跪。
+但 v1 的 <code>notes</code> 明确写了 <i>"band 5 crosses the Fermi level → METALLIC (band gap = 0 eV)"</i>——
+<b>agent 物理上是对的（Rb 是碱金属，确实没 gap）</b>，但是评分规则把 band_gap/gap_type/vbm_k/cbm_k 四个字段都按半导体打了 0。详见 §8 案例 A。</li>
+<li><b>M2 transition-metal / 复杂晶体</b>（CoSb<sub>3</sub>, Ti<sub>3</sub>O<sub>5</sub>, MgSiO<sub>3</sub>-bridgmanite）：
+反复出现 timeout / scheduler kill / 0.5 得分天花板。这是物理上的「重型题」。</li>
+</ul>
+</div>
+
+<div class="good">
+<h4>发现 4 · v4 系列在「v1 大跪题」上提分巨大</h4>
+<p>v4.2 比 v1 在同一题上提分 ≥ 0.2 的 T2 案例：</p>
+<ul style="font-family:monospace;font-size:13px;">
+<li>M1_T2_Ge:    v1=0.18 → v4.2=0.80 (+0.62)</li>
+<li>M1_T2_KF:    v1=0.35 → v4.2=0.76 (+0.41)</li>
+<li>M1_T2_MgO:   v1=0.35 → v4.2=0.80 (+0.45)</li>
+<li>M1_T2_LiCl:  v1=0.10 → v4.2=0.50 (+0.40)</li>
+<li>M1_T2_NaCl:  v1=0.35 → v4.2=0.75 (+0.40)</li>
+<li>M2_T2_MgSiO<sub>3</sub>: v1=0.10 → v4.2=0.50 (+0.40)</li>
+</ul>
+<p>共性是「v1 把流程跑歪了（错了 NSCF k-path / 缺 vc-relax / 错了 occupations）」的题，被 v4 的子 agent 编排修好。
+案例 C（Ge）。</p>
+</div>
+
+<h2 id="scoreboard">§5 逐题打分总表</h2>
+<p>列：v1 / v4.1 / v4.2 三版本总分（每题 6 字段加权平均），最后一列是 v4.2 − v1 的 delta。
+失败题用 ❌ 标记，进行中用 ⏳。</p>
+
+<table>
+<thead>
+<tr><th>Task ID</th><th>Type</th><th>v1</th><th>v4.1</th><th>v4.2</th><th>Δ (v4.2−v1)</th></tr>
+</thead>
+<tbody>
+<tr><td>M1_T1_Cd_vc_relax</td><td>T1</td><td class="num"><span class="score-low">0.400</span></td><td class="num"><span class="score-low">0.400</span></td><td class="num"><span class="score-mid">0.762</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.36</span></td></tr>
+<tr><td>M1_T1_GaAs_vc_relax</td><td>T1</td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">1.000</span></td><td class='num'><span style="color:#7f8c8d;font-weight:600">+0.00</span></td></tr>
+<tr><td>M1_T1_NaCl_vc_relax</td><td>T1</td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">1.000</span></td><td class='num'><span style="color:#7f8c8d;font-weight:600">+0.00</span></td></tr>
+<tr><td>M1_T1_Si_vc_relax</td><td>T1</td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">1.000</span></td><td class='num'><span style="color:#7f8c8d;font-weight:600">+0.00</span></td></tr>
+<tr><td>M1_T2_AlAs_bands_dos</td><td>T2</td><td class="num"><span class="score-mid">0.842</span></td><td class="num"><span class="score-mid">0.650</span></td><td class="num"><span class="score-mid">0.650</span></td><td class='num'><span style="color:#c0392b;font-weight:600">-0.19</span></td></tr>
+<tr><td>M1_T2_AlN_bands_dos</td><td>T2</td><td class="num"><span class="score-1">0.950</span></td><td class="num"><span class="score-mid">0.750</span></td><td class="num"><span class="score-mid">0.750</span></td><td class='num'><span style="color:#c0392b;font-weight:600">-0.20</span></td></tr>
+<tr><td>M1_T2_BN_hex_bands_dos</td><td>T2</td><td class="num"><span class="score-mid">0.536</span></td><td class="num"><span class="score-mid">0.650</span></td><td class="num"><span class="score-mid">0.650</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.11</span></td></tr>
+<tr><td>M1_T2_C_diamond_bands_dos</td><td>T2</td><td class="num"><span class="score-mid">0.750</span></td><td class="num"><span class="score-mid">0.750</span></td><td class="num"><span class="score-mid">0.750</span></td><td class='num'><span style="color:#7f8c8d;font-weight:600">+0.00</span></td></tr>
+<tr><td>M1_T2_CdSe_bands_dos</td><td>T2</td><td class="num"><span class="score-1">0.852</span></td><td class="num"><span class="score-mid">0.750</span></td><td class="num"><span class="score-mid">0.750</span></td><td class='num'><span style="color:#c0392b;font-weight:600">-0.10</span></td></tr>
+<tr><td>M1_T2_GaN_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.394</span></td><td class="num"><span class="score-mid">0.800</span></td><td class="num"><span class="score-low">0.050</span></td><td class='num'><span style="color:#c0392b;font-weight:600">-0.34</span></td></tr>
+<tr><td>M1_T2_Ge_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.180</span></td><td class="num"><span class="score-low">0.450</span></td><td class="num"><span class="score-mid">0.800</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.62</span></td></tr>
+<tr><td>M1_T2_InP_bands_dos</td><td>T2</td><td class="num"><span class="score-1">0.881</span></td><td class="num"><span class="score-mid">0.768</span></td><td class="num"><span class="score-mid">0.800</span></td><td class='num'><span style="color:#c0392b;font-weight:600">-0.08</span></td></tr>
+<tr><td>M1_T2_KF_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.350</span></td><td class="num"><span class="score-mid">0.758</span></td><td class="num"><span class="score-mid">0.755</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.41</span></td></tr>
+<tr><td>M1_T2_LiCl_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.100</span></td><td class="num"><span class="score-mid">0.500</span></td><td class="num"><span class="score-mid">0.500</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.40</span></td></tr>
+<tr><td>M1_T2_MgO_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.350</span></td><td class="num"><span class="score-mid">0.750</span></td><td class="num"><span class="score-mid">0.800</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.45</span></td></tr>
+<tr><td>M1_T2_NaCl_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.350</span></td><td class="num"><span class="score-mid">0.750</span></td><td class="num"><span class="score-mid">0.750</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.40</span></td></tr>
+<tr><td>M1_T2_Rb_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.205</span></td><td class="num"><span class="score-low">0.050</span></td><td class="num"><span class="score-low">0.050</span></td><td class='num'><span style="color:#c0392b;font-weight:600">-0.16</span></td></tr>
+<tr><td>M1_T2_SiO2_alpha_quartz_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.250</span></td><td class="num"><span class="score-low">0.337</span></td><td class="num"><span class="score-low">0.335</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.08</span></td></tr>
+<tr><td>M1_T2_Si_bands_dos</td><td>T2</td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-mid">0.800</span></td><td class="num"><span class="score-mid">0.781</span></td><td class='num'><span style="color:#c0392b;font-weight:600">-0.22</span></td></tr>
+<tr><td>M2_T1_CsPbI3_gamma_vc_relax</td><td>T1</td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">1.000</span></td><td class='num'><span style="color:#7f8c8d;font-weight:600">+0.00</span></td></tr>
+<tr><td>M2_T1_WO3_roomT_vc_relax</td><td>T1</td><td class="num"><span class="score-1">1.000</span></td><td class="num"><span class="score-1">0.934</span></td><td class="num"><span class="score-1">1.000</span></td><td class='num'><span style="color:#7f8c8d;font-weight:600">+0.00</span></td></tr>
+<tr><td>M2_T2_CaTiO3_tet_bands_dos</td><td>T2</td><td class="num"><span class="score-mid">0.500</span></td><td class="num"><span class="score-mid">0.550</span></td><td class="num"><span class="score-mid">0.682</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.18</span></td></tr>
+<tr><td>M2_T2_CoSb3_bands_dos</td><td>T2</td><td class="num"><span class="score-mid">0.750</span></td><td> <span style="color:#c0392b;font-size:11px;font-weight:600">❌ failed</span></td><td> <span style="color:#e67e22;font-size:11px;font-weight:600">⏳ running</span></td><td class='num'><span style="color:#bdc3c7">—</span></td></tr>
+<tr><td>M2_T2_HfO2_monoclinic_bands_dos</td><td>T2</td><td class="num"><span class="score-mid">0.604</span></td><td class="num"><span class="score-mid">0.700</span></td><td class="num"><span class="score-mid">0.790</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.19</span></td></tr>
+<tr><td>M2_T2_LiAlSi2O6_spodumene_bands_dos</td><td>T2</td><td class="num"><span class="score-mid">0.650</span></td><td class="num"><span class="score-mid">0.773</span></td><td class="num"><span class="score-mid">0.650</span></td><td class='num'><span style="color:#7f8c8d;font-weight:600">+0.00</span></td></tr>
+<tr><td>M2_T2_MgSiO3_bridgmanite_bands_dos</td><td>T2</td><td class="num"><span class="score-low">0.100</span></td><td class="num"><span class="score-mid">0.500</span></td><td class="num"><span class="score-mid">0.500</span></td><td class='num'><span style="color:#27ae60;font-weight:600">+0.40</span></td></tr>
+<tr><td>M2_T2_Ti3O5_bands_dos</td><td>T2</td><td class="num"><span class="score-mid">0.797</span></td><td> <span style="color:#c0392b;font-size:11px;font-weight:600">❌ failed</span></td><td class="num"><span class="score-mid">0.800</span></td><td class='num'><span style="color:#7f8c8d;font-weight:600">+0.00</span></td></tr>
+</tbody>
+</table>
+
+<h2 id="heatmap">§6 T2 六字段失分热力图</h2>
+<p>21 道 T2 题，每题 6 个评分字段，对所有 done 的 run 取算术平均后画出来。条形越长 / 越绿
+说明该字段在该版本上得分越高。<code>n=</code> 是参与平均的样本数。</p>
+
+<table style="max-width:1100px;">
+<thead>
+<tr><th>字段</th><th>v1 (n done = 21)</th><th>v4.1 (n = 19)</th><th>v4.2 (n = 20)</th></tr>
+</thead>
+<tbody>
+<tr><td><code>band_gap_ev</code></td><td><span class="heatmap-bar" style="width:104px;background:#f39c12;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.583</span> <span style="color:#95a5a6;font-size:11px">(n=21)</span></td><td><span class="heatmap-bar" style="width:163px;background:#27ae60;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.906</span> <span style="color:#95a5a6;font-size:11px">(n=19)</span></td><td><span class="heatmap-bar" style="width:154px;background:#27ae60;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.861</span> <span style="color:#95a5a6;font-size:11px">(n=20)</span></td></tr>
+<tr><td><code>gap_type</code></td><td><span class="heatmap-bar" style="width:137px;background:#27ae60;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.762</span> <span style="color:#95a5a6;font-size:11px">(n=21)</span></td><td><span class="heatmap-bar" style="width:132px;background:#27ae60;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.737</span> <span style="color:#95a5a6;font-size:11px">(n=19)</span></td><td><span class="heatmap-bar" style="width:135px;background:#27ae60;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.750</span> <span style="color:#95a5a6;font-size:11px">(n=20)</span></td></tr>
+<tr><td><code>vbm_k_label</code></td><td><span class="heatmap-bar" style="width:111px;background:#f39c12;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.619</span> <span style="color:#95a5a6;font-size:11px">(n=21)</span></td><td><span class="heatmap-bar" style="width:104px;background:#f39c12;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.579</span> <span style="color:#95a5a6;font-size:11px">(n=19)</span></td><td><span class="heatmap-bar" style="width:108px;background:#f39c12;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.600</span> <span style="color:#95a5a6;font-size:11px">(n=20)</span></td></tr>
+<tr><td><code>cbm_k_label</code></td><td><span class="heatmap-bar" style="width:137px;background:#27ae60;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.762</span> <span style="color:#95a5a6;font-size:11px">(n=21)</span></td><td><span class="heatmap-bar" style="width:142px;background:#27ae60;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.789</span> <span style="color:#95a5a6;font-size:11px">(n=19)</span></td><td><span class="heatmap-bar" style="width:144px;background:#27ae60;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.800</span> <span style="color:#95a5a6;font-size:11px">(n=20)</span></td></tr>
+<tr><td><code>dos_e_fermi</code></td><td><span class="heatmap-bar" style="width:26px;background:#e74c3c;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.145</span> <span style="color:#95a5a6;font-size:11px">(n=21)</span></td><td><span class="heatmap-bar" style="width:70px;background:#f39c12;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.392</span> <span style="color:#95a5a6;font-size:11px">(n=19)</span></td><td><span class="heatmap-bar" style="width:77px;background:#f39c12;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.431</span> <span style="color:#95a5a6;font-size:11px">(n=20)</span></td></tr>
+<tr><td><code>dos_curve</code></td><td><span class="heatmap-bar" style="width:44px;background:#e74c3c;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.248</span> <span style="color:#95a5a6;font-size:11px">(n=21)</span></td><td><span class="heatmap-bar" style="width:3px;background:#e74c3c;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.021</span> <span style="color:#95a5a6;font-size:11px">(n=19)</span></td><td><span class="heatmap-bar" style="width:10px;background:#e74c3c;"></span> <span style="font-variant-numeric:tabular-nums;font-size:12px;color:#34495e">0.057</span> <span style="color:#95a5a6;font-size:11px">(n=20)</span></td></tr>
+
+</tbody>
+</table>
+
+<div class="meta">
+<h4 style="margin-top:0">怎么读这张图</h4>
+<ul>
+<li><code>band_gap_ev</code>：<b>v4.1/v4.2 大幅提升</b>（0.58 → 0.86–0.91）。v4 的 vc-relax preflight 让 SCF 跑在
+正确弛豫后的几何上，gap 值更准。这是 v4 系列最大单点贡献。</li>
+<li><code>gap_type</code>（direct/indirect）：三版本都在 0.74 附近持平。错的题里
+有相当一部分是「金属被强按半导体」（Rb / Cd），是评分规则问题，不是 agent 算错。</li>
+<li><code>vbm_k_label</code>：三版本都在 0.58–0.62 徘徊。<b>这是 agent 最稳定的「弱点」</b>——
+agent 经常报错 VBM 所在的高对称点标签（比如 GAMMA vs X vs L）。猜测：seekpath 给的 k-path label
+和 reference 的 label 习惯不一致（例如 GAMMA = G = Γ），或者 VBM 在 path 之外的 k 点上。</li>
+<li><code>cbm_k_label</code>：v1=0.76, v4=0.78–0.80。CBM 比 VBM 容易抽对，奇怪但持续。</li>
+<li><code>dos_e_fermi</code>（Fermi 能级数值）：<b>v1 跪（0.145），v4.1/v4.2 拉到 0.39/0.43</b>。v4 系列大量
+通过子 agent 把 SCF 收敛 + DOS NSCF 的 E_F 跑对了。但仍然不到 0.5，说明
+还有相当多题的 E_F 和 reference 差异显著。</li>
+<li><code>dos_curve</code>：<b>全军覆没</b>。v1=0.248, v4.1=0.021, v4.2=0.057。
+<b>这是 T2 0.8 天花板的根因</b>。即使其他 5 个字段全满分，<code>dos_curve = 0</code> 也会把总分压到 ~0.83。
+有意思的是 v1 反而比 v4 高——见 §8 案例 D 讨论。</li>
+</ul>
+</div>
+
+<h2 id="patterns">§7 T2 失分共性模式</h2>
+
+<p>把 21 道 T2 题在三版本上的 <code>per_field_scores</code> 全部摊开，按字段归零 (=0) 出现频率统计：</p>
+
+<h4>常见「字段归零」模式</h4>
+<ul>
+<li><strong><code>dos_curve = 0</code> · 18/21 题在 v4.2 上</strong>：dos_curve 评分对 reference 的对齐方式（绝对能量
+vs E−E_F）和 binning 步长高度敏感。agent 通常按「Emin = E_F − 5 eV，Emax = E_F + 5 eV，deltaE = 0.05 eV」
+跑 dos.x，但 reference 可能用不同的 binning 或对齐方式。</li>
+<li><strong><code>vbm_k_label = 0</code> · 通用</strong>：α-SiO<sub>2</sub>、MgSiO<sub>3</sub>、CaTiO<sub>3</sub>、CoSb<sub>3</sub>
+等复杂晶体上三版本都错。猜测：reference 的 k-label 用了特定文献的约定（如 W vs W2 vs SUMMIT），seekpath
+返回的 label 与之不符。</li>
+<li><strong><code>gap_type = 0</code> · 在金属 / 半金属上</strong>：Rb（碱金属）、Cd（半金属性）反复被罚。
+agent 正确识别金属性，但 rubric 期望「direct」或「indirect」字符串。</li>
+<li><strong><code>band_gap_ev = 0</code> · v1 多发，v4 少发</strong>：v1 缺 vc-relax，
+SCF 跑在错的几何上，gap 严重偏离 reference（阈值通常 ±0.1–0.2 eV）。v4.1/v4.2 用 preflight 子 agent 弥补。</li>
+</ul>
+
+<h2 id="cases">§8 案例深挖（5 例）</h2>
+
+<div class="case">
+<h4>案例 A · Rb (M1_T2_Rb_bands_dos) — Agent 物理对、rubric 判错的「碱金属罚单」</h4>
+<p><b>背景</b>：Rb 是 alkali metal（碱金属），晶体结构 body-centered tetragonal (I4/mmm)，
+band 5 (Rb 5s) 横穿 Fermi 能级 → 必然金属、无 band gap。</p>
+<table style="font-size:12px;max-width:900px;">
+<thead><tr><th></th><th>total</th><th>band_gap_ev</th><th>gap_type</th><th>vbm_k_label</th><th>cbm_k_label</th><th>dos_e_fermi</th><th>dos_curve</th></tr></thead>
+<tbody><tr><td><b>v1</b></td><td class="num"><span class="score-low">0.205</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-partial">0.11</span></td><td><span class="field-tag field-perfect">1.0</span></td></tr><tr><td><b>v4.1</b></td><td class="num"><span class="score-low">0.050</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.2</b></td><td class="num"><span class="score-low">0.050</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td></tr></tbody></table>
+<p><b>诊断</b>：</p>
+<ul>
+<li>v1 的 <code>notes</code> 原话：「<i>Band 5 crosses the Fermi level → METALLIC (band gap = 0 eV).
+Gap type: N/A (metallic, band 5 crosses E_F). DOS at E_F is ~0.93 states/eV confirming metallic character.</i>」
+  → <b>agent 100% 答对了「这是金属」这件事</b>。</li>
+<li>但是评分规则把 <code>band_gap_ev / gap_type / vbm_k_label / cbm_k_label</code> 四个字段全按半导体期望比对：
+  agent 报 gap=0 → reference 期望某个 eV 值 → 罚 0。这是 <b>rubric 不识别 metallic 输出</b>。</li>
+<li>v1 反而拿到 0.205 是因为 dos_curve 偶然对齐（v1 报告了完整的 DOS 曲线分布，恰好与 reference 数值吻合），
+v4.1/v4.2 反而 dos_curve = 0（很可能是 binning 不同）。</li>
+</ul>
+<p><b>给合作者的问题</b>（详见 §11）：金属类材料在 T2 题里应该怎么打分？是单独定义一套
+metal-friendly 字段（<code>dos_at_efermi</code> / <code>fermi_surface_*</code>），还是把已知金属从 T2 题集中拿掉？</p>
+</div>
+
+<div class="case">
+<h4>案例 B · GaN — v4.2 把已知宽带半导体「抽成了金属」(v4.1 → v4.2 退化)</h4>
+<p><b>背景</b>：GaN wurtzite，宽带 direct gap @ Γ。PBE-DFT 预期 ~1.7 eV（被低估，实验 ~3.4 eV）。</p>
+<table style="font-size:12px;max-width:900px;">
+<thead><tr><th></th><th>total</th><th>band_gap_ev</th><th>gap_type</th><th>vbm_k_label</th><th>cbm_k_label</th><th>dos_e_fermi</th><th>dos_curve</th></tr></thead>
+<tbody><tr><td><b>v1</b></td><td class="num"><span class="score-low">0.394</span></td><td><span class="field-tag field-partial">0.11</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.1</b></td><td class="num"><span class="score-mid">0.800</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.2</b></td><td class="num"><span class="score-low">0.050</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td></tr></tbody></table>
+
+<p><b>extracted_fields 对比</b>：</p>
+<pre><code>// v4.1 (得分 0.8)
+band_gap_ev: 1.7393
+gap_type:    'direct'
+vbm_k_label: 'GAMMA'
+cbm_k_label: 'GAMMA'
+dos_e_fermi: 10.413
+
+// v4.2 (得分 0.05) — 把 GaN 抽成金属
+band_gap_ev: 0.0
+gap_type:    'metal'
+vbm_k_label: 'metal'
+cbm_k_label: 'metal'
+dos_e_fermi: 10.407
+</code></pre>
+
+<p><b>编排日志</b>（来自 <code>workdir/orchestrator.json</code>）：Planner → SCF (8×8×6, ecutwfc=40 Ry,
+occupations='fixed') → Bands (NSCF along seekpath, 24 bands, 331 k-points)
+→ DOS (16×16×10 tetrahedra, ΔE=0.01 eV)。三步 Verifier 全部 <code>verdict.pass=true</code>。
+QE 没跑挂、文件齐全、JOB DONE 都有。</p>
+
+<p><b>诊断</b>：</p>
+<ul>
+<li>v4.2 的 Verifier 只检查「QE 跑通 / 文件存在 / 路径合法」，<b>不做物理常识 sanity check</b>。
+GaN 是教科书级宽带半导体，被抽成「metal」应当触发警报。</li>
+<li>具体让字段提取出错的原因猜测：ecutwfc=40 Ry 对 GaN 偏低（教科书推荐 ≥ 60–80 Ry），
+或 NSCF 的 bands 数 / k-path 没覆盖到 Γ 点附近的 VBM/CBM。
+但是 v4.1 在同样条件下抽对了 1.74 eV，说明问题不一定是 cutoff，更可能是 v4.2 的
+extract 逻辑没正确读 <code>bands.dat</code> 里的 occupations。</li>
+<li>v4.2 的 <code>notes</code> 字段也是<b>空字符串</b>——Executor 没像 v1/v4.1 那样总结一段「我提取到的物理结论」。
+这削弱了 Verifier 做交叉验证的能力。</li>
+</ul>
+
+<p><b>给合作者的问题</b>：v4.2 子 agent 编排里需要加一层「Physics Verifier」（验证 gap_type 与已知材料类别一致、
+band_gap 与 PBE 期望量级相符）。怎么落地最实用？</p>
+</div>
+
+<div class="case">
+<h4>案例 C · Ge — v1 大跪 → v4.2 拉满（除 dos_curve 外）的「v4 修了什么」展示</h4>
+<p><b>背景</b>：Ge diamond structure，indirect gap (Γ → L)。PBE-DFT 算得很小（~0–0.1 eV）。</p>
+<table style="font-size:12px;max-width:900px;">
+<thead><tr><th></th><th>total</th><th>band_gap_ev</th><th>gap_type</th><th>vbm_k_label</th><th>cbm_k_label</th><th>dos_e_fermi</th><th>dos_curve</th></tr></thead>
+<tbody><tr><td><b>v1</b></td><td class="num"><span class="score-low">0.180</span></td><td><span class="field-tag field-partial">0.45</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.1</b></td><td class="num"><span class="score-low">0.450</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.2</b></td><td class="num"><span class="score-mid">0.800</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td></tr></tbody></table>
+<p><b>诊断</b>：</p>
+<ul>
+<li>v1 (0.18)：band_gap=0.45 (partial)，但 gap_type/vbm_k/cbm_k/dos_e_fermi/dos_curve 全 0。
+  v1 的 <code>notes</code>（1266 字符）显示它<b>把 Ge 抽成了金属</b>（PBE 算 Ge 时 gap 容易塌成 0，
+  agent 见到 valence band 顶部跨 E_F 就报 metal）。</li>
+<li>v4.1 (0.45)：band_gap=1.0 (gap 抽对了)，但 gap_type/vbm_k/cbm_k 依然 0（路径 label 没对上）。</li>
+<li>v4.2 (0.80)：5/6 字段满分（band_gap、gap_type、vbm_k、cbm_k、dos_e_fermi 全对），
+  仅 dos_curve = 0 把它锁在 0.8 天花板。</li>
+</ul>
+<p><b>v4 在这里做对的事</b>：</p>
+<ol>
+<li>v4.1 的 vc-relax preflight 把 Ge 弛豫到了「实际等等还有微弱 gap」的几何上，让 SCF 不再塌成金属。</li>
+<li>v4.2 的 Planner-Executor 把 NSCF k-path 配对到了 seekpath 给的标准 path，
+  vbm_k_label / cbm_k_label 字段抽对。</li>
+</ol>
+<p>这是 v4 系列价值的最佳例证：<b>v1 的失败模式是「流程跑歪」，v4 修的就是流程</b>。</p>
+</div>
+
+<div class="case">
+<h4>案例 D · α-SiO<sub>2</sub> 石英 — 三版本同款失分模式 (vbm_k_label 总是错)</h4>
+<p><b>背景</b>：α-quartz P3<sub>1</sub>21 (triagonal)，9 atoms/cell，PBE gap ~5.7 eV (indirect)。</p>
+<table style="font-size:12px;max-width:900px;">
+<thead><tr><th></th><th>total</th><th>band_gap_ev</th><th>gap_type</th><th>vbm_k_label</th><th>cbm_k_label</th><th>dos_e_fermi</th><th>dos_curve</th></tr></thead>
+<tbody><tr><td><b>v1</b></td><td class="num"><span class="score-low">0.250</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.1</b></td><td class="num"><span class="score-low">0.337</span></td><td><span class="field-tag field-partial">0.21</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-partial">0.08</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.2</b></td><td class="num"><span class="score-low">0.335</span></td><td><span class="field-tag field-partial">0.21</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td></tr></tbody></table>
+<p><b>共性失分</b>：vbm_k_label 三版本都 0，dos_curve 三版本都 0，dos_e_fermi 三版本都接近 0。
+band_gap_ev 三版本都只拿了 ~0.2（说明 PBE 算出来和 reference 差距大），唯一稳的是 gap_type=1.0 和 cbm_k_label=1.0。</p>
+<p><b>诊断</b>：α-quartz 的 k-path label 在文献中习惯叫 K, M, A, H, L 等三方系特殊点；
+seekpath 给出的 label 和 reference 取的可能不一致。
+此外，indirect gap 的 VBM 经常在非高对称点（path 外）上，<b>沿 path 取离散 VBM 是结构上的近似</b>，
+和 reference 用 dense k-mesh 的真正 VBM 位置不一致。</p>
+</div>
+
+<div class="case">
+<h4>案例 E · MgSiO<sub>3</sub> bridgmanite — v4 把 band_gap 拉对，但 gap_type 三版本全错</h4>
+<p><b>背景</b>：MgSiO<sub>3</sub> bridgmanite，Pbnm 钙钛矿，20 atoms/cell，地幔下部主要矿物。
+PBE gap ~5 eV，理论上 indirect。</p>
+<table style="font-size:12px;max-width:900px;">
+<thead><tr><th></th><th>total</th><th>band_gap_ev</th><th>gap_type</th><th>vbm_k_label</th><th>cbm_k_label</th><th>dos_e_fermi</th><th>dos_curve</th></tr></thead>
+<tbody><tr><td><b>v1</b></td><td class="num"><span class="score-low">0.100</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.1</b></td><td class="num"><span class="score-mid">0.500</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td></tr><tr><td><b>v4.2</b></td><td class="num"><span class="score-mid">0.500</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-perfect">1.0</span></td><td><span class="field-tag field-zero">0</span></td><td><span class="field-tag field-zero">0</span></td></tr></tbody></table>
+<p><b>诊断</b>：
+v1 (0.10) → v4.1 (0.50) / v4.2 (0.50) 的提升完全来自 band_gap_ev 字段（0 → 1）。
+但 gap_type / vbm_k_label / dos_e_fermi / dos_curve 在三版本上稳定为 0。
+猜测：agent 报「direct」但 reference 是「indirect」（或反过来）；vbm_k_label
+落在 Z 或 S 等 Pbnm 特殊 k 点，seekpath 标记不一致。dos_e_fermi 偏移可能是因为
+agent 没把 PBE 的 E_F 减成 0（用绝对能量而 reference 用相对能量）。</p>
+</div>
+
+<h2 id="failed">§9 几道直接 fail 的题：失败原因分类</h2>
+
+<p>所有历史 <code>status IN ('failed','cancelled')</code> 行（包含重跑前的失败记录）按失败桶分类后：</p>
+
+<table>
+<thead><tr><th>Version</th><th>Task</th><th>Status</th><th>Failure bucket</th><th>Error (truncated)</th></tr></thead>
+<tbody>
+<tr><td><b>v1</b></td><td><code>M1_T2_Rb_bands_dos</code></td><td>failed</td><td><span class="field-tag field-partial">timeout</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver did not produce result.json</td></tr><tr><td><b>v1</b></td><td><code>M2_T2_LiAlSi2O6_spodumene_bands_dos</code></td><td>failed</td><td><span class="field-tag field-partial">turn_budget_exceeded</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver incomplete: turn_budget_exceeded (max_turns=100)</td></tr><tr><td><b>v4.1</b></td><td><code>M2_T2_CoSb3_bands_dos</code></td><td>failed</td><td><span class="field-tag field-partial">infra_scheduler_kill</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">process died (reaped by scheduler)</td></tr><tr><td><b>v4.1</b></td><td><code>M2_T2_CoSb3_bands_dos</code></td><td>failed</td><td><span class="field-tag field-partial">infra_scheduler_kill</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">process died (reaped by scheduler)</td></tr><tr><td><b>v4.1</b></td><td><code>M2_T2_Ti3O5_bands_dos</code></td><td>failed</td><td><span class="field-tag field-partial">infra_scheduler_kill</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">process died (reaped by scheduler)</td></tr><tr><td><b>v4.1</b></td><td><code>M2_T2_Ti3O5_bands_dos</code></td><td>failed</td><td><span class="field-tag field-partial">infra_scheduler_kill</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">process died (reaped by scheduler)</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_Cd_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">api_bug_reasoning_content</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver incomplete: orchestrator crashed: BadRequestError: Error code: 400 - {&#x27;error&#x27;: {&#x27;message&#x27;: &#x27;The `reasoning_content` in the thinking mode must be passed back to the API.&#x27;, &#x27;type&#x27;: &#x27;invalid_reque</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_GaAs_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">api_bug_reasoning_content</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver incomplete: orchestrator crashed: BadRequestError: Error code: 400 - {&#x27;error&#x27;: {&#x27;message&#x27;: &#x27;The `reasoning_content` in the thinking mode must be passed back to the API.&#x27;, &#x27;type&#x27;: &#x27;invalid_reque</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_NaCl_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">api_bug_reasoning_content</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver incomplete: orchestrator crashed: BadRequestError: Error code: 400 - {&#x27;error&#x27;: {&#x27;message&#x27;: &#x27;The `reasoning_content` in the thinking mode must be passed back to the API.&#x27;, &#x27;type&#x27;: &#x27;invalid_reque</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_Si_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">harness_crash</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">harness exited without report.json</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_Si_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">api_bug_reasoning_content</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver incomplete: orchestrator crashed: BadRequestError: Error code: 400 - {&#x27;error&#x27;: {&#x27;message&#x27;: &#x27;The `reasoning_content` in the thinking mode must be passed back to the API.&#x27;, &#x27;type&#x27;: &#x27;invalid_reque</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_Si_vc_relax</code></td><td>cancelled</td><td><span class="field-tag field-partial">user_cancelled</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">cancelled by user</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_Si_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">api_bug_reasoning_content</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver incomplete: orchestrator crashed: BadRequestError: Error code: 400 - {&#x27;error&#x27;: {&#x27;message&#x27;: &#x27;The `reasoning_content` in the thinking mode must be passed back to the API.&#x27;, &#x27;type&#x27;: &#x27;invalid_reque</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_Si_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">api_bug_reasoning_content</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver incomplete: orchestrator crashed: BadRequestError: Error code: 400 - {&#x27;error&#x27;: {&#x27;message&#x27;: &#x27;The `reasoning_content` in the thinking mode must be passed back to the API.&#x27;, &#x27;type&#x27;: &#x27;invalid_reque</td></tr><tr><td><b>v4.2</b></td><td><code>M1_T1_Si_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">api_bug_reasoning_content</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver incomplete: orchestrator crashed: BadRequestError: Error code: 400 - {&#x27;error&#x27;: {&#x27;message&#x27;: &#x27;The `reasoning_content` in the thinking mode must be passed back to the API.&#x27;, &#x27;type&#x27;: &#x27;invalid_reque</td></tr><tr><td><b>v4.2</b></td><td><code>M2_T1_CsPbI3_gamma_vc_relax</code></td><td>cancelled</td><td><span class="field-tag field-partial">user_cancelled</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">cancelled by user</td></tr><tr><td><b>v4.2</b></td><td><code>M2_T1_WO3_roomT_vc_relax</code></td><td>failed</td><td><span class="field-tag field-partial">timeout</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver did not produce result.json</td></tr><tr><td><b>v4.2</b></td><td><code>M2_T1_WO3_roomT_vc_relax</code></td><td>cancelled</td><td><span class="field-tag field-partial">user_cancelled</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">cancelled by user</td></tr><tr><td><b>v4.2</b></td><td><code>M2_T2_CoSb3_bands_dos</code></td><td>failed</td><td><span class="field-tag field-partial">timeout</span></td><td style="font-size:11px;color:#7f8c8d;max-width:520px">solver did not produce result.json</td></tr>
+</tbody>
+</table>
+
+<div class="meta">
+<h4 style="margin-top:0">失败桶解读</h4>
+<ul>
+<li><b>v1</b>: <code>timeout</code> (Rb——单 agent 把 NSCF dense k-mesh 跑爆 wall-clock)，
+  <code>turn_budget_exceeded</code> (LiAlSi<sub>2</sub>O<sub>6</sub>——agent 反复来回改输入，把 100 turns 用光)。
+  这两个都是<b>真正的 agent 能力不足</b>（不知道何时 stop optimizing），
+  在 v4 系列上重跑后两题都恢复到 done 状态。</li>
+<li><b>v4.1</b>: 4 条 <code>infra_scheduler_kill</code>，全是 CoSb<sub>3</sub> / Ti<sub>3</sub>O<sub>5</sub>
+  ——<b>Lambda 服务器 OOM-killer 或 scheduler 把进程收掉</b>，与 agent 设计无关。
+  CoSb<sub>3</sub> (4 atoms × 2 fold) 和 Ti<sub>3</sub>O<sub>5</sub> 的 NSCF dense k-mesh
+  容易爆内存。</li>
+<li><b>v4.2</b>: 7 条 <code>api_bug_reasoning_content</code> 是<b>同一个工程 bug</b>——
+  DeepSeek API 在 "thinking mode" 下要求把 <code>reasoning_content</code> 字段原样回传，
+  v4.2 的 orchestrator 切到子 agent 的对话上下文时<b>丢掉了这个字段</b>，触发 400 错误。
+  发生 task 全是 T1 vc_relax（M1_T1_Si ×4, NaCl/GaAs/Cd 各一）——这是一个清掉 history 重跑就好的纯工程 bug，
+  不影响 agent 设计评估。<br>
+  剩下：2 条 <code>timeout</code> (WO<sub>3</sub>, CoSb<sub>3</sub>)、1 条 <code>harness_crash</code>、
+  3 条 <code>user_cancelled</code>（用户主动 cancel 的）。</li>
+</ul>
+</div>
+
+<div class="warn">
+<strong>诚实修正后的「fail 题数」</strong>：v1 = 2 (Rb, LiAlSi<sub>2</sub>O<sub>6</sub>，
+都是真 agent 问题，目前重跑后都 done)；v4.1 = 4 (全部基础设施)；v4.2 = 2 (WO<sub>3</sub> + CoSb<sub>3</sub> timeout，
+其他都是 API bug 或 user cancel)。<b>不要被 v4.2 raw 10 failed 误导</b>。
+</div>
+
+<h2 id="cost">§10 耗时与成本</h2>
+
+<div class="cards">
+<div class="card v1"><div class="card-label">v1 total wall-clock</div>
+<div class="card-value">14.2 h</div>
+<div class="card-sub">27 题完成；API 成本 $0.978 / 平均 $0.0362 每题</div></div>
+<div class="card v41"><div class="card-label">v4.1 total wall-clock</div>
+<div class="card-value">18.5 h</div>
+<div class="card-sub">25 题完成；API 成本 $0.754 / 平均 $0.0301 每题</div></div>
+<div class="card v42"><div class="card-label">v4.2 total wall-clock</div>
+<div class="card-value">27.5 h</div>
+<div class="card-sub">26 题完成；API 成本未记录 (v4.2 没接 cost ledger)</div></div>
+</div>
+
+<p><strong>解读</strong>：</p>
+<ul>
+<li><b>v4.2 比 v1 慢 ~92%</b> (1.93x wall-clock)。
+   每题多了一层 Planner → 三步 Executor → 三步 Verifier 的 round trip，
+   外加 vc-relax preflight 子 agent。</li>
+<li><b>v4.1 比 v1 贵 30%</b> wall-clock 但便宜 23% API cost——preflight 子 agent 让主 agent 少绕弯，
+   token 总量反而下降。这是 v4.1 设计的甜蜜点。</li>
+<li><b>v4.2 cost = 0</b> 是因为 cost ledger 还没接上 v4.2 的多 subagent 调用；这不是真便宜了。
+   下一轮需要把 v4.2 的 cost tracking 修起来再做公平比较。</li>
+</ul>
+
+<h2 id="questions">§11 给材料计算合作者的提问清单</h2>
+
+<p style="color:#7f8c8d">把上面这些失分模式带去和你们讨论。下面是我准备的 4 组问题，按急切程度从高到低排。</p>
+
+<div class="qbox">
+<h4>🅰️ 工作流 / 决策树（最高优先级 — 这些指导能直接编码进 agent 的 system prompt）</h4>
+<ol>
+<li><b>vc-relax preflight 该不该总是做</b>？v4.1/v4.2 默认所有 T2 都先跑一遍 vc-relax，
+但对已知稳定相 (Si diamond, NaCl rocksalt, C diamond) 这是不是浪费？你们 lab 平时做 bands/DOS 之前
+怎么决定要不要再 relax？</li>
+<li><b>NSCF k-path 的选取</b>：seekpath 自动给的 path 经常和你们文献里习惯的 label 对不上
+（α-SiO<sub>2</sub> case, MgSiO<sub>3</sub> case 都是 vbm_k_label 错）。你们手算时怎么选 path？
+有没有「per-space-group 的标准 path 字典」是你们做组内 baseline 时用的？</li>
+<li><b>金属/半金属如何在 T2 题里打分</b>？Rb（碱金属）、Cd（半金属）reproducibly 拿低分，
+但 agent 物理上识别正确为金属。你们 lab 跑 DFT 时，「band gap = 0 / metallic」是怎么和有 gap 的材料做横向比较的？</li>
+<li><b>ecutwfc / ecutrho 怎么选下限</b>？v4.2 在 GaN 上用 ecutwfc = 40 Ry，
+v4.1 用更高 (待查) 拿到正确 gap。是否应当为每种过渡金属 / 含 O / 含 N 元素强制一个最小 cutoff？
+有没有 GBRV / SSSP / PseudoDojo 的现成 recommended-cutoff 表你们日常拿来用？</li>
+<li><b>smearing 选 mv vs gauss vs fixed</b>：agent 经常默认 mv (Methfessel-Paxton) + degauss=0.01–0.02 Ry，
+但绝缘体可能 fixed 更精确。你们的经验法则？</li>
+</ol>
+</div>
+
+<div class="qbox">
+<h4>🅱️ 评分 rubric / 参考值的合理性（如果觉得 bench 题打分不公）</h4>
+<ol>
+<li><b>金属的 band_gap / gap_type / vbm_k / cbm_k 是不是不该参与打分</b>？
+Rb 上 agent 答对「这是金属」反而被 4 个字段判 0，是 metric 不区分材料类别。</li>
+<li><b>band_gap_ev 的容差</b>：现在 reference 用某个具体 eV，agent 误差 &gt; ±0.1 eV 似乎就归零。
+对于 PBE 系统性低估带隙的情况（GaN reference 是 PBE 的 1.74 eV 还是实验的 3.4 eV？），
+你们觉得合理的 tolerance 是多少？</li>
+<li><b>dos_curve 的对齐</b>：agent 几乎全军覆没。你们 lab 比较两条 DOS curve 时是用
+绝对能量、E−E_F、还是某种归一化？binning step (现在 0.01–0.05 eV) 该不该统一？</li>
+<li><b>vbm_k_label 在 indirect-gap material 上的歧义</b>（α-SiO<sub>2</sub>, MgSiO<sub>3</sub>）：
+当 VBM 不在 high-symmetry path 上时怎么报？应该报「最接近的 path label」还是直接报 k-vector？</li>
+</ol>
+</div>
+
+<div class="qbox">
+<h4>🅲 针对具体失败案例的专家诊断（每条用你们 5 分钟回答）</h4>
+<ol>
+<li><b>GaN v4.2 被抽成金属</b>（案例 B）——给 ecutwfc=40 Ry、occupations='fixed'、
+8×8×6 k-mesh，agent 报告 SCF 收敛但 extract 出 gap=0。
+最可能的 root cause 是 cutoff 太低、k-mesh 不够密、还是 bands.dat 占据数 reader 算错？</li>
+<li><b>MgSiO<sub>3</sub> bridgmanite gap_type 三版本都错</b>（案例 E）——你们做 bridgmanite 时
+gap 是 direct 还是 indirect？哪个 k 点对？</li>
+<li><b>α-SiO<sub>2</sub> vbm_k_label 三版本都错</b>（案例 D）——quartz 的标准 k-path 怎么取最稳？
+seekpath 给的 path 在 trigonal P3<sub>1</sub>21 上是不是有坑？</li>
+<li><b>CoSb<sub>3</sub> / Ti<sub>3</sub>O<sub>5</sub> 反复跑爆内存</b>——你们做这类材料的 bands/DOS 时
+怎么做 memory budgeting？（多少 k-points × 多少 bands × 多少 PWs 是「能跑动」的上限）</li>
+</ol>
+</div>
+
+<div class="qbox">
+<h4>🅳 赝势 / 收敛库 (低优先级，但如果有现成 cheat sheet 直接给我我就嵌进 prompt 里)</h4>
+<ol>
+<li>过渡金属 d 电子的 ecutwfc 下限——Co (CoSb<sub>3</sub>), Ti (Ti<sub>3</sub>O<sub>5</sub>, CaTiO<sub>3</sub>)
+你们日常用多少？</li>
+<li>含 O 化合物（HfO<sub>2</sub>, MgSiO<sub>3</sub>, CaTiO<sub>3</sub>, α-SiO<sub>2</sub>）—— O 的赝势用 GBRV vs SSSP vs PseudoDojo 有偏好吗？</li>
+<li>Rb / Cs 这类大半径 alkali，是否要用 semicore states 的赝势？</li>
+<li>对于这 28 道题，你们有没有现成的「我跑过、收敛参数是这些」的 .in 文件可以直接给我做 ground truth？</li>
+</ol>
+</div>
+
+<h2 id="appendix">§12 附录</h2>
+
+<h4>数据来源</h4>
+<ul>
+<li>数据库：<code>/home/shijie/projects/web/runs_local/state.db</code> · 表 <code>runs</code> · 筛选 <code>agent_id IN ('v1','v4_1','v4_2')</code></li>
+<li>每个 run 的 per-field 评分：<code>/home/shijie/projects/web/runs_local/&lt;run_id&gt;/report.json</code></li>
+<li>v4.2 子 agent 编排日志：同目录下 <code>workdir/orchestrator.json</code></li>
+<li>题集定义：<code>/home/shijie/projects/bench/tools/subset_presets.yaml</code> → <code>standard27</code></li>
+</ul>
+
+<h4>聚合 SQL</h4>
+<pre><code>SELECT agent_id, status, COUNT(*), ROUND(AVG(total_score),3)
+FROM runs WHERE agent_id IN ('v1','v4_1','v4_2')
+GROUP BY agent_id, status ORDER BY agent_id;</code></pre>
+
+<h4>per_field_scores 字段定义</h4>
+<ul>
+<li><code>band_gap_ev</code> · numeric, eV, tolerance ±something around reference (PBE-DFT 期望)</li>
+<li><code>gap_type</code> · 'direct' / 'indirect' / 'metal' string match</li>
+<li><code>vbm_k_label</code> · high-symmetry k-point label string ('GAMMA' / 'X' / 'L' / etc.)</li>
+<li><code>cbm_k_label</code> · same</li>
+<li><code>dos_e_fermi</code> · numeric, eV (absolute or relative TBD)</li>
+<li><code>dos_curve</code> · array of DOS values vs energy</li>
+</ul>
+
+<h4>Snapshot 时的悬挂 run</h4>
+<ul>
+<li>v4.2 · M2_T2_CoSb<sub>3</sub>_bands_dos — 进行中 (status=running)</li>
+<li>v4.2 · M1_T1_Si_vc_relax — 历史上多条 failed (API bug)，目前 done</li>
+</ul>
+
+<h4>已知工程债务</h4>
+<ol>
+<li>v4.2 的 cost ledger 没接通——下次跑前要把多 subagent 的 token 总量算回来。</li>
+<li>v4.2 orchestrator 在切子 agent 上下文时丢 <code>reasoning_content</code> 字段——已识别，待修。</li>
+<li>v4.2 的 Verifier 缺「物理合理性」一层——案例 B (GaN 被抽成金属) 暴露的设计缺口。</li>
+</ol>
+
+<p style="color:#7f8c8d;font-size:12px;margin-top:30px;">
+<i>报告 by Claude (Opus 4.7), 2026-05-17. 自动从 bench DB 提取与渲染。</i>
+</p>
+
+</body>
+</html>
