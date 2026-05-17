@@ -97,8 +97,9 @@
 凡是物理细节都会用白话过掉。<br>
 <strong>报告生成时间</strong>：2026-05-17 ・ <strong>篇幅</strong>：约 1 小时阅读，可分段。<br>
 <strong>本次更新</strong>：在 2026-05-13 三版本稿基础上，新增 §14–§17 讲 <strong>v4</strong>
-（submit 前自审 + 任务无关的输出键发现）和 <strong>v4.1</strong>（preflight 子 agent
-两连发）；v5 各节顺延为 §18–§20。
+（submit 前自审 + 任务无关的输出键发现）；§18 集中讲 <strong>v4.1</strong>（preflight
+子 agent 双连发）和 <strong>v4.2</strong>（PlannerOrchestrator 架构重做，跟 v5 形成双路线）；
+v5 各节顺延为 §19–§21。
 </div>
 
 <nav class="toc">
@@ -117,16 +118,17 @@
   <li><a href="#s11">脚手架 4 · bash_guard 安全护栏</a></li>
   <li><a href="#s12">附加 · Prompt Caching 3 个断点</a></li>
   <li><a href="#s13">v3 修了 v1 哪些痛点（一表对照）</a></li>
-  <li><a href="#s18">v4 在 v3 上多做了什么（总览图）</a></li>
-  <li><a href="#s19">v4 增量一：_audit_task_outputs · submit 前自审</a></li>
-  <li><a href="#s20">v4 增量二：parse_required_keys · 任务类型无关</a></li>
-  <li><a href="#s21">v4 杂项 + v4.1 小补丁（preflight 子 agent 两连发）</a></li>
-  <li><a href="#s22">v5 的两个新东西：MCP 工具 + 自动验证</a></li>
-  <li><a href="#s23">v5 的双路径：Claude 路 vs Legacy 路</a></li>
-  <li><a href="#s20">v5 三大新机制深挖</a></li>
-  <li><a href="#s21">四版本一表对照</a></li>
-  <li><a href="#s22">术语表</a></li>
-  <li><a href="#s23">延伸阅读</a></li>
+  <li><a href="#s14">v4 在 v3 上多做了什么（总览图）</a></li>
+  <li><a href="#s15">v4 增量一：_audit_task_outputs · submit 前自审</a></li>
+  <li><a href="#s16">v4 增量二：parse_required_keys · 任务类型无关</a></li>
+  <li><a href="#s17">v4 杂项三件套</a></li>
+  <li><a href="#s18">v4 系续补丁：v4.1（preflight 子 agent）+ v4.2（PlannerOrchestrator）</a></li>
+  <li><a href="#s19">v5 的两个新东西：MCP 工具 + 自动验证</a></li>
+  <li><a href="#s20">v5 的双路径：Claude 路 vs Legacy 路</a></li>
+  <li><a href="#s21">v5 三大新机制深挖</a></li>
+  <li><a href="#s22">四版本一表对照（含 v4.1 / v4.2）</a></li>
+  <li><a href="#s23">术语表</a></li>
+  <li><a href="#s24">延伸阅读</a></li>
 </ol>
 </nav>
 
@@ -143,12 +145,13 @@
 <li>没接触过 agent 工程 → <strong>从 §2 开始顺读</strong>，§3 是通用前置必看</li>
 <li>已经写过简单 agent，想看具体技巧 → 可以跳到 <strong>§7 v3 部分</strong>（最多干货）</li>
 <li>想看 v4 增量（submit 自审 / 任务无关输出键）→ <strong>§14-17</strong>，最适合"已经懂 v3 的人"</li>
-<li>想了解最新 v5 设计 → <strong>§18-20 v5 章节</strong></li>
-<li>只想快速对比四版 → 直接看 <strong>§21 一表对照</strong></li>
+<li>想看 v4.1 preflight + v4.2 orchestrator 怎么搭的 → <strong>§18</strong>，一节看完</li>
+<li>想了解最新 v5 设计 → <strong>§19-21 v5 章节</strong></li>
+<li>只想快速对比四版 → 直接看 <strong>§22 一表对照</strong></li>
 </ul>
 
 <p>遇到生词不要慌——文档里所有重要概念第一次出现时都有 <strong>💡 概念卡片</strong>
-讲清楚，后面再用直接超链回去；<strong>§22 术语表</strong>也可以速查。</p>
+讲清楚，后面再用直接超链回去；<strong>§23 术语表</strong>也可以速查。</p>
 
 
 <!-- ════════════ §2 ════════════ -->
@@ -1153,9 +1156,9 @@ bench 才是"出题人"——出题人在 prompt 里写清楚要交什么，agen
 
 
 <!-- ════════════ §17 ════════════ -->
-<h2 id="s17">§17 v4 杂项 + v4.1 小补丁（preflight 子 agent 两连发）</h2>
+<h2 id="s17">§17 v4 杂项三件套</h2>
 
-<h3>v4 杂项三件套</h3>
+<p>v4 的两个硬增量讲完了，还有三件不大但有用的杂项：</p>
 
 <ul>
 <li><strong>standalone <code>solve.py</code></strong>：v4 把入口提到仓库根，<code>agent/</code>
@@ -1170,7 +1173,29 @@ debug 一个失败 run 时直接读这三个就够。</li>
 经 wrapper 启动；CPU 用 <code>-np 4</code> 直接跑）。同一份 solver 部署到不同后端不用改代码。</li>
 </ul>
 
-<h3>v4.1 小补丁：两个 preflight 子 agent</h3>
+<p>v4 主体到此为止——下一节讲 v4 上线后两周内打的两个续作：
+<strong>v4.1</strong>（在主循环外加 preflight 子 agent）和
+<strong>v4.2</strong>（把整条主循环换成 Magentic-One 风格的 planner-orchestrator）。</p>
+
+
+<!-- ════════════ §18 ════════════ -->
+<h2 id="s18">§18 v4 系续补丁：v4.1（preflight 子 agent）+ v4.2（PlannerOrchestrator）</h2>
+
+<p>v4 上线后的两周里，又往 v4 这一脉上加了两层：</p>
+
+<ul>
+<li><strong>v4.1（2026-05-15 / 16）</strong>——不动主循环，在它<strong>开跑之前</strong>派两个
+子 agent 把"该选哪些参数"决定好，再喂给主 agent。两个 phase 共约 600 行。</li>
+<li><strong>v4.2（2026-05-17）</strong>——<strong>整条主循环换掉</strong>。把一锅 ReAct
+拆成 planner / executor / verifier 三个子 agent，引入双 ledger + 6 种 typed step kinds +
+replan 预算。1500+ 行代码 + 9 个新测试。和 v5 形成"双路线"——同问题、不同栈。</li>
+</ul>
+
+<p>放在同一节讲是因为它们<strong>都是 v4 一脉的延续</strong>（继续在 hand-rolled Anthropic loop
+上加东西，没引入 claude-agent-sdk）；v5 是另一条平行路线，下面 §19-§21 单独讲。</p>
+
+
+<h3 id="s18-1">§18.1 v4.1 · preflight 子 agent 双连发</h3>
 
 <p>v4.1 是 v4 上线后两周内打的两个补丁包，目标都是<strong>提升 T2（bands_dos）任务的得分</strong>。
 不引入新工具，不改主循环——只在主 agent 跑之前先派两个<em>专精</em>子 agent 把准备工作做扎实。
@@ -1183,7 +1208,8 @@ debug 一个失败 run 时直接读这三个就够。</li>
 返回一个结构化结果（一段文本 / 一个 dict），主 agent 把它<strong>注入到自己的 prompt 里</strong>
 再开始干活。</p>
 <p>跟 v5 的 sub-agent 区别：v5 的子 agent 是<strong>主循环中途</strong>被调用的工具；
-v4.1 的子 agent 是<strong>主循环开始前</strong>跑的 preflight，是 prompt 注入而非工具调用。</p>
+v4.1 的子 agent 是<strong>主循环开始前</strong>跑的 preflight，是 prompt 注入而非工具调用。
+v4.2 的子 agent 又不一样——是 orchestrator 在<strong>每个 step</strong>调度的，下面 §18.2 讲。</p>
 <p class="echo">在 v4.1 里：<code>vc_relax</code> 子 agent 提前算好弛豫后的晶格；
 <code>config_advisor</code> 子 agent 提前定好 <code>occupations</code> 和 <code>ecutrho</code>
 该选哪个。两个结果都注入 system prompt，主 agent 开局就拿到对的参数。</p>
@@ -1238,8 +1264,280 @@ v4.1 等于走了 prompt-engineering 之外的另一条路：<em>能用代码定
 比一刀切禁更省 token。</p>
 
 
-<!-- ════════════ §18 ════════════ -->
-<h2 id="s18">§18 v5 的两个新东西：MCP 工具 + 自动验证</h2>
+<h3 id="s18-2">§18.2 v4.2 · PlannerOrchestrator 把整条主循环换掉</h3>
+
+<p>v4.1 还是"主 agent 一锅 ReAct + preflight 调料"。v4.2 把那一锅<strong>整个端走</strong>，
+换成 Magentic-One 风格的<strong>三层架构</strong>：planner 出计划、executor 一步一步干、
+verifier 一步一步审。1500+ 行新代码，9 个新测试文件，<strong>主循环已经不在 v4 那条
+<code>run_loop</code> 里</strong>了。</p>
+
+<div class="concept" id="c-orchestrator">
+<span class="lbl">💡 概念</span><h4>Planner-Orchestrator 模式</h4>
+<p>不再让一个 LLM 从头到尾自己想自己干。把任务拆成三个角色——<strong>planner</strong>
+（先写一份步骤计划）、<strong>executor</strong>（按 plan 一步一步实际跑）、
+<strong>verifier</strong>（每一步跑完后审查是不是真做完了）——三个角色各自是独立 LLM 调用，
+有自己的 prompt、工具子集、模型选择。中间状态由一个<strong>orchestrator</strong>程序持有，
+存在 ledger 数据结构里。</p>
+<p>来源是微软 Magentic-One 论文（2024）。优点：角色分工后，每个 LLM 只用想清楚自己那一块，
+prompt 短、推理稳；planner 只看 verifier 的诊断<em>文字</em>，不直接读文件——
+LLM 的注意力不被无关 context 稀释。</p>
+<p class="echo">在 v4.2 里：planner 用 sonnet（要复杂规划）、executor 用 sonnet（要写
+QE 输入）、verifier 用 haiku（只判 pass/fail，省钱）、config_advisor 还是 v4.1 那一套。
+所有角色跑完后，<code>workdir/orchestrator.json</code> 保留完整 ledger。</p>
+</div>
+
+<h4>架构总览</h4>
+
+<div class="svg-wrap">
+<svg width="780" height="430" viewBox="0 0 780 430" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ar42" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34495e"/>
+    </marker>
+  </defs>
+
+  <!-- Orchestrator 中心 -->
+  <rect x="290" y="40" width="200" height="70" rx="10" fill="#34495e" stroke="#2c3e50" stroke-width="2"/>
+  <text x="390" y="68" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">PlannerOrchestrator</text>
+  <text x="390" y="88" text-anchor="middle" fill="#ecf0f1" font-size="11">持有 TaskLedger + ProgressLedger</text>
+  <text x="390" y="102" text-anchor="middle" fill="#ecf0f1" font-size="11">orchestrator.json 落盘</text>
+
+  <!-- Planner -->
+  <rect x="40" y="160" width="190" height="70" rx="8" fill="#9b59b6" stroke="#7d3c98" stroke-width="2"/>
+  <text x="135" y="185" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Planner</text>
+  <text x="135" y="204" text-anchor="middle" fill="#fff" font-size="11">submit_plan → PlanSpec</text>
+  <text x="135" y="218" text-anchor="middle" fill="#fff" font-size="11">≤ 2 次 replan</text>
+
+  <!-- Executor -->
+  <rect x="295" y="160" width="190" height="70" rx="8" fill="#27ae60" stroke="#1e8449" stroke-width="2"/>
+  <text x="390" y="185" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Executor</text>
+  <text x="390" y="204" text-anchor="middle" fill="#fff" font-size="11">复用 v4 run_loop（bash 等）</text>
+  <text x="390" y="218" text-anchor="middle" fill="#fff" font-size="11">每 step ≤ 2 次 retry</text>
+
+  <!-- Verifier -->
+  <rect x="550" y="160" width="190" height="70" rx="8" fill="#e67e22" stroke="#ba6310" stroke-width="2"/>
+  <text x="645" y="185" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Verifier</text>
+  <text x="645" y="204" text-anchor="middle" fill="#fff" font-size="11">submit_verdict → {pass, diagnosis}</text>
+  <text x="645" y="218" text-anchor="middle" fill="#fff" font-size="11">read_file + list_dir 工具</text>
+
+  <!-- Step kinds 行 -->
+  <rect x="40" y="270" width="700" height="50" rx="8" fill="#eaf2f8" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="390" y="290" text-anchor="middle" font-size="13" font-weight="700" fill="#21618c">6 种 typed step_kinds</text>
+  <text x="390" y="310" text-anchor="middle" font-size="12" fill="#21618c">scf · relax · vc_relax · bands · dos · collect</text>
+
+  <!-- WorkdirStager -->
+  <rect x="40" y="340" width="340" height="60" rx="8" fill="#fef9e7" stroke="#f1c40f" stroke-width="1.5"/>
+  <text x="210" y="362" text-anchor="middle" font-size="13" font-weight="700" fill="#7d6608">WorkdirStager</text>
+  <text x="210" y="382" text-anchor="middle" font-size="11" fill="#7d6608">每 step 一个子目录 · 共享 cwd · promote 时核对路径</text>
+
+  <!-- v4.1 preflight 框 -->
+  <rect x="400" y="340" width="340" height="60" rx="8" fill="#fef9e7" stroke="#f1c40f" stroke-width="1.5"/>
+  <text x="570" y="362" text-anchor="middle" font-size="13" font-weight="700" fill="#7d6608">v4.1 preflight（沿用）</text>
+  <text x="570" y="382" text-anchor="middle" font-size="11" fill="#7d6608">vc_relax preflight + config_advisor</text>
+
+  <!-- 箭头：Orchestrator -> 三角色 -->
+  <line x1="340" y1="110" x2="160" y2="160" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar42)"/>
+  <line x1="390" y1="110" x2="390" y2="160" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar42)"/>
+  <line x1="440" y1="110" x2="620" y2="160" stroke="#34495e" stroke-width="1.5" marker-end="url(#ar42)"/>
+
+  <!-- executor → step kinds → verifier 横向 -->
+  <line x1="390" y1="230" x2="390" y2="270" stroke="#34495e" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="400" y="252" font-size="11" fill="#7f8c8d">用 step_kind addon 拼提示</text>
+
+  <!-- Executor → Verifier verdict -->
+  <line x1="485" y1="195" x2="550" y2="195" stroke="#27ae60" stroke-width="1.5" marker-end="url(#ar42)"/>
+  <text x="490" y="187" font-size="11" fill="#1e8449">submit_payload</text>
+
+  <!-- Verifier → Orchestrator 回流 -->
+  <path d="M 645 160 C 645 130 540 120 490 110" stroke="#e67e22" stroke-width="1.5" fill="none" marker-end="url(#ar42)" stroke-dasharray="4,2"/>
+  <text x="540" y="135" font-size="11" fill="#ba6310">verdict 回 orchestrator</text>
+</svg>
+</div>
+<div class="diagram-caption">图 8 · v4.2 PlannerOrchestrator 架构（planner / executor / verifier 三层 + ledger 状态机 + typed step_kinds）</div>
+
+
+<h4>双 ledger：把状态从"prompt 历史"里拎出来</h4>
+
+<p>v3 / v4 时代的 agent state 全部隐藏在 Anthropic Messages API 的对话历史里，
+debug 一个失败 run 要读 transcript.json 一轮一轮翻。v4.2 把所有<strong>结构化决策点</strong>
+拎出来塞进两个 <strong>pydantic 校验的 ledger</strong>：</p>
+
+<table>
+<thead><tr><th>Ledger</th><th>包含什么</th><th>谁写</th><th>谁读</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>TaskLedger</strong></td>
+  <td>required_keys（从 prompt 抽的）、initial_plan（planner 第一次出的）、
+replans（每次 replan 的原因 + 新 plan）、final_status</td>
+  <td>orchestrator</td>
+  <td>planner（每次 replan 都注入 prompt）</td>
+</tr>
+<tr>
+  <td><strong>ProgressLedger</strong></td>
+  <td>每个 step 的 Attempt 列表（executor session_id、submit_payload、verifier 的
+VerdictSpec、时间戳）；status 是 <code>pending / in_progress / done / failed</code></td>
+  <td>executor + verifier 跑完后 orchestrator 追加</td>
+  <td>orchestrator 决定 retry / replan / promote 时</td>
+</tr>
+</tbody>
+</table>
+
+<p>两个 ledger 合在一起序列化成 <code>workdir/orchestrator.json</code>——bench 跑完后
+直接 <code>jq</code> 一下就能看到完整的"谁规划了什么、谁失败了几次、verifier 怎么说的"。
+debug 体验比翻 transcript 高几个数量级。</p>
+
+
+<h4>Plan 强 schema：planner 不能瞎写</h4>
+
+<p>planner 唯一能调的工具叫 <code>submit_plan</code>，参数 schema 是 pydantic 校验的
+<code>PlanSpec</code>：</p>
+
+<pre><code><span class="c"># solver/v4.2/agent/ledger.py · L26-66（精简）</span>
+StepKind = Literal[<span class="s">"scf"</span>, <span class="s">"relax"</span>, <span class="s">"vc_relax"</span>, <span class="s">"bands"</span>, <span class="s">"dos"</span>, <span class="s">"collect"</span>]
+
+<span class="k">class</span> PlanStep(BaseModel):
+    id: str                            <span class="c"># 例 'scf_1'</span>
+    kind: StepKind                     <span class="c"># 从 6 种里挑</span>
+    desc: str                          <span class="c"># 一行 goal 给 executor 看</span>
+    deps: list[str]                    <span class="c"># 拓扑序依赖</span>
+    expected_outputs: dict[str, str]   <span class="c"># key → workdir-relative path</span>
+
+    <span class="hi">@model_validator(mode=<span class="s">"after"</span>)</span>
+    <span class="k">def</span> _outputs_have_step_prefix(self):
+        <span class="c"># 强制：每个 output 路径必须以 '&lt;step.id&gt;/' 开头</span>
+        prefix = <span class="s">f"{self.id}/"</span>
+        bad = {k: p <span class="k">for</span> k, p <span class="k">in</span> self.expected_outputs.items()
+               <span class="k">if</span> <span class="k">not</span> p.startswith(prefix)}
+        <span class="k">if</span> bad:
+            <span class="k">raise</span> ValueError(<span class="s">f"step {self.id!r}: paths must start with {prefix!r}"</span>)
+        <span class="k">return</span> self
+
+<span class="k">class</span> PlanSpec(BaseModel):
+    steps: list[PlanStep] = Field(..., min_length=<span class="n">1</span>)
+    <span class="c"># validators: no duplicate ids, all deps resolve, no self-loop</span>
+</code></pre>
+
+<p>planner 写错（步骤 id 重复、deps 引用不存在的 step、output 路径漏了 step 前缀），
+orchestrator 把<strong>具体哪个字段错了</strong>拼回 prompt 让它重写——最多 5 次内必须改对，
+否则触发 give_up（计入 replan 预算）。</p>
+
+
+<h4>Verifier：用便宜模型 + 工具受限</h4>
+
+<p>每个 step 跑完后，orchestrator 派一个 verifier agent。verifier 只有 3 个工具
+（<code>read_file</code> / <code>list_dir</code> / <code>submit_verdict</code>），<strong>不能
+跑 bash</strong>——避免它误删 charge density、改了 charge density 之类。模型用便宜的 haiku，
+按 step_kind 的 checklist 检查 expected_outputs 是否真的存在 + 内容是否合理（log 末尾有
+<code>JOB DONE.</code>、SCF 收敛了、bands.dat 列数对等）。返回结构化 <code>VerdictSpec</code>：</p>
+
+<pre><code><span class="c"># solver/v4.2/agent/ledger.py · L99-115</span>
+<span class="k">class</span> VerdictSpec(BaseModel):
+    pass_: bool = Field(..., alias=<span class="s">"pass"</span>)
+    diagnosis: str  <span class="c"># pass=False 时必须给出具体错误，让 executor 修</span>
+</code></pre>
+
+<p>verdict 返回的 <code>diagnosis</code> 字段是 v4.2 的核心 affordance：失败时，
+orchestrator 把 diagnosis<strong>注入到同一个 executor session</strong>（resume 模式）让它接着改，
+而不是从头开新 session——保留 prompt cache + 让 LLM 看到自己之前做过什么。
+连失败两次 → 整个 step 标记 failed → orchestrator 走 replan 路径。</p>
+
+
+<h4>Typed step_kinds：把"每种 QE 子任务怎么做"固化成 Python</h4>
+
+<p><code>solver/v4.2/agent/step_kinds/</code> 下 6 个模块，每个模块导出两个函数：</p>
+
+<ul>
+<li><code>system_prompt_addon(step, main_workdir, step_subdir, upstream)</code>——
+拼出 executor 的<strong>step-specific 提示块</strong>（这一步要做什么 / cwd 在哪 /
+output 必须写在哪 / 该 step kind 的 QE 参数 dos and don'ts）</li>
+<li><code>verifier_checklist(step)</code>——
+拼出 verifier 的<strong>检查清单</strong>（该 step kind 验收时应该看哪几条）</li>
+</ul>
+
+<p>举例（<code>scf.py</code> 的 checklist）：</p>
+
+<pre><code><span class="c"># solver/v4.2/agent/step_kinds/scf.py（节选）</span>
+<span class="k">def</span> verifier_checklist(step):
+    <span class="k">return</span> dedent(<span class="s">"""\
+        ## SCF verifier checklist
+
+        Required (failure on any → pass=False):
+        1. Each expected_output file/dir exists at its workdir-relative path
+        2. The *_out log contains JOB DONE. near the end (last 64 KB)
+        3. SCF converged: search for "convergence has been achieved" in the log
+        4. out/&lt;prefix&gt;.save/ directory exists with charge-density-hdf5 inside
+        """</span>)
+</code></pre>
+
+<p>这意味着<strong>加新任务类型不再需要改 system prompt 或主循环</strong>——只要在
+<code>step_kinds/</code> 加一个新模块，planner 的 StepKind 字典加一个枚举值，就完事。
+T1 / T2 已经覆盖；如果以后要支持电声耦合 / NEB / 形变弹性常数，加一个文件即可。</p>
+
+
+<h4>多角色模型注册表</h4>
+
+<p>v4.2 的 <code>manifest.yaml</code> default_args 里能看到每个角色一个模型：</p>
+
+<pre><code><span class="c"># solver/v4.2/manifest.yaml</span>
+default_args:
+  - <span class="s">"--planner-model"</span>
+  - <span class="s">"claude-sonnet-4-6"</span>           <span class="c"># 写计划要会推理</span>
+  - <span class="s">"--executor-model"</span>
+  - <span class="s">"claude-sonnet-4-6"</span>           <span class="c"># 写 QE 输入要细</span>
+  - <span class="s">"--verifier-model"</span>
+  - <span class="s">"claude-haiku-4-5-20251001"</span>   <span class="c"># 只判 pass/fail，省钱</span>
+  - <span class="s">"--config-advisor-model"</span>
+  - <span class="s">"claude-haiku-4-5-20251001"</span>   <span class="c"># 沿用 v4.1，便宜模型够用</span>
+</code></pre>
+
+<p>这个分工很关键：以前一锅 ReAct 时整个任务用一个模型，要么贵要么不准；
+现在 verifier 那种"只判对错"的任务用 haiku，<strong>每题省 30–50% token cost</strong>，
+还能让 planner 用更好的模型而不会爆预算。</p>
+
+
+<h4>v4.2 跟 v5 的关系：双路线</h4>
+
+<p>看到这里你可能会问——v4.2 跟 v5（§19-§21）听起来很像？都有 verifier、都有 subagent、
+都在 plan + 执行 + 检查的循环里。<strong>两者解决一样的问题，但走完全不同的栈</strong>：</p>
+
+<table>
+<thead><tr><th>维度</th><th>v4.2 路线</th><th>v5 路线</th></tr></thead>
+<tbody>
+<tr><td><strong>底层</strong></td><td>hand-rolled <code>anthropic.messages.create</code> loop</td>
+    <td>claude-agent-sdk（Anthropic 官方 agent SDK）</td></tr>
+<tr><td><strong>支持模型</strong></td><td>多 provider（Anthropic / DeepSeek / 任意 OpenAI-shape）</td>
+    <td>Claude 独占（SDK 限制）；其他模型走 Legacy 路</td></tr>
+<tr><td><strong>工具接口</strong></td><td>自定义 JSON schema（同 v3）</td>
+    <td>MCP（typed、async、跨 agent 复用）</td></tr>
+<tr><td><strong>验证机制</strong></td><td>verifier subagent 每 step 跑一次 + checklist</td>
+    <td>submit 前 verifier gate（单点）+ ProgressLedger 卡死信号</td></tr>
+<tr><td><strong>规划层</strong></td><td>planner subagent + PlanSpec pydantic 校验</td>
+    <td>SDK 内置（中央 prompt 隐式规划）</td></tr>
+<tr><td><strong>失败恢复</strong></td><td>step retry × 2 → replan × 2 → submit incomplete</td>
+    <td>verifier hard_fail 时 replay；ProgressLedger 触发时 subagent 介入</td></tr>
+<tr><td><strong>代码尺寸</strong></td><td>v4.2 自身 ~3500 行（含 v4.1 / v4 沿用部分）</td>
+    <td>v5 SDK 路 ~1200 行 + SDK 内部托管</td></tr>
+<tr><td><strong>用什么场景</strong></td><td>跨 provider 部署、需要全套自家代码控制</td>
+    <td>已经在 Claude 生态、想最小化自己维护的代码</td></tr>
+</tbody>
+</table>
+
+<p>两条路线的 trade-off 不是技术问题、是<strong>组织问题</strong>：
+v4.2 适合"想自己能完全 debug、不依赖第三方 SDK 更新节奏"的团队；
+v5 适合"完全 trust Anthropic 的工具栈、想把演进权交给 SDK"的团队。
+项目同时维护两条是为了在不同 bench 上做 A/B——同一架构骨架、不同实现栈，
+能看出 SDK 究竟带来了多少。</p>
+
+
+<h4>实测一句话</h4>
+
+<p>v4.2 在 M1_T1 + M1_T2 全集（约 30 题）上跑下来，T2 通过率从 v4.1 的"靠 preflight
+撞运气"水平稳定到<strong>"按 plan 一步一步走，每步都有 verifier 兜底"</strong>，
+卡死率（4h 超时）相比 v4 显著下降。完整跑分另起报告，本文只做设计讲解。</p>
+
+
+<!-- ════════════ §19 ════════════ -->
+<h2 id="s19">§19 v5 的两个新东西：MCP 工具 + 自动验证</h2>
 
 <p>v5 跟 v3 比有两个根本性的改变：</p>
 
@@ -1345,8 +1643,8 @@ EOF""")</code></pre></td>
 </ul>
 
 
-<!-- ════════════ §19 ════════════ -->
-<h2 id="s19">§19 v5 的双路径：Claude 路 vs Legacy 路</h2>
+<!-- ════════════ §20 ════════════ -->
+<h2 id="s20">§20 v5 的双路径：Claude 路 vs Legacy 路</h2>
 
 <p>v5 有个现实约束：<strong>claude-agent-sdk 只能跑 Claude 系列模型</strong>。
 但项目要兼容 deepseek-v4-pro（性价比高）、本地开源模型等。所以 v5 在 <code>solve.py</code> 入口分叉：</p>
@@ -1421,8 +1719,8 @@ SDK 提供的高级功能（子 agent、ledger、hooks）通常绑死某个 LLM 
 v5 选择两边都留。</p>
 
 
-<!-- ════════════ §20 ════════════ -->
-<h2 id="s20">§20 v5 三大新机制深挖</h2>
+<!-- ════════════ §21 ════════════ -->
+<h2 id="s21">§21 v5 三大新机制深挖</h2>
 
 <h3 id="s16-subagent">16.1 SCF 收敛子 agent</h3>
 
@@ -1569,36 +1867,48 @@ top-K 且分数 ≥ 0.7 的塞进 system prompt 的特殊 section。可用 <code
 </div>
 
 
-<!-- ════════════ §21 ════════════ -->
-<h2 id="s21">§21 四版本一表对照</h2>
+<!-- ════════════ §22 ════════════ -->
+<h2 id="s22">§22 四版本一表对照</h2>
+
+<p>v4.1 是在 v4 主循环外加 preflight；v4.2 把整条主循环换成 PlannerOrchestrator——
+所以表里把它们当独立列处理。注意 v4.2 跟 v5 在最后一列形成<strong>双路线</strong>对照——
+解决同样的 verifier / subagent / 卡死控制问题、但栈完全不同。</p>
 
 <table>
 <thead>
-<tr><th>维度</th><th>v1-stable</th><th>v3</th><th>v4 / v4.1</th><th>v5 (latest)</th></tr>
+<tr><th>维度</th><th>v1-stable</th><th>v3</th><th>v4</th><th>v4.1</th><th>v4.2</th><th>v5</th></tr>
 </thead>
 <tbody>
-<tr><td><strong>工具数</strong></td><td>4</td><td>4（同）</td><td>4（同 v3）</td><td>Claude 路 7；Legacy 路 4</td></tr>
-<tr><td><strong>工具协议</strong></td><td>自定义 JSON schema</td><td>同 v1</td><td>同 v3</td><td>MCP（Claude 路）+ 旧 schema（Legacy 路）</td></tr>
-<tr><td><strong>系统提示行数</strong></td><td>42（静态）</td><td>379（动态）</td><td>同 v3；v4.1 加 advisor 注入块</td><td>~80（executor.md）</td></tr>
-<tr><td><strong>pre-tool hook</strong></td><td>无</td><td>qe_input_lint + bash_guard</td><td>同 v3；v4.1 加 lint Rule C/D</td><td>同 v3（Legacy 路）；Claude 路用 SDK PreToolUse</td></tr>
-<tr><td><strong>prompt caching</strong></td><td>无</td><td>3 断点</td><td>同 v3（3 断点）</td><td>SDK 内置</td></tr>
-<tr><td><strong>submit 前自审</strong></td><td>无</td><td>无</td><td><strong>有</strong>（_audit_task_outputs，6 关）</td><td>有（verify_run gate + replay）</td></tr>
-<tr><td><strong>任务类型 schema</strong></td><td>hardcode</td><td>hardcode（vc_relax）</td><td><strong>从 prompt 末尾自动抽</strong></td><td>同 v4</td></tr>
-<tr><td><strong>子 agent</strong></td><td>无</td><td>无</td><td>v4.1 preflight × 2（vc_relax / config_advisor）</td><td>convergence_fixer（仅 Claude 路）</td></tr>
-<tr><td><strong>卡死检测</strong></td><td>无</td><td>无</td><td>无</td><td>ProgressLedger 7 信号</td></tr>
-<tr><td><strong>经验库</strong></td><td>无</td><td>无</td><td>无</td><td>有（embedding 检索）</td></tr>
-<tr><td><strong>支持模型</strong></td><td>任意（OpenAI shape）</td><td>任意</td><td>Anthropic 专精</td><td>Claude（完整）/ 其他（降级到 v3 风格）</td></tr>
-<tr><td><strong>max_turns 默认</strong></td><td>100</td><td>80</td><td>80</td><td>60</td></tr>
-<tr><td><strong>max_output_tokens 默认</strong></td><td>16384</td><td>8192</td><td>8192</td><td>8192</td></tr>
-<tr><td><strong>solver_timeout 默认</strong></td><td>7200s</td><td>7200s</td><td>7200s</td><td>7200–14400s（按 backend）</td></tr>
-<tr><td><strong>主要解决的痛点</strong></td><td>—（基线）</td><td>领域知识缺口</td><td>solver/bench 解耦 + submit 谎报</td><td>流程级缺口（卡死、自验证）</td></tr>
-<tr><td><strong>什么时候用</strong></td><td>跨 provider 对照基线</td><td>非 Claude 模型日常</td><td>Anthropic 模型 + 多任务类型</td><td>Claude 模型上的最强组合</td></tr>
+<tr><td><strong>主循环</strong></td><td>ReAct</td><td>同 v1</td><td>同 v3</td><td>同 v3 + preflight 预热</td><td><strong>PlannerOrchestrator</strong>（planner+executor+verifier）</td><td>SDK 内置 + dual-path</td></tr>
+<tr><td><strong>工具数</strong></td><td>4</td><td>4</td><td>4</td><td>4</td><td>4（executor 内）+ verifier 3</td><td>Claude 路 7；Legacy 4</td></tr>
+<tr><td><strong>工具协议</strong></td><td>自定义 JSON</td><td>同 v1</td><td>同 v3</td><td>同 v3</td><td>自定义 JSON + pydantic 强校验（submit_plan / submit_verdict）</td><td>MCP / 旧 schema</td></tr>
+<tr><td><strong>system prompt</strong></td><td>42 行静态</td><td>379 行动态</td><td>同 v3</td><td>+ advisor 注入块</td><td>base prompt + step_kind addon（每 step 拼）</td><td>~80 行 executor.md</td></tr>
+<tr><td><strong>pre-tool hook</strong></td><td>无</td><td>qe_input_lint + bash_guard</td><td>同 v3</td><td>+ lint Rule C/D</td><td>同 v4.1（executor 沿用）</td><td>Legacy 同 v3；Claude 用 SDK PreToolUse</td></tr>
+<tr><td><strong>submit 自审</strong></td><td>无</td><td>无</td><td><strong>有</strong>（_audit_task_outputs）</td><td>同 v4</td><td>verifier 每 step 一次 + 终态 audit</td><td>verify_run gate + replay</td></tr>
+<tr><td><strong>任务类型 schema</strong></td><td>hardcode</td><td>hardcode</td><td><strong>prompt 末尾自动抽</strong></td><td>同 v4</td><td>同 v4 + typed StepKind 枚举</td><td>同 v4</td></tr>
+<tr><td><strong>子 agent</strong></td><td>无</td><td>无</td><td>无</td><td>preflight × 2（vc_relax / config_advisor）</td><td>planner / executor / verifier 三层 + v4.1 preflight 沿用</td><td>convergence_fixer（仅 Claude 路）</td></tr>
+<tr><td><strong>规划层</strong></td><td>隐式（LLM 自决）</td><td>同</td><td>同</td><td>同 + advisor 提示</td><td><strong>显式 PlanSpec</strong>（pydantic 校验）+ replan × 2</td><td>SDK 隐式</td></tr>
+<tr><td><strong>失败恢复</strong></td><td>耗 turn 就交</td><td>同</td><td>audit fail → exit 2</td><td>同 v4</td><td>step retry × 2 → replan × 2 → incomplete</td><td>hard_fail replay；ProgressLedger 信号</td></tr>
+<tr><td><strong>卡死检测</strong></td><td>无</td><td>无</td><td>无</td><td>无</td><td>turn 预算分到 subagent（更细粒度）</td><td>ProgressLedger 7 信号</td></tr>
+<tr><td><strong>持久化状态</strong></td><td>transcript</td><td>+ bash.log + lint.log</td><td>+ transcript.json 格式化</td><td>同 v4</td><td><strong>+ orchestrator.json（双 ledger）</strong></td><td>SDK transcript</td></tr>
+<tr><td><strong>多模型路由</strong></td><td>单</td><td>单</td><td>单</td><td>单</td><td><strong>4 个角色独立模型</strong>（planner/executor/verifier/advisor）</td><td>单（SDK 限 Claude）</td></tr>
+<tr><td><strong>支持模型</strong></td><td>任意</td><td>任意</td><td>Anthropic</td><td>Anthropic</td><td>Anthropic / DeepSeek / OpenAI-shape</td><td>Claude / Legacy 降级</td></tr>
+<tr><td><strong>代码量</strong></td><td>~600 行</td><td>~1800 行</td><td>+ 90 行（audit）</td><td>+ 600 行（preflight）</td><td>+ 1500 行（orchestrator）；9 新测试</td><td>~1200 行 SDK 包装</td></tr>
+<tr><td><strong>主要解决的痛点</strong></td><td>—（基线）</td><td>领域知识</td><td>submit 谎报 + schema 耦合</td><td>T2 题前置参数选错</td><td>一锅 prompt 推不动复杂多步任务 / 卡死</td><td>同 v4.2，但走 SDK 栈</td></tr>
+<tr><td><strong>什么时候用</strong></td><td>基线对照</td><td>非 Claude 日常</td><td>Anthropic 多任务</td><td>多任务 + T2</td><td>跨 provider 多步骤生产</td><td>Claude 生态最强组合</td></tr>
 </tbody>
 </table>
 
+<p class="echo" style="font-style:italic;color:#7d6608;border-left:3px solid #f1c40f;padding-left:12px;">
+看完表可以发现：v4.2 跟 v5 在功能上重合度 ~80%，但实现栈完全不同。v4.2 自己写完所有
+orchestrator / verifier / ledger 逻辑（能多 provider、能完全 debug），v5 让 SDK 托管那些
+（少写代码、跟 SDK 一起演进）。这是<strong>"自家代码 vs 平台 SDK"</strong>这条经典 trade-off
+在 agent 工程里的具体形态。
+</p>
 
-<!-- ════════════ §22 ════════════ -->
-<h2 id="s22">§22 术语表</h2>
+
+<!-- ════════════ §23 ════════════ -->
+<h2 id="s23">§23 术语表</h2>
 
 <dl class="glossary">
 <dt>Agent</dt>
@@ -1626,32 +1936,52 @@ top-K 且分数 ≥ 0.7 的塞进 system prompt 的特殊 section。可用 <code
 <dd>工具的标准化接口协议，类比 USB——agent 和工具开发解耦。<a href="#c-mcp">详见 §18</a>。</dd>
 
 <dt>Sub-agent</dt>
-<dd>主 agent 调用的专精 agent，有自己的提示、工具子集、轮数。<a href="#c-subagent">详见 §20.1</a>。</dd>
+<dd>主 agent 调用的专精 agent，有自己的提示、工具子集、轮数。<a href="#c-subagent">详见 §21.1</a>。</dd>
 
 <dt>Preflight Subagent</dt>
 <dd>主 agent 开始前先派去做"前置决策"的子 agent，结果<strong>注入到主 agent 的 prompt 里</strong>。
-v4.1 的 vc_relax / config_advisor 走这个路子。<a href="#c-preflight-subagent">详见 §17</a>。</dd>
+v4.1 的 vc_relax / config_advisor 走这个路子。<a href="#c-preflight-subagent">详见 §18.1</a>。</dd>
 
 <dt>Submit Audit</dt>
 <dd>solver 在写 result.json 前自己复刻一遍 bench 端 audit（path / size / JOB DONE），
 fail 直接吐 incomplete。v4 引入。<a href="#s15">详见 §15</a>。</dd>
 
+<dt>Planner-Orchestrator</dt>
+<dd>把任务拆给 planner / executor / verifier 三个角色 LLM，中间状态由程序持有 ledger
+追踪。Magentic-One 论文风格。v4.2 引入。<a href="#c-orchestrator">详见 §18.2</a>。</dd>
+
+<dt>TaskLedger / ProgressLedger</dt>
+<dd>v4.2 的双 ledger：TaskLedger 存 plan + 每次 replan；ProgressLedger 存每个 step 的
+attempt 列表 + verifier 判决。合体序列化到 <code>workdir/orchestrator.json</code>。
+<a href="#s18">详见 §18.2</a>。</dd>
+
+<dt>Step Kind</dt>
+<dd>v4.2 的 typed step 枚举：<code>scf / relax / vc_relax / bands / dos / collect</code>，
+每种自带 executor prompt addon + verifier checklist。加新任务类型只要加一个 step kind 文件。
+<a href="#s18">详见 §18.2</a>。</dd>
+
+<dt>PlanSpec / VerdictSpec</dt>
+<dd>v4.2 用 pydantic 校验的两个工具输入 schema——planner 出 <code>PlanSpec</code>
+（steps 数组 + 拓扑序 deps + expected_outputs），verifier 出 <code>VerdictSpec</code>
+（<code>pass</code> + <code>diagnosis</code>）。schema fail 时 orchestrator 把错误塞回 prompt 让 LLM 自改。
+<a href="#s18">详见 §18.2</a>。</dd>
+
 <dt>Stuck Detection</dt>
-<dd>程序级检测 agent 是否"卡住"——重复动作、错误累计、token 耗尽。<a href="#c-stuck">详见 §20.2</a>。</dd>
+<dd>程序级检测 agent 是否"卡住"——重复动作、错误累计、token 耗尽。<a href="#c-stuck">详见 §21.2</a>。</dd>
 
 <dt>Verifier Gate</dt>
-<dd>submit 前用 Python 重新验证输出，hard_fail 时 replay 让 LLM 修。<a href="#c-verify">详见 §20.3</a>。</dd>
+<dd>submit 前用 Python 重新验证输出，hard_fail 时 replay 让 LLM 修。<a href="#c-verify">详见 §21.3</a>。</dd>
 
 <dt>Experience Replay</dt>
-<dd>把历史成功案例 embedding 化，新任务来了检索 top-K 喂进 system prompt。<a href="#c-exp">详见 §20.4</a>。</dd>
+<dd>把历史成功案例 embedding 化，新任务来了检索 top-K 喂进 system prompt。<a href="#c-exp">详见 §21.4</a>。</dd>
 
 <dt>Context Window</dt>
 <dd>LLM 一次能"看"的最大 token 数。<a href="#c-ctx">详见 §6</a>。</dd>
 </dl>
 
 
-<!-- ════════════ §23 ════════════ -->
-<h2 id="s23">§23 延伸阅读</h2>
+<!-- ════════════ §24 ════════════ -->
+<h2 id="s24">§24 延伸阅读</h2>
 
 <h4>本仓内其他报告</h4>
 <ul>
@@ -1684,7 +2014,7 @@ fail 直接吐 incomplete。v4 引入。<a href="#s15">详见 §15</a>。</dd>
 <strong>读完了下一步</strong>：如果你想动手改 solver——
 推荐先在 v3 (<code>solvers/current/</code>) 上加新 hook 练手（影响面小、Legacy 路也用得到）；
 v5 的子 agent 和 verifier 适合在你对 Claude SDK 比较熟之后再玩。
-任何时候遇到 "不知道这个名词什么意思"——回 §22 术语表查。
+任何时候遇到 "不知道这个名词什么意思"——回 §23 术语表查。
 </div>
 
 </body>
