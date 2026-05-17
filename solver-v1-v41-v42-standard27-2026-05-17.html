@@ -98,6 +98,7 @@ nav.toc ol{margin:4px 0;padding-left:20px;}
 <li><a href="#failed">几道直接 fail 的题：失败原因分类</a></li>
 <li><a href="#cost">耗时与成本</a></li>
 <li><a href="#questions">给材料计算合作者的提问清单</a></li>
+<li><a href="#recommendations">工程建议：hook / subagent 怎么堵这些坑</a></li>
 <li><a href="#appendix">附录</a></li>
 </ol>
 </nav>
@@ -680,7 +681,157 @@ seekpath 给的 path 在 trigonal P3<sub>1</sub>21 上是不是有坑？</li>
 </ol>
 </div>
 
-<h2 id="appendix">§12 附录</h2>
+<h2 id="recommendations">§12 工程建议：可以加哪些 hook / subagent 把这些失分点堵上</h2>
+
+<p style="color:#7f8c8d;font-size:13px">先快速盘点 v4.2 已有的「约束基础设施」（避免重复造轮子）：</p>
+
+<div class="meta" style="font-size:13px">
+<b>v4.2 现有约束层</b>（<code>solver/v4.2/agent/</code>）：
+<ul style="margin:6px 0">
+<li><code>subagents/_metals.py</code> · 硬编码 <code>METAL_ELEMENTS</code> + <code>STRONGLY_ELECTRONEGATIVE</code> 集合（Rb / Cd / Co / Ti 等都在）</li>
+<li><code>subagents/config_advisor.py</code> · 确定性分类器（formula → is_metal）+ 小 LLM cross-check，
+    产物 <code>workdir/.config_advice.json</code>（含 <code>is_metal / occupations / smearing / degauss / ecutrho_factor</code>）</li>
+<li><code>subagents/vc_relax.py</code> · T2 preflight，把弛豫后的几何注入主 agent</li>
+<li><code>subagents/verifier.py</code> · 每步只校验「QE 跑通 + 文件存在 + JOB DONE」</li>
+<li><code>tools/qe_input_lint.py</code> · pre-spawn bash 拦截，4 条规则：
+  <ul style="margin:4px 0">
+  <li>Rule A · vc_relax 收敛阈值 auto-tighten</li>
+  <li>Rule B · bands NSCF 强制 calculation=&apos;nscf&apos; 而非 &apos;bands&apos;（修「evaluator 看到 metal 假象」）</li>
+  <li>Rule C · USPP 强制 ecutrho ≈ 10 × ecutwfc</li>
+  <li>Rule D · occupations 与 config_advisor 不符时 <b>warn-only</b>（设计上保守，不自动改）</li>
+  </ul>
+</li>
+</ul>
+</div>
+
+<p>基于报告里 5 个案例 + 9 节失败分类，下面 7 条建议按 ROI 排序（每条 = 失分映射 + 约束类型 + 加在哪 + 预估工作量）：</p>
+
+<h3>🥇 高 ROI（最该先做）</h3>
+
+<div class="case" style="background:#eafaf1">
+<h4>建议 1 · 升级 Rule D 从 warn-only 到 <b>auto-rewrite</b> occupations</h4>
+<p>
+<b>类型</b>：bash pre-spawn hook（已有 <code>qe_input_lint.py</code>，扩展 Rule D）<br>
+<b>失分映射</b>：案例 A (Rb 11 eV 假 gap)、§9 v1 Rb timeout、其他 alkali / transition-metal 题<br>
+<b>做法</b>：当 <code>.config_advice.json.is_metal=True</code> 而 scf.in / bands NSCF in 用了 <code>occupations='fixed'</code>，
+直接改成 <code>occupations='smearing', smearing='mv', degauss=0.02</code>。在 lint result 里向 LLM 报告改动让它知道。
+保留 <b>反向告警</b>：advisor 说 insulator 但 agent 用 smearing → warn only（agent 可能见到半金属现象，让它有选择权）。
+</p>
+<p><b>工作量</b>：~1 小时（Rule D 已经有 <code>_find_config_advice</code> 基础设施，只需把 warn 改成 mutate + 在 textual report 加 patched=True）。
+<b>风险</b>：advisor 误判（如 graphite 当 metal 但实际半金属可能想用 fixed）→ 用「only when is_metal=True AND deterministic_source AND not llm_override」三重保险，对 LLM_override 的边缘 case 仍 warn-only。</p>
+</div>
+
+<div class="case" style="background:#eafaf1">
+<h4>建议 2 · 给 v4.2 Verifier 加一层 <b>Physics Sanity Check</b></h4>
+<p>
+<b>类型</b>：subagent（扩展 <code>verifier.py</code>）<br>
+<b>失分映射</b>：案例 B (GaN v4.2 被抽成 metal)、所有「agent QE 跑通但 extracted_fields 反物理常识」的题<br>
+<b>做法</b>：在 step 完成、bench evaluator 跑完后（或在 submit 前自跑一次 extract），把 <code>extracted_fields.gap_type</code>
+对 <code>config_advice.is_metal</code> 做一致性检查：
+<ul>
+<li>known metal × extracted gap &gt; 0.5 eV → fail verdict, diagnosis="possible metal mis-detection: check occupations / nbnd / bands.dat truncation"</li>
+<li>known wide-gap insulator (O / F 含氧化物，advisor 给的 is_metal=False) × extracted gap_type=&apos;metal&apos; → fail verdict</li>
+<li>已知半导体（来自 advisor）× extracted band_gap_ev &lt; 0.05 eV → fail verdict</li>
+</ul>
+fail 后 Orchestrator 让 Executor resume，附 diagnosis。当前 verifier 只看「QE 跑通」太宽松。
+</p>
+<p><b>工作量</b>：~2 小时（verifier.py 已有 verdict 框架，加一个 check 函数 + 接 config_advice）。
+<b>风险</b>：罕见误杀（PBE 真把 GaAs 算成 metal 等）→ 把 fail 改成 soft warning + 让 Executor 多跑一次 sanity SCF 验证。</p>
+</div>
+
+<div class="case" style="background:#eafaf1">
+<h4>建议 3 · 加 Rule E：<b>DOS NSCF canonical-config 强制</b></h4>
+<p>
+<b>类型</b>：bash pre-spawn hook（<code>qe_input_lint.py</code> 新增 Rule E）<br>
+<b>失分映射</b>：§4 头条发现 1 (dos_curve 三版本 0.02–0.25) + 整个 0.8 天花板<br>
+<b>做法</b>：拦截 <b>DOS NSCF</b>（calculation='nscf' AND 后面跟 dos.x 的 input）和 <b>dos.x input</b>。
+强制：
+<ul>
+<li>k-mesh 下限：metals 24×24×24, semiconductors 16×16×16（按 advisor.is_metal 分支）</li>
+<li>occupations: 'tetrahedra' (insulator) / 'smearing mv 0.02' (metal) —— 强制一致于 advisor</li>
+<li>dos.x deltaE = 0.01 eV（GT canonical 的常用值，等合作者确认 §11-🅱️ Q7）</li>
+<li>dos.x Emin/Emax = E_F ± 5 eV（与 evaluator 的 dos_energy_window_ev 一致）</li>
+</ul>
+<b>注意</b>：这条强烈依赖合作者回答 §11-🅱️ Q5 / Q7（什么是 GT canonical 配置）——
+建议在合作者会议确认后再实施，否则会写错 canonical 值。
+</p>
+<p><b>工作量</b>：~3 小时（含 input 解析、advisor 接入、unit test）。
+<b>风险</b>：硬编码 canonical 可能对边缘材料不合适 → 先跑小 ablation（在 10 题上对比 enforced vs free 的 dos_curve 得分）。</p>
+</div>
+
+<h3>🥈 中 ROI</h3>
+
+<div class="case">
+<h4>建议 4 · 新增 <b>k-path / OFF_PATH 预测器 subagent</b></h4>
+<p>
+<b>类型</b>：subagent（新文件 <code>subagents/kpath_advisor.py</code>，类似 config_advisor 的轻量级 LLM cross-check）<br>
+<b>失分映射</b>：案例 D (α-SiO<sub>2</sub> vbm_k='K' 但 agent 抽 'GAMMA')、案例 E (MgSiO<sub>3</sub> vbm='OFF_PATH')、§6 vbm_k_label 三版本 0.6 持平<br>
+<b>做法</b>：在 vc_relax preflight 后跑一次 seekpath，得到 high-symmetry path，再用经验规则 + LLM
+预测：「这是 indirect-gap 钙钛矿 / 含 Pbnm 空间群 / 含半金属元素 → VBM 大概率 OFF_PATH」。
+产物写到 <code>workdir/.kpath_advice.json</code>，给主 agent 看：
+<ul>
+<li>建议的 NSCF k-path 串</li>
+<li>「如果 VBM 不在你跑的 path 上，extracted_fields 里 vbm_k_label 一定要填 'OFF_PATH' 字符串」（这点 evaluator 已支持但 agent 不知道）</li>
+</ul>
+</p>
+<p><b>工作量</b>：~4 小时（seekpath 调用已有；advisor LLM prompt 要写；要测）。</p>
+</div>
+
+<div class="case">
+<h4>建议 5 · 加 Rule F：<b>memory-budget pre-flight</b></h4>
+<p>
+<b>类型</b>：bash pre-spawn hook（<code>qe_input_lint.py</code> 新增 Rule F）<br>
+<b>失分映射</b>：§9 v4.1 4 条 infra_scheduler_kill（CoSb<sub>3</sub> ×2 / Ti<sub>3</sub>O<sub>5</sub> ×2）、§9 v4.2 WO<sub>3</sub> + CoSb<sub>3</sub> timeout<br>
+<b>做法</b>：在 NSCF k-mesh × nbnd × n_atoms 提交前估算 peak RAM
+（粗：<code>≈ nbnd × n_kpts × n_pws × 16 byte × MPI_factor</code>），与 <code>psutil.virtual_memory().total</code> 比。
+&gt; 80% RAM 时拒绝 spawn，向 LLM 回写「这台机 RAM 不够，建议降 k-mesh 到 X×X×X 或 nbnd 到 Y」。
+</p>
+<p><b>工作量</b>：~3 小时（公式校准要先看 3-5 个真实 run 的 RAM peak vs 输入参数对应表，避免拒错）。</p>
+</div>
+
+<div class="case">
+<h4>建议 6 · turn-budget watchdog（轻量 hook）</h4>
+<p>
+<b>类型</b>：loop-level 注入 message（<code>agent/loop.py</code>）<br>
+<b>失分映射</b>：§9 v1 LiAlSi<sub>2</sub>O<sub>6</sub>_spodumene turn_budget_exceeded<br>
+<b>做法</b>：当 <code>current_turn &gt; 0.7 × max_turns</code> 时在下一条 LLM 输入加一行 system reminder：
+「⚠ 你已用 70% turns；如果当前结果可交付，立刻 submit；不要继续优化」。
+&gt; 0.9 时强制 submit（agent 不 submit 则 harness 用 ledger 里最近一次成功 step 的 outputs 兜底）。
+</p>
+<p><b>工作量</b>：~1 小时。这是「便宜的兜底」，对 v4.2 因为 orchestrator 已经分步，意义比 v1 小一点。</p>
+</div>
+
+<h3>🥉 工程稳定性（不直接提分但堵漏）</h3>
+
+<div class="case">
+<h4>建议 7 · v4.2 orchestrator 的 reasoning_content state-machine 单元测试</h4>
+<p>
+<b>类型</b>：测试 + 小 bugfix（不是新 hook）<br>
+<b>失分映射</b>：§9 v4.2 中 7 条同一个 <code>reasoning_content must be passed back</code> API bug<br>
+<b>做法</b>：mock DeepSeek thinking-mode 响应，跑一个 2-turn 主 agent → 子 agent → 主 agent 切换，
+assert <code>reasoning_content</code> 字段在切回主 agent 时被原样附在 history 里。
+当前 orchestrator 切上下文时丢字段；测试加上之后顺手修。
+</p>
+<p><b>工作量</b>：~2 小时（含测试 + 修复）。</p>
+</div>
+
+<div class="note">
+<b>组合优先级建议</b>：
+<ol>
+<li><b>立刻可做</b>（不依赖合作者）：建议 1 (Rule D auto-rewrite) + 建议 7 (reasoning_content bug)
+   → 1 天工作量，预计修复 Rb + 4 道 v4.2 失败 task。</li>
+<li><b>合作者会议后做</b>：建议 3 (Rule E DOS canonical) 需要 §11-🅱️ Q5/Q7 的答案，否则 canonical 写错。</li>
+<li><b>并行做</b>：建议 2 (Physics Verifier) — 直接补 v4.2 Verifier 短板，不依赖外部知识。</li>
+<li><b>下一轮</b>：建议 4 (kpath_advisor) + 建议 5 (memory pre-flight) — 需要更多测试样本和经验阈值。</li>
+</ol>
+<b>预估总收益</b>（粗）：若 1+2+3 都落地且 §11-🅱️ 几个问题有合作者实质回答，T2 均分有望从 0.63 突破到 0.85+（dos_curve 不再集体跪 → 多数题接近满分）。
+</div>
+
+<p style="color:#7f8c8d;font-size:13px"><i>说明：上面建议都限定在 <code>solver/v4.2/</code>，不动 <code>bench/harness/</code>。
+evaluator 端的明显缺口（如 Rb metal-detection cascade 失败、OFF_PATH 检测 cross-version 不稳）
+当 §11-🅱️ 的问题列项让合作者讨论，没在本节提具体修法。</i></p>
+
+<h2 id="appendix">§13 附录</h2>
 
 <h4>数据来源</h4>
 <ul>
