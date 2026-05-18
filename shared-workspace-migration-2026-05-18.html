@@ -54,7 +54,7 @@ a:hover { text-decoration: underline; }
 <strong>时间：</strong>2026-05-18<br>
 <strong>状态：</strong><span class="tag tag-done">bench + web 代码已搬</span>
 <span class="tag tag-done">tokens 已建</span>
-<span class="tag tag-pending">runs_local mv 待 weilin 停服务后执行</span><br>
+<span class="tag tag-done">shared runs_local 已建，等 weilin 把旧 runs mv 进来</span><br>
 <strong>token：</strong>不在本报告里（公开仓库），私聊 shijie 索取，或登服务器读 <code>/srv/shared/science/web/tokens.yaml</code>
 </div>
 
@@ -63,7 +63,7 @@ a:hover { text-decoration: underline; }
 <ul>
   <li><b>bench</b>（<code>dft-agent-bench</code>）已搬到 <code>/srv/shared/science/bench</code>。两人都是 collaborator，直接 push 到 <code>origin/main</code>，不再走 fork。</li>
   <li><b>web</b>（<code>dft-agent-bench-web-fresh</code>）已搬到 <code>/srv/shared/science/web</code>。同上直推。</li>
-  <li><b>runs_local</b> 即将共享：350GB 实验数据将从 shijie home 搬到 <code>/srv/shared/science/web/runs_local</code>；当前还在 home，等 weilin 停掉 port 8765 server 后 shijie 执行 mv + symlink。</li>
+  <li><b>runs_local</b> 共享目录已建：<code>/srv/shared/science/web/runs_local</code>。两人都把 <strong>自己旧 runs</strong> mv 进去（shijie 的 350GB 暂留 home，shijie 的 web 配置目前指 home 读历史；weilin 把他 home 下的旧 runs mv 进共享）。新 run 自然落共享（web 默认 <code>REPO_ROOT/runs_local</code>，cwd = 共享 web 时即指向共享）。</li>
   <li><b>tokens.yaml</b> 在共享 web 目录里，里面 3 条 token：shijie / weilin 都是 <code>is_dev_role:true</code>（root 级），yangjin 是 <code>view.others_runs</code> 只读级。</li>
   <li><b>运行时配置（.env / config.toml）</b>：每人在 <code>~/.web-runtime/</code> 维护自己一份；启服务前 cp 覆盖到共享目录。</li>
 </ul>
@@ -75,7 +75,7 @@ a:hover { text-decoration: underline; }
 <tbody>
 <tr><td><code>/srv/shared/science/bench/</code></td><td>dft-agent-bench checkout（题目 / GT / 评分代码）</td><td>shijie + weilin（直推 main）</td><td><span class="tag tag-done">就绪</span></td></tr>
 <tr><td><code>/srv/shared/science/web/</code></td><td>dft-agent-bench-web-fresh checkout（backend + 静态前端）</td><td>shijie + weilin（直推 master）</td><td><span class="tag tag-done">就绪</span></td></tr>
-<tr><td><code>/srv/shared/science/web/runs_local/</code></td><td>实验数据（END state）</td><td>shijie + weilin</td><td><span class="tag tag-pending">mv 待执行</span></td></tr>
+<tr><td><code>/srv/shared/science/web/runs_local/</code></td><td>实验数据（go-forward 位置：新 run + weilin 旧 runs）</td><td>shijie + weilin</td><td><span class="tag tag-done">就绪（等 weilin 旧 runs 迁入）</span></td></tr>
 <tr><td><code>/srv/shared/science/web/tokens.yaml</code></td><td>3 用户 token 注册中心</td><td>shijie + weilin（ACL 限定）</td><td><span class="tag tag-done">就绪</span></td></tr>
 <tr><td><code>/srv/shared/science/dft-agent-bench-data/</code></td><td>已有数据归档（runs-archive-shijie / -weilin）</td><td>weilin 建的，两人均可</td><td><span class="tag tag-done">不动</span></td></tr>
 <tr><td><code>/srv/shared/science/solver/v{1,4.1,4.2,5}/</code></td><td>solver 各版本（现状）</td><td>不确定（weilin 建的伞目录）</td><td><span class="tag tag-pending">下轮单独整</span></td></tr>
@@ -84,25 +84,37 @@ a:hover { text-decoration: underline; }
 </table>
 
 <div class="callout">
-<b>关于 runs_local：</b>当前 350GB 数据还在 <code>/home/shijie/projects/web/runs_local</code>。
-weilin 这边正跑着 port 8765 的 server——只要它在写文件，shijie 不能安全 mv。
-请 weilin 找个空档 <code>kill</code> 那个进程并告诉 shijie，shijie 随后执行：
-<pre><code>mv /home/shijie/projects/web/runs_local /srv/shared/science/web/runs_local
-ln -s /srv/shared/science/web/runs_local /home/shijie/projects/web/runs_local
-# 加 ACL 让 weilin 在已有 350GB 里也可写</code></pre>
-mv 完成后两人都按下面"协作工作流"里的方式起 server，新 run 自动写到共享。
+<b>关于 runs_local 的分阶段策略：</b>
+<ul>
+  <li>shijie 的 350GB 历史 runs 暂留 <code>/home/shijie/projects/web/runs_local</code>。shijie 本机 web 配置指向 home 读历史；新 runs 走默认 <code>REPO_ROOT/runs_local</code> = 共享。后续若需要全合并到共享，再单独 mv。</li>
+  <li>weilin 把<strong>自己 home 下的旧 runs</strong> mv 到共享：<pre><code># weilin 自己跑：
+# 1. 先停掉自己在跑的 uvicorn（如果有）
+pgrep -af "uvicorn.*backend" -u $USER
+# kill 对应 PID
+
+# 2. mv（同 FS 是瞬间 rename；改路径前看一眼 du）
+du -sh /home/weilin/path/to/your/old/runs_local
+mv /home/weilin/path/to/your/old/runs_local/* /srv/shared/science/web/runs_local/
+
+# 3. 修一下权限让两人都可写（默认 ACL 只对 mv 之后新建文件生效，已搬入的需补）
+chmod -R a+rwX /srv/shared/science/web/runs_local
+find /srv/shared/science/web/runs_local -type d -exec setfacl -d -m u::rwx,g::rwx,o::rwx,m::rwx {} +
+</code></pre></li>
+  <li>新 run（无论谁起的服务）只要 cwd 是 <code>/srv/shared/science/web/</code>，就会自动落到共享 <code>runs_local/</code>。两人都能 ls / 看 / rerun_eval 对方的 run。</li>
+</ul>
 </div>
 
 <h2>Run 的新工作目录</h2>
 
 <ul>
   <li><b>bench_dir</b>: <code>/srv/shared/science/bench</code></li>
-  <li><b>runs_local</b>: <code>/srv/shared/science/web/runs_local</code>（mv 完成后；当前过渡期 home 仍是真目录）</li>
-  <li><b>solver 路径</b>: 暂时各人指自己 home 的 solver / .venv（本轮没整 solver；下轮再共享化）</li>
+  <li><b>runs_local（新 run 的去处）</b>: <code>/srv/shared/science/web/runs_local</code> ——web 默认 <code>demo_runs_dir = REPO_ROOT/runs_local</code>，从 <code>/srv/shared/science/web</code> 启服务即落到这里</li>
+  <li><b>runs_local（旧历史 runs）</b>: shijie 的 350GB 暂留 home；weilin 把他自己的旧 runs mv 进共享（见上面 callout 命令）</li>
+  <li><b>solver 路径</b>: shijie 当前指 <code>/srv/shared/science/solver/v4.2/agent/solve.py</code>，weilin 用他自己的 solver / .venv（venv 不能跨用户复用）</li>
   <li><b>QE wrapper / workspace_root</b>: 各人自己 home（每人 QE 安装路径不一样）</li>
 </ul>
 
-<p>跑出来的 run 落到共享 runs_local 后，两人都能 <code>ls</code> / 看 / <code>rerun_eval</code>，互相结果可见。</p>
+<p>weilin 旧 runs mv 进共享后，两人都能 <code>ls</code> / 看 / <code>rerun_eval</code> 对方的 run。</p>
 
 <h2>你（weilin）的一次性操作清单</h2>
 
@@ -128,7 +140,22 @@ git config --global --add safe.directory /srv/shared/science/web</code></pre>
 </ul>
 </li>
 <li><b>跟 shijie 私聊拿你的 Bearer token</b>（is_dev_role=true，能管 token / 看一切 / cancel 别人 run / 注册 agent）。绝对不要把 token 贴到任何公开渠道。</li>
-<li><b>停一下你当前 port 8765 上的 uvicorn 进程</b>，让 shijie 把 runs_local mv 到共享。完成后即可正常起服务。</li>
+<li><b>把你 home 下的旧 runs mv 到共享 <code>runs_local</code></b>（让你的历史 run 也能透过共享 web 看到）：
+<pre><code># 1. 先停掉自己跑的 uvicorn
+pgrep -af "uvicorn.*backend" -u $USER    # 找到对应 PID
+kill &lt;PID&gt;
+
+# 2. 确认源路径 + 大小
+du -sh /home/weilin/path/to/your/old/runs_local
+
+# 3. mv 进共享（同 FS rename 是瞬间，跨 FS 会拷贝）
+mv /home/weilin/path/to/your/old/runs_local/* /srv/shared/science/web/runs_local/
+
+# 4. 加权限（默认 ACL 只对未来新建生效，已搬入的要补）
+chmod -R a+rwX /srv/shared/science/web/runs_local
+find /srv/shared/science/web/runs_local -type d -exec setfacl -d -m u::rwx,g::rwx,o::rwx,m::rwx {} +
+</code></pre>
+</li>
 </ol>
 
 <h2>启动 server 的标准流程</h2>
@@ -193,8 +220,9 @@ bash start.sh
 <h2>Pending / 后续</h2>
 
 <ul>
-  <li><b>runs_local mv</b>：等 weilin 停 port 8765 server 后 shijie 执行（350GB 同 FS rename，秒级；之后 <code>chmod -R a+rwX</code> 加默认 ACL 几分钟）</li>
-  <li><b>solver 共享化</b>：现在 <code>/srv/shared/science/solver/</code> 是 weilin 之前建的伞目录，含 v{1,4.1,4.2,5} 子 repo；统一规范 / 谁是 owner / 怎么共享 venv，需要单独 plan 再讨论</li>
+  <li><b>weilin 旧 runs 入共享</b>：weilin 按上面 callout / checklist 自己执行 mv（同 FS 是秒级 rename）</li>
+  <li><b>shijie 350GB 历史 runs 是否合并</b>：当前 shijie 本机 web 配置读 home 历史；若决定全合并到共享需单独 mv，本轮不做。若只是要"两人都能 ls 看 shijie 历史"，最简就是给共享加 symlink，不要 mv（避免改动太大）</li>
+  <li><b>solver 共享化</b>：现在 <code>/srv/shared/science/solver/</code> 含 v{1,4.1,4.2,5} 子 repo；统一规范 / venv 怎么共享需要单独 plan 讨论</li>
   <li><b>meta-harness-dft（196GB）</b>：在 shijie home，暂不动</li>
   <li><b>仓库内 hardcoded path 清理</b>：搜索 backend 代码里所有 <code>/home/shijie/</code> 字符串（CLAUDE.md 提到过 weilin 改过一轮 chore/cleanup-hardcoded-weilin-paths）——还有没漏的待二轮发现</li>
 </ul>
