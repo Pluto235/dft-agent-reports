@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>共享工作区搬迁 handoff · 2026-05-18</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+       'Microsoft YaHei', sans-serif;
+       max-width: 1100px; margin: 0 auto; padding: 30px; color: #2c3e50; line-height: 1.75; }
+h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+h2 { color: #34495e; margin-top: 50px; border-bottom: 1px solid #bdc3c7; padding-bottom: 5px; }
+h3 { color: #34495e; margin-top: 30px; }
+p { margin: 10px 0; }
+ul, ol { padding-left: 24px; }
+li { margin: 4px 0; }
+code { background: #f4f6f7; padding: 1px 6px; border-radius: 3px; font-size: 13.5px;
+       font-family: ui-monospace, 'SF Mono', Menlo, monospace; color: #c0392b; }
+pre { background: #2c3e50; color: #ecf0f1; padding: 16px 18px; border-radius: 6px;
+      overflow-x: auto; font-size: 13px; line-height: 1.55;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+pre code { background: transparent; color: inherit; padding: 0; }
+.meta { background: #ecf0f1; padding: 14px 20px; border-radius: 6px; margin: 15px 0;
+        line-height: 1.7; }
+.meta strong { color: #2c3e50; }
+.note { background: #fffbe6; border-left: 4px solid #f1c40f; padding: 12px 16px;
+        margin: 16px 0; font-size: 14.5px; color: #7d6608; border-radius: 4px; line-height: 1.75; }
+.callout { background: #eaf6ff; border-left: 4px solid #3498db; padding: 12px 16px;
+        margin: 16px 0; font-size: 14.5px; color: #21618c; border-radius: 4px; line-height: 1.75; }
+.danger { background: #fdecea; border-left: 4px solid #e74c3c; padding: 12px 16px;
+        margin: 16px 0; font-size: 14.5px; color: #922b21; border-radius: 4px; line-height: 1.75; }
+table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13.5px; }
+th { background: #34495e; color: white; padding: 9px 11px; text-align: left; font-weight: 600; }
+td { border-bottom: 1px solid #ecf0f1; padding: 8px 11px; vertical-align: top; }
+tr:hover td { background: #f8f9fa; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 3px;
+       font-size: 12px; font-weight: 600; margin-right: 4px; }
+.tag-done { background: #27ae60; color: white; }
+.tag-pending { background: #e67e22; color: white; }
+.tag-deprecated { background: #95a5a6; color: white; }
+hr { border: none; border-top: 1px solid #ecf0f1; margin: 30px 0; }
+.disclaimer { color: #7f8c8d; font-size: 13px; margin: 20px 0; line-height: 1.7;
+       border-top: 1px dashed #bdc3c7; padding-top: 16px; }
+a { color: #2980b9; text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<h1>共享工作区搬迁 handoff（2026-05-18）</h1>
+
+<div class="meta">
+<strong>受众：</strong>weilin（次要：yangjin、未来加入的合作者）<br>
+<strong>时间：</strong>2026-05-18<br>
+<strong>状态：</strong><span class="tag tag-done">bench + web 代码已搬</span>
+<span class="tag tag-done">tokens 已建</span>
+<span class="tag tag-pending">runs_local mv 待 weilin 停服务后执行</span><br>
+<strong>token：</strong>不在本报告里（公开仓库），私聊 shijie 索取，或登服务器读 <code>/srv/shared/science/web/tokens.yaml</code>
+</div>
+
+<h2>TL;DR</h2>
+
+<ul>
+  <li><b>bench</b>（<code>dft-agent-bench</code>）已搬到 <code>/srv/shared/science/bench</code>。两人都是 collaborator，直接 push 到 <code>origin/main</code>，不再走 fork。</li>
+  <li><b>web</b>（<code>dft-agent-bench-web-fresh</code>）已搬到 <code>/srv/shared/science/web</code>。同上直推。</li>
+  <li><b>runs_local</b> 即将共享：350GB 实验数据将从 shijie home 搬到 <code>/srv/shared/science/web/runs_local</code>；当前还在 home，等 weilin 停掉 port 8765 server 后 shijie 执行 mv + symlink。</li>
+  <li><b>tokens.yaml</b> 在共享 web 目录里，里面 3 条 token：shijie / weilin 都是 <code>is_dev_role:true</code>（root 级），yangjin 是 <code>view.others_runs</code> 只读级。</li>
+  <li><b>运行时配置（.env / config.toml）</b>：每人在 <code>~/.web-runtime/</code> 维护自己一份；启服务前 cp 覆盖到共享目录。</li>
+</ul>
+
+<h2>新文件结构</h2>
+
+<table>
+<thead><tr><th>路径</th><th>角色</th><th>谁能写</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td><code>/srv/shared/science/bench/</code></td><td>dft-agent-bench checkout（题目 / GT / 评分代码）</td><td>shijie + weilin（直推 main）</td><td><span class="tag tag-done">就绪</span></td></tr>
+<tr><td><code>/srv/shared/science/web/</code></td><td>dft-agent-bench-web-fresh checkout（backend + 静态前端）</td><td>shijie + weilin（直推 master）</td><td><span class="tag tag-done">就绪</span></td></tr>
+<tr><td><code>/srv/shared/science/web/runs_local/</code></td><td>实验数据（END state）</td><td>shijie + weilin</td><td><span class="tag tag-pending">mv 待执行</span></td></tr>
+<tr><td><code>/srv/shared/science/web/tokens.yaml</code></td><td>3 用户 token 注册中心</td><td>shijie + weilin（ACL 限定）</td><td><span class="tag tag-done">就绪</span></td></tr>
+<tr><td><code>/srv/shared/science/dft-agent-bench-data/</code></td><td>已有数据归档（runs-archive-shijie / -weilin）</td><td>weilin 建的，两人均可</td><td><span class="tag tag-done">不动</span></td></tr>
+<tr><td><code>/srv/shared/science/solver/v{1,4.1,4.2,5}/</code></td><td>solver 各版本（现状）</td><td>不确定（weilin 建的伞目录）</td><td><span class="tag tag-pending">下轮单独整</span></td></tr>
+<tr><td><code>/home/&lt;user&gt;/projects/{bench,web}/</code></td><td>旧个人副本</td><td>各自</td><td><span class="tag tag-deprecated">弃用</span></td></tr>
+</tbody>
+</table>
+
+<div class="callout">
+<b>关于 runs_local：</b>当前 350GB 数据还在 <code>/home/shijie/projects/web/runs_local</code>。
+weilin 这边正跑着 port 8765 的 server——只要它在写文件，shijie 不能安全 mv。
+请 weilin 找个空档 <code>kill</code> 那个进程并告诉 shijie，shijie 随后执行：
+<pre><code>mv /home/shijie/projects/web/runs_local /srv/shared/science/web/runs_local
+ln -s /srv/shared/science/web/runs_local /home/shijie/projects/web/runs_local
+# 加 ACL 让 weilin 在已有 350GB 里也可写</code></pre>
+mv 完成后两人都按下面"协作工作流"里的方式起 server，新 run 自动写到共享。
+</div>
+
+<h2>Run 的新工作目录</h2>
+
+<ul>
+  <li><b>bench_dir</b>: <code>/srv/shared/science/bench</code></li>
+  <li><b>runs_local</b>: <code>/srv/shared/science/web/runs_local</code>（mv 完成后；当前过渡期 home 仍是真目录）</li>
+  <li><b>solver 路径</b>: 暂时各人指自己 home 的 solver / .venv（本轮没整 solver；下轮再共享化）</li>
+  <li><b>QE wrapper / workspace_root</b>: 各人自己 home（每人 QE 安装路径不一样）</li>
+</ul>
+
+<p>跑出来的 run 落到共享 runs_local 后，两人都能 <code>ls</code> / 看 / <code>rerun_eval</code>，互相结果可见。</p>
+
+<h2>你（weilin）的一次性操作清单</h2>
+
+<ol>
+<li><b>git safe.directory</b>（不做会报 dubious ownership）：
+<pre><code>git config --global --add safe.directory /srv/shared/science/bench
+git config --global --add safe.directory /srv/shared/science/web</code></pre>
+</li>
+<li><b>建个人 runtime 目录</b>：
+<pre><code>mkdir -p ~/.web-runtime && chmod 700 ~/.web-runtime</code></pre>
+然后写两份你自己的文件：
+<ul>
+  <li><code>~/.web-runtime/env</code> —— 你自己的 <code>ANTHROPIC_API_KEY</code> / <code>DEEPSEEK_API_KEY</code> / <code>AUTH_TOKEN</code> 等。<br>
+      模板见 <code>/srv/shared/science/web/.env.example</code>。<br>
+      建议 <code>chmod 600 ~/.web-runtime/env</code>。</li>
+  <li><code>~/.web-runtime/config.toml</code> —— 拷 <code>/srv/shared/science/web/config.toml.example</code> 为基底，必填：
+      <ul>
+        <li><code>bench_dir = "/srv/shared/science/bench"</code></li>
+        <li><code>agent_solver_path = "/path/to/your/solver/...solve.py"</code>（你自己 home 下的 solver）</li>
+        <li><code>workspace_root = "/path/to/your/home/workspace"</code></li>
+        <li>QE wrapper 相关字段也指你 home</li>
+      </ul></li>
+</ul>
+</li>
+<li><b>跟 shijie 私聊拿你的 Bearer token</b>（is_dev_role=true，能管 token / 看一切 / cancel 别人 run / 注册 agent）。绝对不要把 token 贴到任何公开渠道。</li>
+<li><b>停一下你当前 port 8765 上的 uvicorn 进程</b>，让 shijie 把 runs_local mv 到共享。完成后即可正常起服务。</li>
+</ol>
+
+<h2>启动 server 的标准流程</h2>
+
+<p>每次起服务前 activate 自己的 runtime（"谁起服务谁写"）：</p>
+
+<pre><code>cd /srv/shared/science/web
+cp ~/.web-runtime/env .env
+cp ~/.web-runtime/config.toml config.toml
+bash start.sh
+# server 默认起在 localhost:8765
+</code></pre>
+
+<div class="note">
+<code>.env</code> 和 <code>config.toml</code> 在共享目录里会被对方写过来覆盖——这是设计本意。
+两人不要同时起服务（端口 8765 也会冲突）。约定好谁在用即可。
+</div>
+
+<h2>协作工作流</h2>
+
+<h3>git</h3>
+<ul>
+  <li><code>origin</code> 都是 <code>git@github.com:wanweilin/...</code>，没有 fork、没有 upstream</li>
+  <li>两人都是 collaborator，直接 push <code>main</code> / <code>master</code></li>
+  <li>共享仓 <code>core.sharedRepository=all</code>，新建文件自动世界可读写（叠加默认 ACL 兜底）</li>
+  <li>未来可以约定特性分支 + PR；现阶段直推也不会撞 owner</li>
+</ul>
+
+<h3>运行时</h3>
+<ul>
+  <li><code>.env</code> / <code>config.toml</code>：每人 <code>~/.web-runtime/</code> 维护，启服务前 cp 进共享目录</li>
+  <li><code>tokens.yaml</code>：共享单一注册中心，<code>chmod 600</code> + 命名 ACL 只允许 shijie/weilin 读</li>
+  <li><code>runs_local/</code>：mv 完成后两人共享，新 run 自动落进去</li>
+  <li><code>state.db</code> / <code>tokens.yaml.bak.*</code>：runtime 自动产物，gitignored，不用管</li>
+</ul>
+
+<h2>多 user 权限模型</h2>
+
+<table>
+<thead><tr><th>用户</th><th>角色</th><th>能做什么</th></tr></thead>
+<tbody>
+<tr><td>shijie</td><td><code>is_dev_role: true</code></td><td>root 级 escape hatch：bypass 所有 capability check，能管 token CRUD UI，看 cluster / usage / failures / 别人 run，注册 / 停用 agent</td></tr>
+<tr><td>weilin</td><td><code>is_dev_role: true</code></td><td>同上</td></tr>
+<tr><td>yangjin</td><td><code>capabilities: [view.others_runs]</code></td><td>能看 shijie + weilin 跑的 run；不能 cancel / delete 别人的 run；看不到 admin 面板 / token 管理 UI；提交的 run owner=yangjin</td></tr>
+</tbody>
+</table>
+
+<p>web 端登录就贴 token 进 UI 即可。token 是 web 层 auth，跟 Linux 账号无关——yangjin 即使在服务器上没 ssh 账号也能用 web。</p>
+
+<h2>弃用 / 不要再用的路径</h2>
+
+<table>
+<thead><tr><th>旧路径</th><th>新路径</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>/home/shijie/projects/bench</code></td><td><code>/srv/shared/science/bench</code></td><td>留作备份不动，所有 bench 操作走共享。shijie 本地一些 fork-based 历史 commit 在搬迁中被丢弃（plan 阶段确认过）</td></tr>
+<tr><td><code>/home/shijie/projects/web</code></td><td><code>/srv/shared/science/web</code></td><td>同上；mv 完成后 <code>/home/shijie/projects/web/runs_local</code> 变 symlink → 共享</td></tr>
+<tr><td><code>/home/shijie/projects/solver</code></td><td>(本轮没动)</td><td>shijie 自己继续用，weilin 用他自己 home 下的 solver</td></tr>
+<tr><td>shijie 的 Pluto235 fork（bench / web）</td><td>(放弃)</td><td>不再走 fork → PR 模式；直接推 wanweilin/...</td></tr>
+</tbody>
+</table>
+
+<h2>Pending / 后续</h2>
+
+<ul>
+  <li><b>runs_local mv</b>：等 weilin 停 port 8765 server 后 shijie 执行（350GB 同 FS rename，秒级；之后 <code>chmod -R a+rwX</code> 加默认 ACL 几分钟）</li>
+  <li><b>solver 共享化</b>：现在 <code>/srv/shared/science/solver/</code> 是 weilin 之前建的伞目录，含 v{1,4.1,4.2,5} 子 repo；统一规范 / 谁是 owner / 怎么共享 venv，需要单独 plan 再讨论</li>
+  <li><b>meta-harness-dft（196GB）</b>：在 shijie home，暂不动</li>
+  <li><b>仓库内 hardcoded path 清理</b>：搜索 backend 代码里所有 <code>/home/shijie/</code> 字符串（CLAUDE.md 提到过 weilin 改过一轮 chore/cleanup-hardcoded-weilin-paths）——还有没漏的待二轮发现</li>
+</ul>
+
+<h2>出问题怎么办</h2>
+
+<ul>
+  <li>git 报 dubious ownership → 检查 <code>safe.directory</code> 是否加了对应路径</li>
+  <li>web 起来但读不到 runs → 检查 <code>config.toml</code> 里 <code>bench_dir</code> / <code>demo_runs_dir</code> 是否指对</li>
+  <li>weilin 写共享目录里某个文件 permission denied → 多半是该文件没有默认 ACL（shijie 修过的目录都有；如果撞到例外，<code>setfacl -m u::rwx,g::rwx,o::rwx file</code> 一下）</li>
+  <li>token 不工作 → 看 <code>/srv/shared/science/web/tokens.yaml</code> 是否包含你的条目；server 重启会重新 lifespan-load 它</li>
+  <li>其它 → 找 shijie</li>
+</ul>
+
+<p class="disclaimer">本报告 self-contained，无外部 CSS / JS / 图片依赖。源 markdown 实际不存在——直接手写 HTML。<br>
+报告里故意不含任何 Bearer token / API key / 服务器主机名 / IP / 端口转发地址；这些走私人渠道。</p>
+
+</body>
+</html>

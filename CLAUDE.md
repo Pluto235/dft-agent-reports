@@ -3,6 +3,12 @@
 DFT-agent bench 报告归档站。每份报告是一个**独立 self-contained HTML 文件**，
 通过 GitHub Pages 静态托管，分享 URL 永久有效。
 
+## 关于 2026-05-18 共享工作区迁移
+
+`bench` / `web` / `solver` 都已搬到 `/srv/shared/science/`（与 weilin 共同维护）。
+**reports 仓本身仍留在 home**——这是 shijie 个人的报告归档，不进入共享工作区。
+对应 handoff 报告：`shared-workspace-migration-2026-05-18.html`。
+
 ## URLs
 
 - 首页：https://pluto235.github.io/dft-agent-reports/
@@ -27,10 +33,23 @@ origin: git@github.com:Pluto235/dft-agent-reports.git  (main branch)
 
 文件命名约定：`<topic>-YYYY-MM-DD.html`（topic 描述实验类型，日期是报告生成日）。
 
+## 报告来源路径（生成 HTML 时数据从哪来）
+
+报告 HTML 通常基于 run 数据生成。以前数据在 `/home/shijie/projects/web/runs_local/`，
+2026-05-18 之后所有 run 数据集中在共享：
+
+- runs：`/srv/shared/science/web/runs_local/`
+- bench 题目 / GT：`/srv/shared/science/bench/`
+- bench 数据归档：`/srv/shared/science/dft-agent-bench-data/`
+- solver 各版本：`/srv/shared/science/solver/v{1,4.1,4.2,5}/`
+
+未来生成报告时数据源走共享路径；本仓 `/home/shijie/projects/reports/` 只存最终 HTML
+和 index.html。
+
 ## 加新报告流程（**重要 — 每次都要做这 4 步**）
 
 ```bash
-cd /home/shijie/dft-agent-reports
+cd /home/shijie/projects/reports
 
 # 1. 把新生成的 HTML 拷进来（命名带日期）
 cp /path/to/new-report-2026-MM-DD.html .
