@@ -381,10 +381,10 @@ SCF 跑在错的几何上 → gap 偏离 reference（tolerance ±0.1 eV）。v4.
 band_gap_ev 平均从 0.58 拉到 0.87–0.91。</li>
 </ul>
 
-<h2 id="cases">§8 案例深挖（7 例）</h2>
+<h2 id="cases">§8 案例深挖（8 例）</h2>
 
-<p style="color:#7f8c8d;font-size:13px">前 5 例（A-E）已升级深度，重点针对「三版本同跪」的硬题；
-F、G 是新增的 M2 OOM-prone 案例。每例：GT vs 三版本 extracted 对照表 + 1 段根因 + 1-2 个尖锐的合作者问题。</p>
+<p style="color:#7f8c8d;font-size:13px">A-E 是单案例深挖；F、G 是 M2 OOM-prone 案例（现已解决）；
+H 是 k-label 失配 cross-material 对比（α-SiO<sub>2</sub> / CaTiO<sub>3</sub> / HfO<sub>2</sub> / MgSiO<sub>3</sub>）。</p>
 
 <div class="case">
 <h4>🅰 案例 A · Rb (M1_T2_Rb_bands_dos) — 三版本同跪：F1 修了 dos_curve，但 metal-detect 接口仍然挂着</h4>
@@ -587,6 +587,62 @@ S5 让 dos_curve 从 0 → 0.670。<b>v1 上 dos_curve 仍然 0</b>——说明 
 如果跑得过就不再需要这条；如果还跑挂就仍然要做。「§12 建议 3: Rule E DOS canonical-config」
 在 F1 之后 <b>降级为 nice-to-have</b>——agent 端不强求和 GT 完全一致的 smearing 配置，F1 已经容忍形状偏差。</p>
 </div>
+
+<div class="case" style="background:#fdf6e3;border-color:#b58900">
+<h4>🅷 案例 H · k-label 失配家族（α-SiO<sub>2</sub> / CaTiO<sub>3</sub> / HfO<sub>2</sub> 与 MgSiO<sub>3</sub> 一道对比）</h4>
+
+<p style="font-size:13px;color:#7d6608">把 §8-E MgSiO<sub>3</sub> 的「VBM 不在 path 上」推广到其他 indirect-gap 复杂晶体后，
+发现并不是同一个故事——分两类，要分开问合作者。</p>
+
+<table style="font-size:12px;max-width:1200px;">
+<thead><tr><th>材料</th><th>GT vbm_k</th><th>GT cbm_k</th><th>v4.2 vbm_k</th><th>v4.2 cbm_k</th><th>v4.2 gap_type</th><th>失分模式</th></tr></thead>
+<tbody>
+<tr><td><b>MgSiO<sub>3</sub> bridgmanite</b></td><td><code>'OFF_PATH'</code></td><td><code>'GAMMA'</code></td><td><b style="color:#c0392b">'GAMMA'</b></td><td><code>'GAMMA'</code> ✓</td><td><b style="color:#c0392b">'direct'</b> (GT 'indirect')</td><td>类型 (a) · 真 OFF_PATH 但 agent 沿 path 回 GAMMA</td></tr>
+<tr><td><b>CaTiO<sub>3</sub>-tet</b></td><td><code>'Z'</code></td><td><code>'GAMMA'</code></td><td><b style="color:#c0392b">'GAMMA'</b></td><td><code>'GAMMA'</code> ✓</td><td><b style="color:#c0392b">'direct'</b> (GT 'indirect')</td><td>类型 (a) · GT 在 Z 点 但 agent 的 k-path 没覆盖 → 落回 GAMMA</td></tr>
+<tr><td><b>α-SiO<sub>2</sub> quartz</b></td><td><code>'K'</code></td><td><code>'GAMMA'</code></td><td><b style="color:#c0392b">'OFF_PATH'</b></td><td><code>'GAMMA'</code> ✓</td><td><code>'indirect'</code> ✓</td><td>类型 (b) · GT 说 K 点 但 agent 评估器报 OFF_PATH（假性 OFF_PATH）</td></tr>
+<tr><td><b>HfO<sub>2</sub> monoclinic</b></td><td><code>'GAMMA'</code></td><td><code>'Y'</code></td><td><code>'GAMMA'</code> ✓</td><td><b style="color:#c0392b">'OFF_PATH'</b></td><td><code>'indirect'</code> ✓</td><td>类型 (b) · GT CBM 在 Y 点 但 agent 评估器报 OFF_PATH</td></tr>
+</tbody>
+</table>
+
+<p><b>两类失分模式</b>：</p>
+<ul>
+<li><b>类型 (a)：「真有 path-外 / 特殊 label 的 VBM/CBM，agent 沿 path NSCF 永远看不见」</b>
+（MgSiO<sub>3</sub>, CaTiO<sub>3</sub>）。
+agent 端 evaluator 取沿 path 最近的高对称点（GAMMA），同时 gap_type 也跟着错（看到 GAMMA→GAMMA 报 'direct'）。
+<b>修法</b>：agent 跑完 path NSCF 后追加一次 dense uniform NSCF（如 16³ Monkhorst-Pack），从中找真正的 VBM/CBM，
+然后报正确 label 或 'OFF_PATH'。</li>
+<li><b>类型 (b)：「GT 的 VBM/CBM 在某个具体 high-symmetry 点，但 agent 端 evaluator 假报 OFF_PATH」</b>
+（α-SiO<sub>2</sub> 的 VBM='K'、HfO<sub>2</sub> 的 CBM='Y'）。
+agent 跑的 seekpath path 应该会覆盖 K/Y（除非用了非 seekpath path），但 evaluator 的 frac-distance 容差
+（<code>_label_for_kpt</code> 在 <code>evaluator.py</code>）可能把略偏的 k 点判为 OFF_PATH。
+<b>修法</b>：agent 端 evaluator 的「label 匹配容差」要放宽，或者让 GT 接受 <code>alternates: ['K', 'OFF_PATH']</code>
+这种宽松匹配。</li>
+</ul>
+
+<p><b>另一个发现 · dos_e_fermi 在这 3 道题上仍然不一致（即使 S3 已经应用）</b>：</p>
+<table style="font-size:12px;max-width:1000px;">
+<thead><tr><th></th><th>α-SiO<sub>2</sub> GT 1.99</th><th>CaTiO<sub>3</sub> GT 9.01</th><th>HfO<sub>2</sub> GT 10.56</th></tr></thead>
+<tbody>
+<tr><td>v1</td><td>2.468 (Δ+0.48)</td><td>9.250 (Δ+0.24)</td><td>11.017 (Δ+0.45)</td></tr>
+<tr><td>v4.1</td><td><b style="color:#c0392b">7.721 (Δ+5.73)</b></td><td><b style="color:#c0392b">11.326 (Δ+2.32)</b></td><td><b style="color:#c0392b">14.601 (Δ+4.04)</b></td></tr>
+<tr><td>v4.2</td><td><b style="color:#27ae60">2.005 (Δ+0.02) ✓</b></td><td><b style="color:#c0392b">11.326 (Δ+2.32)</b></td><td><b style="color:#c0392b">14.601 (Δ+4.04)</b></td></tr>
+</tbody>
+</table>
+<p>v4.1 / v4.2 在 CaTiO<sub>3</sub> 和 HfO<sub>2</sub> 上 dos_e_fermi <b>偏 2–4 eV</b>——比 v1 反而更糟。
+这是典型的「reference 约定 mismatch」：agent 端 evaluator 读 <code>"the Fermi energy is"</code> 行（smearing-determined E_F）
+而 GT 用了 <code>"highest occupied level"</code> 行（VBM-top）。两者在绝缘体上差一个有限 smearing 形状的 broadening，
+对宽带氧化物可能差 2–4 eV。<b>α-SiO<sub>2</sub> v4.2 抽对了</b>说明 agent 在某些 task 上确实切到了 fixed occupations，
+但在 CaTiO<sub>3</sub> / HfO<sub>2</sub> 上没切——可能是 advisor 把含 Ti / Hf 的氧化物当成 "metal-like" 而强制 smearing。</p>
+
+<p><b>给合作者的 2 个尖锐问题</b>：
+(1) <b>类型 (a) 修法</b>：跑 dense uniform NSCF 找真 VBM/CBM 是 standard practice 吗？
+你们做 MgSiO<sub>3</sub> / CaTiO<sub>3</sub> bands plot 时是直接 sympath 然后看 plot，
+还是真的会再跑一遍 dense mesh 确认 band extrema 位置？
+(2) <b>类型 (b) 修法</b>：α-SiO<sub>2</sub> VBM 在 K 点是 well-established 的吗？
+HfO<sub>2</sub>-monoclinic CBM 在 Y 点呢？还是说这些其实在 GT 里也是软的——
+该不该让 bench 给这些 label 加 <code>alternates: [...]</code> 接受附近高对称点？</p>
+</div>
+
 
 <h2 id="failed">§9 几道直接 fail 的题：失败原因分类</h2>
 
