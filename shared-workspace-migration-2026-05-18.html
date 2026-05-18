@@ -78,7 +78,7 @@ a:hover { text-decoration: underline; }
 <tr><td><code>/srv/shared/science/web/runs_local/</code></td><td>实验数据（go-forward 位置：新 run + weilin 旧 runs）</td><td>shijie + weilin</td><td><span class="tag tag-done">就绪（等 weilin 旧 runs 迁入）</span></td></tr>
 <tr><td><code>/srv/shared/science/web/tokens.yaml</code></td><td>3 用户 token 注册中心</td><td>shijie + weilin（ACL 限定）</td><td><span class="tag tag-done">就绪</span></td></tr>
 <tr><td><code>/srv/shared/science/dft-agent-bench-data/</code></td><td>已有数据归档（runs-archive-shijie / -weilin）</td><td>weilin 建的，两人均可</td><td><span class="tag tag-done">不动</span></td></tr>
-<tr><td><code>/srv/shared/science/solver/v{1,4.1,4.2,5}/</code></td><td>solver 各版本（现状）</td><td>不确定（weilin 建的伞目录）</td><td><span class="tag tag-pending">下轮单独整</span></td></tr>
+<tr><td><code>/srv/shared/science/solver/v{1,4.1,4.2,5}/</code></td><td>solver 4 个版本各一份 checkout（同仓 <code>Pluto235/dft-bench-solver</code> 的 4 个分支）</td><td>shijie + weilin（ACL'd）</td><td><span class="tag tag-done">就绪（venv 仍各自 home）</span></td></tr>
 <tr><td><code>/home/&lt;user&gt;/projects/{bench,web}/</code></td><td>旧个人副本</td><td>各自</td><td><span class="tag tag-deprecated">弃用</span></td></tr>
 </tbody>
 </table>
@@ -110,7 +110,7 @@ find /srv/shared/science/web/runs_local -type d -exec setfacl -d -m u::rwx,g::rw
   <li><b>bench_dir</b>: <code>/srv/shared/science/bench</code></li>
   <li><b>runs_local（新 run 的去处）</b>: <code>/srv/shared/science/web/runs_local</code> ——web 默认 <code>demo_runs_dir = REPO_ROOT/runs_local</code>，从 <code>/srv/shared/science/web</code> 启服务即落到这里</li>
   <li><b>runs_local（旧历史 runs）</b>: shijie 的 350GB 暂留 home；weilin 把他自己的旧 runs mv 进共享（见上面 callout 命令）</li>
-  <li><b>solver 路径</b>: shijie 当前指 <code>/srv/shared/science/solver/v4.2/agent/solve.py</code>，weilin 用他自己的 solver / .venv（venv 不能跨用户复用）</li>
+  <li><b>solver 路径</b>: 4 个版本已共享，shijie 当前在 <code>config.toml</code> 指 <code>/srv/shared/science/solver/v4.2/agent/solve.py</code>；weilin 也可以指共享路径，但 <code>python_path</code> 仍指自己 home 的 <code>.venv/bin/python</code>（venv 含 user-specific binary 路径，不能跨用户复用）。详见下面 §Solver 布局</li>
   <li><b>QE wrapper / workspace_root</b>: 各人自己 home（每人 QE 安装路径不一样）</li>
 </ul>
 
@@ -174,6 +174,44 @@ bash start.sh
 两人不要同时起服务（端口 8765 也会冲突）。约定好谁在用即可。
 </div>
 
+<h2>Solver 布局（已共享）</h2>
+
+<p>4 个 solver 版本都已 clone 到共享，各占一个 dir：</p>
+
+<table>
+<thead><tr><th>路径</th><th>分支</th><th>solve.py 入口</th></tr></thead>
+<tbody>
+<tr><td><code>/srv/shared/science/solver/v1/</code></td><td><code>v1-stable</code></td><td><code>agent/solve.py</code></td></tr>
+<tr><td><code>/srv/shared/science/solver/v4.1/</code></td><td><code>v4.1</code></td><td><code>agent/solve.py</code>（顶层也有 <code>solve.py</code> 入口）</td></tr>
+<tr><td><code>/srv/shared/science/solver/v4.2/</code></td><td><code>v4.2</code></td><td><code>agent/solve.py</code>（同上）</td></tr>
+<tr><td><code>/srv/shared/science/solver/v5/</code></td><td><code>v5</code></td><td><code>agent/solve.py</code>（同上）</td></tr>
+</tbody>
+</table>
+
+<div class="note">
+<b>跟 bench / web 的 git 拓扑不一样</b>：solver 4 份的 origin 都是 <code>git@github.com:Pluto235/dft-bench-solver.git</code>（shijie 的 fork），而不是 <code>wanweilin/...</code>。
+这是历史延续——solver 主仓在 shijie fork 下，weilin push 需要 shijie 在 Pluto235 设为 collaborator。
+不确定的话先开 PR 给 shijie 合并；或这一轮也把 solver 翻成 wanweilin 主仓（需要单独 plan）。
+</div>
+
+<h3>venv 仍是每人自己一份</h3>
+
+<p>solver 的 <code>.venv/</code> <strong>没</strong>共享化——venv 里编译的 binary 含 user-specific 绝对路径，跨用户用会爆。
+每人在自己 home 各跑一次 venv build：</p>
+
+<pre><code># 例：v4.2
+cd /srv/shared/science/solver/v4.2
+python -m venv ~/.venvs/solver-v4.2    # 路径自己定，建议放 home
+source ~/.venvs/solver-v4.2/bin/activate
+pip install -r requirements.txt        # 或按各 version README 的指令
+deactivate
+
+# 然后在自己 ~/.web-runtime/config.toml 的 [[agents]] 块里：
+# python_path = "/home/&lt;you&gt;/.venvs/solver-v4.2/bin/python"
+</code></pre>
+
+<p>每人 venv 一份，solver 代码一份，是 hybrid 共享方案；下一轮考虑是否把 venv 也共享化（要不要走 conda env / module / 容器都是开放问题）。</p>
+
 <h2>协作工作流</h2>
 
 <h3>git</h3>
@@ -222,7 +260,8 @@ bash start.sh
 <ul>
   <li><b>weilin 旧 runs 入共享</b>：weilin 按上面 callout / checklist 自己执行 mv（同 FS 是秒级 rename）</li>
   <li><b>shijie 350GB 历史 runs 是否合并</b>：当前 shijie 本机 web 配置读 home 历史；若决定全合并到共享需单独 mv，本轮不做。若只是要"两人都能 ls 看 shijie 历史"，最简就是给共享加 symlink，不要 mv（避免改动太大）</li>
-  <li><b>solver 共享化</b>：现在 <code>/srv/shared/science/solver/</code> 含 v{1,4.1,4.2,5} 子 repo；统一规范 / venv 怎么共享需要单独 plan 讨论</li>
+  <li><b>solver venv 共享化</b>：solver 4 个版本代码已共享，<code>.venv</code> 还是每人 home 各一份。是否走 conda env / module / 容器待决定</li>
+  <li><b>solver origin 是否翻 wanweilin</b>：当前 4 份的 origin 都是 <code>Pluto235/dft-bench-solver</code>（shijie fork），跟 bench/web 的 wanweilin 拓扑不一致；要不要统一需单独讨论</li>
   <li><b>meta-harness-dft（196GB）</b>：在 shijie home，暂不动</li>
   <li><b>仓库内 hardcoded path 清理</b>：搜索 backend 代码里所有 <code>/home/shijie/</code> 字符串（CLAUDE.md 提到过 weilin 改过一轮 chore/cleanup-hardcoded-weilin-paths）——还有没漏的待二轮发现</li>
 </ul>
