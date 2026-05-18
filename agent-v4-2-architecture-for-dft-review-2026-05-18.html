@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v4.2 Solver 架构 · 邀请 DFT 专家评审 · 2026-05-18</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+         'Microsoft YaHei', sans-serif;
+         max-width: 920px; margin: 40px auto; padding: 0 28px; color: #2c3e50; line-height: 1.75; }
+  h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 12px; margin-top: 30px; }
+  h2 { color: #34495e; border-left: 5px solid #3498db; padding-left: 12px; margin-top: 50px; }
+  h3 { color: #2c3e50; margin-top: 30px; }
+  h4 { color: #34495e; margin-top: 22px; }
+  p { margin: 12px 0; }
+  a { color: #2980b9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+         background: #ecf0f1; padding: 2px 5px; border-radius: 3px; font-size: 90%; color: #c0392b; }
+  pre { background: #2c3e50; color: #ecf0f1; padding: 16px 20px; border-radius: 6px;
+        overflow-x: auto; font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 13px; line-height: 1.55; }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+
+  .meta { background: #ecf0f1; border-left: 4px solid #3498db; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .note { background: #fdf2e9; border-left: 4px solid #e67e22; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .qbox { background: #eafaf1; border: 1px solid #58d68d; border-left: 5px solid #27ae60;
+          padding: 14px 18px; margin: 22px 0; border-radius: 6px; }
+  .qbox h4 { margin: 0 0 8px 0; color: #1d8348; }
+  .qbox ul { margin: 6px 0; padding-left: 22px; }
+  .qbox li { margin: 4px 0; }
+
+  .concept { background: #fef9e7; border: 1px solid #f4d03f; border-radius: 8px;
+             padding: 16px 20px; margin: 24px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .concept .lbl { display: inline-block; background: #f1c40f; color: #fff;
+                  font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+                  margin-right: 8px; }
+  .concept h4 { margin: 0 0 8px 0; display: inline; color: #7d6608; }
+  .concept p { margin: 8px 0 0 0; }
+
+  .analogy { background: #eaf2f8; border-left: 4px solid #5dade2;
+             padding: 12px 18px; margin: 18px 0; border-radius: 4px;
+             font-size: 15px; }
+  .analogy::before { content: "🌰 类比 · "; font-weight: 700; color: #21618c; }
+
+  .diagram-caption { text-align: center; color: #7f8c8d; font-style: italic;
+                     font-size: 14px; margin: 6px 0 30px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #d5dbdb; text-align: left;
+           vertical-align: top; }
+  th { background: #34495e; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  td code { font-size: 12px; }
+
+  nav.toc { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 16px 24px; margin: 24px 0; }
+  nav.toc h3 { margin-top: 0; color: #34495e; }
+  nav.toc ol { padding-left: 24px; }
+  nav.toc li { padding: 3px 0; }
+
+  .svg-wrap { text-align: center; margin: 24px 0 6px; padding: 16px;
+              background: #fafbfc; border-radius: 8px; border: 1px solid #ecf0f1; }
+  .svg-wrap svg { max-width: 100%; height: auto; }
+
+  details { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 8px 14px; margin: 14px 0; }
+  details summary { cursor: pointer; color: #34495e; font-weight: 600; }
+  details[open] summary { margin-bottom: 8px; }
+
+  h2[id], h3[id], .concept[id] { scroll-margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>v4.2 Solver 架构 · 邀请 DFT 专家评审</h1>
+
+<div class="meta">
+<strong>给谁看</strong>：DFT / Quantum ESPRESSO 实战熟练、对 LLM agent 略有耳闻的合作者。<br>
+<strong>看完后请做的事</strong>：跳到 <a href="#s6">§6 请教 DFT 专家</a> 给出 4 类反馈
+（system prompt 的领域知识、verifier 的物理检查清单、step kinds 切分、qe_input_lint 默认值）。<br>
+<strong>背景</strong>：DFT-agent bench 的主推 solver 已切到 <strong>v4.2</strong>。它把 v1
+那种"单 LLM 边想边干"换成了"<strong>planner + executor + verifier 三个 LLM 角色</strong>
++ <strong>4 处把 DFT 领域知识硬编码进去的钩子</strong>"。我们想请你判断：这些硬编码的默认值
+和判定规则，物理上是否合理？<br>
+<strong>对应代码</strong>：<code>/srv/shared/science/solver/v4.2/</code>　·
+<strong>相关报告</strong>：
+<a href="solver-versions-explained-2026-05-17.html">四版本 solver 入门教程</a>（工程视角全景）、
+<a href="solver-v1-v41-v42-standard27-2026-05-17.html">27 题横向对比</a>（成绩数据）<br>
+<strong>本报告日期</strong>：2026-05-18　·　<strong>预计阅读</strong>：20–25 分钟。
+</div>
+
+<nav class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">背景：v1 baseline 是什么，为什么不够</a></li>
+  <li><a href="#s2">v4.2 一图概览：三角色 + 两 ledger</a></li>
+  <li><a href="#s3">v4.2 vs v1 ─ 每个新增组件解决什么具体问题</a></li>
+  <li><a href="#s4">四个 DFT 专家最该审的「硬编码决策」</a>
+    <ol>
+      <li><a href="#s41">Knowledge injection：system prompt 里塞了什么 DFT 知识</a></li>
+      <li><a href="#s42">Verifier 的物理 sanity checklist（按 step kind）</a></li>
+      <li><a href="#s43">Step kinds 的切分</a></li>
+      <li><a href="#s44">qe_input_lint 的默认值表 + 处理策略</a></li>
+    </ol>
+  </li>
+  <li><a href="#s5">一个真实 trace 示例 · M1_T1 Si vc-relax</a></li>
+  <li><a href="#s6">请教 DFT 专家的具体问题</a></li>
+  <li><a href="#s7">附录：仓库路径与相关链接</a></li>
+</ol>
+</nav>
+
+
+<!-- ─────────────────────────────── §1 ─────────────────────────────── -->
+<h2 id="s1">1 · 背景：v1 baseline 是什么，为什么不够</h2>
+
+<p>v1 是我们最早能跑通 bench 的 solver。整个 agent 就是<strong>一个 LLM</strong>，给它 4 个工具
+（<code>bash</code> / <code>write_file</code> / <code>read_file</code> / <code>submit</code>）
+和一段 42 行的通用系统提示词，然后让它读 task prompt、自己想、自己写 QE 输入、自己跑、
+自己判断收没收敛、自己 submit。形式上是经典的 ReAct 循环（think → act → observe → think → …）。</p>
+
+<div class="analogy">
+v1 像一个<strong>临时雇来的远程同事，啃过 QE 文档但没真做过项目</strong>。你把题目甩给他，
+他会试着做；但你不在旁边，他怎么做、查没查、什么时候放弃，全凭他自己。</div>
+
+<p>这种最小架构在 6 道 M1_T1（单元胞 vc-relax，Si / NaCl / Cu 这种）上能跑出 0.7+ 的均分，
+但只要难度上来，就会暴露几类系统性失败模式：</p>
+
+<table>
+<thead><tr><th>v1 暴露的失败模式</th><th>物理表现 / 后果</th></tr></thead>
+<tbody>
+<tr><td>vc-relax 用 QE 默认松阈值（<code>press_conv_thr=0.5 kbar</code>、
+    <code>forc_conv_thr=1e-3 Ry/Bohr</code>、<code>etot_conv_thr=1e-4 Ry</code>）</td>
+    <td>cubic 系统的弛豫结构漂移 ≥0.01° 或 ≥0.05% → pymatgen <code>SpacegroupAnalyzer</code>
+    把它降级为 trigonal/orthorhombic，<strong>空间群分扣 0.25</strong>。实测 ~25% miss 率。</td></tr>
+<tr><td>SCF 不收敛 → 死循环</td>
+    <td>LLM 反复改 mixing_beta / 加 nstep，2 小时墙时间用完，submit 不出来。</td></tr>
+<tr><td>metal 用了 <code>occupations='fixed'</code></td>
+    <td>SCF 振荡或假收敛；或者 insulator 用了 smearing 把 gap 抹平。</td></tr>
+<tr><td>大单胞 bands_dos 直接上来跑 bands</td>
+    <td>结构没先 vc-relax，bands 结果用错初始几何；或者 PBE+USPP 用 <code>ecutrho=4×ecutwfc</code>
+    （NC pseudo 的默认）→ 带隙漂 0.2–0.5 eV。</td></tr>
+<tr><td>bash 里 <code>pip install</code> / <code>curl</code></td>
+    <td>bench audit 直接判 0 分（评分要求纯离线运行）。</td></tr>
+<tr><td>LLM 自己说"我做完了"</td>
+    <td>漏交付字段 / 提交了未收敛的 .out / 给的路径根本不存在。</td></tr>
+</tbody>
+</table>
+
+<p>这些不是"LLM 笨"的问题，而是 v1 架构里<strong>缺三层保险</strong>：
+没人提前过滤输入（→ qe_input_lint）、没人在执行完之后独立检查物理（→ verifier）、
+没人在出错时决定该重试还是放弃（→ orchestrator 状态机）。v4.2 就是把这三层都补上。</p>
+
+
+<!-- ─────────────────────────────── §2 ─────────────────────────────── -->
+<h2 id="s2">2 · v4.2 一图概览：三角色 + 两 ledger</h2>
+
+<p>v4.2 的核心结构可以一图概括：</p>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 880 560" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'PingFang SC', sans-serif" font-size="12">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#34495e"/>
+    </marker>
+  </defs>
+
+  <!-- Task prompt input -->
+  <rect x="340" y="10" width="200" height="36" rx="6" fill="#ecf0f1" stroke="#7f8c8d"/>
+  <text x="440" y="33" text-anchor="middle" fill="#2c3e50">Task prompt (来自 bench)</text>
+  <line x1="440" y1="46" x2="440" y2="68" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Phase 1 -->
+  <rect x="120" y="68" width="640" height="100" rx="8" fill="#fff8e1" stroke="#f1c40f" stroke-width="1.5"/>
+  <text x="140" y="88" font-weight="700" fill="#7d6608">Phase 1 · Preflight（确定性 + 子 agent）</text>
+  <rect x="140" y="100" width="280" height="50" rx="6" fill="#fff" stroke="#f1c40f"/>
+  <text x="280" y="120" text-anchor="middle" font-weight="600" fill="#34495e">config_advisor</text>
+  <text x="280" y="138" text-anchor="middle" fill="#2c3e50" font-size="11">metal/insulator 分类 → occupations / smearing / ecutrho_factor</text>
+  <rect x="460" y="100" width="280" height="50" rx="6" fill="#fff" stroke="#f1c40f"/>
+  <text x="600" y="120" text-anchor="middle" font-weight="600" fill="#34495e">vc_relax preflight</text>
+  <text x="600" y="138" text-anchor="middle" fill="#2c3e50" font-size="11">bands_dos 任务先松弛几何（注入主 prompt）</text>
+
+  <line x1="440" y1="168" x2="440" y2="195" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Phase 2 outer box -->
+  <rect x="40" y="195" width="800" height="305" rx="8" fill="#eaf2f8" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="60" y="215" font-weight="700" fill="#21618c">Phase 2 · PlannerOrchestrator 循环</text>
+
+  <!-- Planner -->
+  <rect x="320" y="225" width="240" height="50" rx="6" fill="#fff" stroke="#5dade2"/>
+  <text x="440" y="245" text-anchor="middle" font-weight="600" fill="#34495e">Planner LLM</text>
+  <text x="440" y="263" text-anchor="middle" fill="#2c3e50" font-size="11">submit_plan → PlanSpec (DAG of steps)</text>
+
+  <line x1="440" y1="275" x2="440" y2="298" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step dispatch -->
+  <rect x="280" y="298" width="320" height="32" rx="6" fill="#fff" stroke="#5dade2"/>
+  <text x="440" y="318" text-anchor="middle" fill="#2c3e50">拓扑序取下一个 ready step → WorkdirStager</text>
+
+  <line x1="440" y1="330" x2="440" y2="350" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Executor -->
+  <rect x="280" y="350" width="320" height="60" rx="6" fill="#fff" stroke="#5dade2"/>
+  <text x="440" y="370" text-anchor="middle" font-weight="600" fill="#34495e">Executor LLM（per step）</text>
+  <text x="440" y="388" text-anchor="middle" fill="#2c3e50" font-size="11">用 step-kind 专属 prompt + bash / write_file / read_file</text>
+  <text x="440" y="403" text-anchor="middle" fill="#c0392b" font-size="11">每次 bash 调用都先过：qe_input_lint + bash_guard 钩子</text>
+
+  <line x1="440" y1="410" x2="440" y2="432" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Verifier -->
+  <rect x="280" y="432" width="320" height="50" rx="6" fill="#fff" stroke="#5dade2"/>
+  <text x="440" y="452" text-anchor="middle" font-weight="600" fill="#34495e">Verifier LLM（per step）</text>
+  <text x="440" y="470" text-anchor="middle" fill="#2c3e50" font-size="11">按 step_kind 的物理 checklist 检查 → pass / fail + diagnosis</text>
+
+  <!-- retry / replan loop arrows -->
+  <path d="M 600 457 Q 720 457 720 370 Q 720 290 600 290" fill="none" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="745" y="375" fill="#c0392b" font-size="11">retry ≤2</text>
+
+  <path d="M 280 457 Q 130 457 130 250 Q 130 230 320 230" fill="none" stroke="#9b59b6" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="60" y="345" fill="#8e44ad" font-size="11">replan ≤2</text>
+
+  <!-- Outputs -->
+  <line x1="440" y1="500" x2="440" y2="520" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="280" y="520" width="320" height="32" rx="6" fill="#ecf0f1" stroke="#7f8c8d"/>
+  <text x="440" y="540" text-anchor="middle" fill="#2c3e50">result.json + orchestrator.json (ledger 序列化)</text>
+</svg>
+</div>
+<div class="diagram-caption">图 1 · v4.2 顶层流程（Phase 1 preflight + Phase 2 三角色循环 + retry / replan 反馈）</div>
+
+<p>三个 LLM 角色分工严格：</p>
+<ul>
+  <li><strong>Planner</strong>：只看 task prompt，输出一个 <code>PlanSpec</code>（步骤 DAG，每步带
+    <code>kind</code> / <code>deps</code> / <code>expected_outputs</code>）。<strong>不读文件、不执行</strong>。</li>
+  <li><strong>Executor</strong>：拿到单个 step 的 prompt（base QE prompt + step_kind addon），
+    用 <code>bash</code> 等工具实际跑 QE，submit 该 step 的产物路径。</li>
+  <li><strong>Verifier</strong>：用 step_kind 专属 checklist 检查 executor 产出的文件，
+    输出 <code>pass / fail + diagnosis</code>。<strong>diagnosis 是 replan 时 planner 唯一的反馈渠道</strong>。</li>
+</ul>
+
+<p>两层 ledger（Magentic-One 风格）把所有状态序列化到 <code>orchestrator.json</code>：
+<strong>TaskLedger</strong> 装初始 plan + 重规划历史；<strong>ProgressLedger</strong>
+装每个 step 的 attempt 列表（含 executor session、verifier diagnosis、orchestrator 决策）。
+任何 bench run 跑完，整条 trace 都能复盘。</p>
+
+<div class="analogy">
+v1 是"一个人闷头干"；v4.2 是"<strong>项目经理（planner）写 spec，工程师（executor）实施，
+QA（verifier）按物理检查清单验收，工头（orchestrator）拿到 QA 报告决定返工还是改方案</strong>"。
+每个角色都能独立换模型——bench 现在 planner / executor 都是 Claude Sonnet，verifier 用更便宜的 Haiku。
+</div>
+
+
+<!-- ─────────────────────────────── §3 ─────────────────────────────── -->
+<h2 id="s3">3 · v4.2 vs v1 ─ 每个新增组件解决什么具体问题</h2>
+
+<p>下表把 §1 那些 v1 失败模式，逐一映射到 v4.2 的应对机制；并标注它在哪一层
+（<strong>prompt</strong> = 写进系统提示靠 LLM 自觉；<strong>hook</strong> = 代码强约束，
+LLM 没法绕过；<strong>verifier</strong> = 事后检查；<strong>orchestrator</strong> = 状态机）。</p>
+
+<table>
+<thead><tr><th>v1 失败模式</th><th>v4.2 的应对</th><th>在哪一层</th></tr></thead>
+<tbody>
+<tr><td>vc-relax 阈值太松 → 空间群退化</td>
+    <td><strong>qe_input_lint</strong> 在 <code>pw.x</code> spawn 之前拦截 input 文件，
+        强制 <code>press_conv_thr ≤ 0.05</code>、<code>forc_conv_thr ≤ 1e-4</code>、
+        <code>etot_conv_thr ≤ 1e-5</code>；LLM 自己写多松都会被收紧。</td>
+    <td>hook（代码强约束）</td></tr>
+<tr><td>SCF 死循环 → 跑墙时间</td>
+    <td>每个 step <strong>≤2 次 retry</strong>；耗尽后 <strong>≤2 次 replan</strong>；
+        最终 give-up 写 incomplete。</td>
+    <td>orchestrator 状态机</td></tr>
+<tr><td>metal 用 fixed occupations</td>
+    <td><strong>config_advisor</strong> 在 planner 启动之前先确定性分类（<code>METAL_ELEMENTS</code>
+        硬编码表 + 化学式正则 + "强电负性元素 → 化合物"），LLM 只做交叉验证；
+        结果注入 planner / executor 的 prompt 和 <code>.config_advice.json</code>。</td>
+    <td>preflight 子 agent + prompt</td></tr>
+<tr><td>USPP 用 <code>ecutrho = 4×ecutwfc</code></td>
+    <td>qe_input_lint Rule C：检测到 pseudo 家族含 USPP/GBRV/PAW，自动把 <code>ecutrho</code>
+        改成 10×ecutwfc。</td>
+    <td>hook</td></tr>
+<tr><td>bands NSCF 用了 <code>calculation='bands'</code></td>
+    <td>qe_input_lint Rule B：发现 <code>K_POINTS crystal_b</code> + <code>calculation='bands'</code>
+        组合，自动改成 <code>'nscf'</code>。原因是 bench evaluator 要从
+        <code>highest occupied, lowest unoccupied level</code> 这行抓 VBM/CBM，
+        QE 只在 nscf 模式下写这行。</td>
+    <td>hook</td></tr>
+<tr><td>大结构直接 bands → 几何没松弛</td>
+    <td><strong>vc_relax preflight</strong>：T2（bands_dos）任务在 planner 跑之前先做一次松弛，
+        把松弛后的几何 + 能量塞进主 executor 的 prompt（避免主 loop 把预算耗在结构上）。</td>
+    <td>preflight 子 agent</td></tr>
+<tr><td>bash 网络命令 → audit 0 分</td>
+    <td><strong>bash_guard</strong> 黑名单 <code>curl / wget / ssh / pip install</code>（除非证明本地确实没装）；
+        <code>pw.x</code> 后台化（<code>&amp;</code> / <code>nohup</code> / <code>setsid</code>）也被拒。</td>
+    <td>hook</td></tr>
+<tr><td>LLM 自报"做完了" → 漏字段 / 提交未收敛</td>
+    <td>Verifier 按 step_kind 的 <strong>verifier_checklist</strong> 检查每个 expected_output
+        的文件存在 + ≥1024 B + <code>JOB DONE.</code>（log 文件）+ 关键物理标志
+        （比如 vc-relax 必须有 <code>bfgs converged in</code>）。</td>
+    <td>verifier LLM + 确定性检查</td></tr>
+<tr><td>bench fermi-slice 漏算金属（已知物理 vs 抽取错配）</td>
+    <td><strong>physics_sanity</strong> step（bands_dos 自动注入）：拿 config_advisor 的高置信
+        is_metal 标签 vs bench evaluator 抽取出的 <code>gap_type</code> / <code>band_gap_ev</code>，
+        失配（已知 metal × 抽取出 &gt;0.5 eV gap）直接触发 replan，要求加大 nbnd / 加密 k-path。</td>
+    <td>orchestrator 自动注入 + 确定性检查</td></tr>
+</tbody>
+</table>
+
+<p>注意整张表里只有一条用了"靠 prompt 自觉"（config_advisor 的物理结论），其他全是 hook /
+状态机 / 事后验证。<strong>这是 v4.2 vs v1 最核心的哲学差异</strong>：v1 把 DFT 知识"告诉"
+LLM 让它自己用；v4.2 把同样的知识<strong>变成代码层强约束</strong>，LLM 想绕都绕不过去。</p>
+
+
+<!-- ─────────────────────────────── §4 ─────────────────────────────── -->
+<h2 id="s4">4 · 四个 DFT 专家最该审的「硬编码决策」</h2>
+
+<p>下面四个机制，每个都把<strong>具体的 DFT 物理判断</strong>写死在了代码或 prompt 里。
+我们想请你看：这些默认值 / 判定规则，物理上对吗？漏了什么？</p>
+
+
+<!-- §4.1 -->
+<div class="concept" id="s41">
+<span class="lbl">§4.1</span><h4>Knowledge injection — system prompt 里塞了什么 DFT 知识</h4>
+<p><strong>做了什么</strong>：v4.2 的 executor system prompt 由
+<code>agent/system_prompt.py</code> 的 <code>build_qe_system_prompt()</code> 拼出，里面硬编码了
+QE 工作流的"潜规则"。每个 step 又叠加该 step_kind 的 addon
+（<code>agent/step_kinds/*.py</code> 的 <code>system_prompt_addon()</code>），加上从 config_advisor
+拿到的 <strong>QE CONFIGURATION ADVISORY</strong> 块。</p>
+
+<p><strong>注入的具体内容</strong>（节选最物理相关的部分）：</p>
+<ul>
+  <li><strong>赝势路径纪律</strong>：必须 <code>pseudo_dir = './pseudos/'</code>，否则 pw.x 落到
+    容器内 <code>/root/espresso/pseudo/</code> 不存在，<code>Error in routine readpp</code>。
+    这是新手最常踩的坑——专门写进 prompt。</li>
+  <li><strong>vc-relax 三阈值</strong>（重复写在 §4.4 详述）：
+    <code>press_conv_thr=0.05 / forc_conv_thr=1.0d-4 / etot_conv_thr=1.0d-5</code>，
+    并在 prompt 里给出完整的 vc-relax 输入模板。</li>
+  <li><strong>bands_dos 工作流 canonical 参数</strong>：bench T2 GT 用了
+    <code>ecutwfc=80, ecutrho=800 (10×, GBRV USPP 标准), kmesh ≈ ceil(50/a_Å) per axis, min 8×8×8</code>。
+    Evaluator 用 ±0.1 eV 容差打分；参数松一点就会确定性扣分。</li>
+  <li><strong>bands NSCF 必须 <code>calculation='nscf'</code> 而不是 <code>'bands'</code></strong>：
+    QE 只在 nscf 模式下写 <code>highest occupied, lowest unoccupied level (ev): ... </code>
+    这行，evaluator 靠它抓 VBM/CBM。</li>
+  <li><strong>DOS NSCF 用 <code>occupations='tetrahedra'</code></strong>；dos.x 用
+    <code>deltaE=0.01 eV, ngauss=0, degauss=0.0015 Ry (=0.02 eV)</code> 来匹配 GT 的能量栅格和高斯展宽，
+    不然 DOS shape RMSE 会跪。</li>
+  <li><strong>晶格 6 标量 → CELL_PARAMETERS 必须用 pymatgen <code>Lattice.from_parameters</code></strong>，
+    禁止手算（rhombohedral 易把 <code>a*sqrt(2/3)</code> 错写 <code>a*sqrt(8/3)</code> → 翻倍体积 → metal/insulator 都判错）。</li>
+  <li><strong>k-path 必须用 <code>seekpath.get_path</code></strong>，不允许手挑高对称点。</li>
+  <li><strong>occupations 选择</strong>：semiconductors/insulators → <code>'fixed'</code>；
+    metals → <code>'smearing'</code>（mv, degauss=0.02）。</li>
+</ul>
+
+<p><strong>我们的理由</strong>：这些都不是 QE 文档第一页就能看到的，而是<strong>"做过项目才知道"
+的潜规则</strong>。每一条都对应过去 v1 / v3 / v4.1 上至少踩过一次的失分 case（详见
+<a href="solver-versions-explained-2026-05-17.html">入门教程</a> §6 / §15）。
+但 DFT 圈一定还有"大家都这么做但论文不写"的细节我们没注入——这是想请教你的（→ §6.1）。</p>
+</div>
+
+
+<!-- §4.2 -->
+<div class="concept" id="s42">
+<span class="lbl">§4.2</span><h4>Verifier 的物理 sanity checklist（按 step kind）</h4>
+<p><strong>做了什么</strong>：每个 step_kind 模块都导出一个 <code>verifier_checklist()</code>
+函数，verifier LLM 拿到这个 checklist 作为 system prompt，再去 read_file 检查产物。
+checklist 是<strong>物理 + 文件</strong>两层。</p>
+
+<p><strong>各 step kind 的 checklist</strong>（节选关键项）：</p>
+
+<table>
+<thead><tr><th>step kind</th><th>必查项</th><th>失败诊断举例</th></tr></thead>
+<tbody>
+<tr><td><code>scf</code></td>
+    <td>文件存在 + ≥1024 B；log 最后 64 KB 含 <code>JOB DONE.</code>；
+        不含 <code>convergence NOT achieved</code>；<code>out/&lt;prefix&gt;.save/</code> 含
+        <code>charge-density.dat</code>（或 .hdf5）且 size&gt;0</td>
+    <td>"out/si.save 为空 → 电荷密度没写出来"</td></tr>
+<tr><td><code>vc_relax</code></td>
+    <td>JOB DONE + <code>bfgs converged in</code> 或 <code>End final coordinates</code>；
+        无 <code>maximum number of steps has been reached</code>；
+        最终 <code>total stress</code> ≤ 0.05 kbar；声明 cubic 的体系，
+        最终 a/b/c 在 0.01 Å 内一致</td>
+    <td>"BFGS 未收敛——bench 会按未收敛结构打分"</td></tr>
+<tr><td><code>relax</code></td>
+    <td>JOB DONE + <code>bfgs converged in</code> / <code>End final coordinates</code>；
+        无 <code>convergence NOT achieved</code></td>
+    <td>同 vc_relax</td></tr>
+<tr><td><code>bands</code></td>
+    <td>所有 <code>*_out</code> 含 JOB DONE；<code>*_dat</code>（bands.dat）≥1024 B 且像 ASCII 数据列</td>
+    <td>"bands.dat 只有 200 B → bands.x 没正确跑完"</td></tr>
+<tr><td><code>dos</code></td>
+    <td>nscf log 含 JOB DONE；dos.dat ≥1024 B 是数值列；无 <code>Error in routine</code></td>
+    <td>"dos.dat 全 0 → fildos 路径写错或 dos.x crash"</td></tr>
+<tr><td><code>collect</code></td>
+    <td>纯文件操作：每个 expected_output 存在 + 非空（合法的"无 LLM 行为"的步骤）</td>
+    <td>"目标路径没生成——是 cp 命令路径写错？"</td></tr>
+<tr><td><code>physics_sanity</code></td>
+    <td>纯 Python 跑（不调 LLM）：拿 config_advisor 的 <code>is_metal</code> + source 高置信
+        vs bench evaluator 抽取出的 <code>gap_type / band_gap_ev</code>；
+        失配（metal × extracted gap&gt;0.5 eV，或 insulator × extracted 'metal'）→ verdict='fail' + replan</td>
+    <td>"已知 Rb 是金属但 fermi-slice 抽出 1.2 eV gap → 加大 nbnd 后重做 bands NSCF"</td></tr>
+</tbody>
+</table>
+
+<p><strong>我们的理由</strong>：v1 让 LLM 自报"做完了"，经常漏字段或提交未收敛的结果；v4.2
+把"做完了"的判断从 LLM 自评<strong>挪到了独立 verifier + 物理 checklist</strong>。
+checklist 现在大多还是<strong>文件 / 字符串级别</strong>的判断，"真物理 sanity"
+（比如 SCF 形式上收敛但电荷密度异常、PBE 算金属带隙不为 0 但很小）覆盖得还不够厚——
+这是想请教你的（→ §6.2）。</p>
+</div>
+
+
+<!-- §4.3 -->
+<div class="concept" id="s43">
+<span class="lbl">§4.3</span><h4>Step kinds 的切分</h4>
+<p><strong>做了什么</strong>：v4.2 把 DFT 工作流切成 <strong>7 种 step kind</strong>，每种
+一个 Python 模块（<code>agent/step_kinds/*.py</code>），导出 <code>system_prompt_addon</code> +
+<code>tool_allowlist</code> + <code>verifier_checklist</code> 三个钩子。Planner 出 plan 时只能从
+这 7 种里挑。</p>
+
+<table>
+<thead><tr><th>kind</th><th>职责</th></tr></thead>
+<tbody>
+<tr><td><code>scf</code></td><td>自洽场——给定结构 → 电荷密度 + <code>scf.out</code></td></tr>
+<tr><td><code>vc_relax</code></td><td>变胞弛豫——晶格 + 内坐标全松，三阈值强制收紧</td></tr>
+<tr><td><code>relax</code></td><td>固定胞内坐标松弛——很少用，通常 vc_relax 替代</td></tr>
+<tr><td><code>bands</code></td><td>k-path bands NSCF + bands.x post-processing，依赖上游 SCF charge density</td></tr>
+<tr><td><code>dos</code></td><td>密集 k-mesh NSCF + dos.x，依赖上游 SCF</td></tr>
+<tr><td><code>collect</code></td><td>纯文件操作（cp / rename / 合并数据），<strong>禁止</strong>调 pw.x / bands.x / dos.x</td></tr>
+<tr><td><code>physics_sanity</code></td><td>bands_dos 任务自动注入的尾步——物理 vs 抽取的一致性检查，纯 Python 不调 LLM</td></tr>
+</tbody>
+</table>
+
+<p><strong>我们的理由</strong>：把工作流"切片"的好处是<strong>每个切片可以独立写 prompt 和
+checklist</strong>——SCF 的 prompt 关心电荷密度，bands 的 prompt 关心 k-path 和 nbnd，互不污染；
+verifier checklist 也按切片定制。新增 step kind = 加一个模块 + 注册，orchestrator 不动。</p>
+
+<p>但 bench 题目今年要扩到 phonon / 缺陷 / 表面能 / DFPT；当前 7 种是否够、该不该新增、
+或者粒度不对（比如 nscf 是否该独立成一类？）——是想请教你的（→ §6.3）。</p>
+</div>
+
+
+<!-- §4.4 -->
+<div class="concept" id="s44">
+<span class="lbl">§4.4</span><h4>qe_input_lint 的默认值表 + 处理策略</h4>
+
+<p><strong>做了什么</strong>：每次 <code>BashTool</code> 准备 spawn 一个 <code>pw.x</code> 调用，
+都会先把对应的 input 文件交给 <code>agent/tools/qe_input_lint.py</code> 跑 4 条独立规则；
+任何一条触发都会把 input 改写到磁盘，并把 <code>--- qe_input_lint ---</code> diff 块返回给 LLM
+（让 LLM 看到自己被改了什么，下次别再写错）。</p>
+
+<table>
+<thead><tr><th>规则</th><th>触发条件</th><th>动作</th><th>默认值 / 理由</th></tr></thead>
+<tbody>
+<tr><td><strong>A · vc-relax 收敛阈值</strong></td>
+    <td><code>&amp;CONTROL.calculation = 'vc-relax'</code></td>
+    <td>强制 <strong>min(LLM 值, 紧默认)</strong>——只能更紧不能更松</td>
+    <td><code>press_conv_thr=0.05</code>（kbar；QE 默认 0.5）<br>
+        <code>forc_conv_thr=1.0d-4</code>（Ry/Bohr；QE 默认 1e-3）<br>
+        <code>etot_conv_thr=1.0d-5</code>（Ry；QE 默认 1e-4）<br>
+        理由：cubic 系统的 SpacegroupAnalyzer 对漂移 ≥0.01° / 0.05% 就降级</td></tr>
+<tr><td><strong>B · bands NSCF 模式</strong></td>
+    <td><code>calculation='bands'</code> 且 <code>K_POINTS crystal_b/tpiba_b</code></td>
+    <td>改成 <code>calculation='nscf'</code></td>
+    <td>QE 只在 nscf 模式下写 <code>highest occupied / lowest unoccupied</code> 行；
+        evaluator 靠这行抓 VBM / CBM</td></tr>
+<tr><td><strong>C · USPP ecutrho 比例</strong></td>
+    <td>pseudo 家族含 USPP / GBRV / PAW 且 <code>ecutrho/ecutwfc &lt; 9</code></td>
+    <td>把 <code>ecutrho</code> 改成 <code>10 × ecutwfc</code></td>
+    <td>GBRV USPP 标准比例 ~10×；4–8× 会让带隙漂 0.2–0.5 eV / 30 Ry ecutwfc</td></tr>
+<tr><td><strong>D · occupations advisory</strong></td>
+    <td>SCF / bands-NSCF 的 <code>occupations</code> 和 config_advisor 推荐不一致</td>
+    <td><strong>仅警告</strong>，不自动改（advisor 在 Mott 绝缘体等边界 case 可能错）</td>
+    <td>config_advisor 推荐：metal → <code>smearing</code>（mv, degauss=0.02）；
+        insulator → <code>fixed</code></td></tr>
+</tbody>
+</table>
+
+<p><strong>处理策略的两条核心</strong>：</p>
+<ol>
+  <li><strong>min(LLM 值, 紧默认)</strong>——只收紧不放松。我们的假设是"如果题目本身能容忍松一点，
+    那紧一点也不会更差，只是多花 1-2 个 BFGS 步"。是否成立请教 §6.4。</li>
+  <li><strong>幂等 + 把 diff 回写给 LLM</strong>——不偷偷修改，让 LLM 在下一回合看到自己刚才写的
+    跟最终落盘的差，逐步学会自己写对。</li>
+</ol>
+</div>
+
+
+<!-- ─────────────────────────────── §5 ─────────────────────────────── -->
+<h2 id="s5">5 · 一个真实 trace 示例 · M1_T1 Si vc-relax</h2>
+
+<p>下面是 2026-05-18 跑的一个 Si vc-relax 任务，完整 trace 在
+<code>/srv/shared/science/web/runs_local/2026-05-18T11-56-54Z_M1_T1_Si_vc_relax/</code>。
+完整时间 408 s，总分 1.0。从 task_prompt 到 result.json 整条决策链都可以复盘。</p>
+
+<details><summary>展开节选：planner → executor → verifier 各 1 turn</summary>
+<pre>
+[Phase 1] config_advisor:
+  formula="Si", elements=["Si"], pseudo_family="SSSP/efficiency (USPP)"
+  is_uspp=True
+  is_metal=False               # Si 不在 METAL_ELEMENTS 表里
+  occupations="fixed"          # 半导体 → fixed
+  ecutrho_factor=10.0          # USPP 标准
+  source="deterministic"
+
+[Phase 2 / Planner turn 1]
+  调用 submit_plan:
+    steps = [
+      { id: "vc_relax_1", kind: "vc_relax", deps: [],
+        expected_outputs: { "vc_relax_out": "vc_relax_1/vc-relax.out" } }
+    ]
+
+[Phase 2 / Executor (vc_relax_1) turn 3]  &lt;-- LLM 写完 input 后第一个 pw.x 调用
+  bash: pw.x -in vc_relax_1/vc-relax.in &gt; vc_relax_1/vc-relax.out 2&gt;&amp;1
+  pre-spawn hook: qe_input_lint Rule A 触发
+  ──── auto-injected by qe_input_lint ────
+  file: vc-relax.in
+  - press_conv_thr = (missing)   →   press_conv_thr = 0.05
+  - forc_conv_thr  = 1.0d-3       →   forc_conv_thr = 1.0d-4
+  reason: vc-relax requires tight thresholds (v3 hard rule)
+  ────
+  → input 被改写后再 spawn pw.x
+
+[Phase 2 / Verifier (vc_relax_1)]
+  read_file vc_relax_1/vc-relax.out (tail 64 KB)
+  ✓ "JOB DONE." 存在
+  ✓ "bfgs converged in 4 steps" 存在
+  ✓ 最终 stress = 0.02 kbar &lt; 0.05
+  ✓ cubic 系统：a = b = c = 5.4307 Å（差异 &lt; 0.0001 Å）
+  → verdict: pass
+
+[Final] result.json:
+  task_outputs = { "vc_relax_out": "vc_relax_1/vc-relax.out" }
+  total_score  = 1.00
+  audit_flags  = all pass (qe_wallclock_ok, no_network, no_background_pw, ...)
+</pre></details>
+
+<p>这条 trace 完整展示了三层保险一起干活的样子：<strong>preflight</strong> 提前定 occupations =
+fixed（Si 半导体），<strong>qe_input_lint hook</strong> 在 spawn 之前补上 LLM 漏写的收敛阈值，
+<strong>verifier</strong> 事后查物理一致性。任意一层失守，其他两层仍能兜住——这就是 v4.2 相比
+v1 的"纵深防御"。</p>
+
+
+<!-- ─────────────────────────────── §6 ─────────────────────────────── -->
+<h2 id="s6">6 · 请教 DFT 专家的具体问题</h2>
+
+<p>下面 4 个问题对应 §4 的四节。任何一条你觉得"<strong>不对</strong>"、"<strong>太松</strong>"、
+"<strong>太紧</strong>"、"<strong>漏了 X 物理场景</strong>"，都请直接告诉我们。</p>
+
+
+<div class="qbox" id="q1">
+<h4>§6.1 · Knowledge injection 够不够</h4>
+<p><strong>请审 §4.1 列出的注入项</strong>：</p>
+<ul>
+  <li>三阈值（vc-relax）、USPP ecutrho ≈ 10×、bands 必须 nscf 模式、DOS 用 tetrahedra、
+    occupations 选择规则——<strong>有没有写错的</strong>？</li>
+  <li>DFT 圈"<strong>大家都这么做但论文 / QE 文档不写</strong>"的潜规则，
+    我们漏了哪些？例如：磁性体系的 starting_magnetization 起点、d/f 电子体系的 Hubbard U、
+    LDA+U 时的 starting_ns_eigenvalue、SOC 起点是不是要 PAW 而不是 USPP……</li>
+  <li>bands_dos canonical 参数（<code>ecutwfc=80, ecutrho=800, k-mesh ≈ ceil(50/a)</code>）
+    对每类材料是否合适？氧化物 / 二维材料 / 重元素 / 磁性体系，是不是该用不同的 canonical？</li>
+  <li>赝势选择本身——bench 用 SSSP efficiency（混合 USPP / PAW / NC）；
+    你建议给 agent 哪些"<strong>该用 PAW 而不是 USPP</strong>"的硬规则？</li>
+</ul>
+</div>
+
+
+<div class="qbox" id="q2">
+<h4>§6.2 · Verifier 的物理 sanity check 够不够厚</h4>
+<p><strong>请审 §4.2 那张 checklist 表</strong>：</p>
+<ul>
+  <li>现在的检查大多是"文件存在 + 字符串匹配"。哪些<strong>真正的物理失败模式</strong>
+    我们没覆盖？例如：
+    <ul>
+      <li>SCF 形式上 <code>JOB DONE.</code> 但能量明显偏离（比如比经验值低 / 高几个 eV/atom）</li>
+      <li>vc-relax 最终 stress 个分量很小，但晶格 a/b/c 漂得严重</li>
+      <li>bands NSCF 的 VBM 跟 SCF 的 fermi 差超过 0.1 eV（说明 NSCF k-path 上没覆盖真正的 VBM）</li>
+      <li>insulator 的 DOS 在 E_F 处不是 0</li>
+      <li>charge density 出现 NaN / spike（QE 在 stdout 通常给警告，但 LLM 经常漏看）</li>
+    </ul>
+  </li>
+  <li>有哪些是<strong>用 grep 几个关键词就能加进 checklist</strong> 的（最好实现），
+    哪些必须 read+解析？</li>
+  <li>physics_sanity 现在只覆盖了"已知 metal 被 fermi-slice 误判成 gap" 这一种失配；
+    其他 metal/insulator 失配场景（比如 Mott / Kondo / 半金属 / topological metal）
+    要不要也写进规则？</li>
+</ul>
+</div>
+
+
+<div class="qbox" id="q3">
+<h4>§6.3 · Step kinds 切分</h4>
+<p><strong>请审 §4.3 那 7 种切片</strong>：</p>
+<ul>
+  <li>现在的 7 种（scf / vc_relax / relax / bands / dos / collect / physics_sanity）
+    对应你日常的 QE 工作流是不是<strong>自然切片</strong>？</li>
+  <li><code>nscf</code> 现在是嵌在 bands 和 dos 里的"内部子步"，<strong>要不要独立成一类</strong>？
+    （好处：dependency 更清晰；坏处：plan 变长，planner 更难写对依赖。）</li>
+  <li>bench 下半年要扩到 <strong>phonon (DFPT, ph.x) / 缺陷形成能 / 表面能 / NEB / HSE 杂化 /
+    DFT+U 总能</strong>。每一类应该怎么切？例如：
+    <ul>
+      <li>phonon 是不是 <code>scf → ph.x（DFPT 计算 dyn matrix）→ q2r → matdyn</code> 四步？</li>
+      <li>缺陷形成能要不要拆成 "perfect_scf + defect_scf + chempot" 三步？</li>
+    </ul>
+  </li>
+  <li>"<strong>1 个 step 1 个 LLM session</strong>" 这个粒度——你觉得太细了还是太粗？
+    粒度太细：planner 出错率高 + LLM 上下文切换成本；粒度太粗：单 step 容易超时 + retry 浪费大。</li>
+</ul>
+</div>
+
+
+<div class="qbox" id="q4">
+<h4>§6.4 · qe_input_lint 默认值 / 处理策略</h4>
+<p><strong>请审 §4.4 那张默认值表</strong>：</p>
+<ul>
+  <li>vc-relax 三阈值（0.05 / 1e-4 / 1e-5）——<strong>是否过紧</strong>？
+    会不会有 cell 接近 instability 的体系（如近相变温度的钙钛矿）反而<strong>该</strong>
+    用松阈值，否则 BFGS 在 noise 里震荡不收敛？</li>
+  <li>"<strong>只收紧不放松</strong>"（<code>min(LLM_value, default)</code>）这个策略——
+    有没有合法物理场景是"<strong>题目就需要松收敛</strong>"的？我们想过的反例只有
+    "做一次粗扫探索 EOS 形状"，但 bench 题目目前没这种。</li>
+  <li>USPP <code>ecutrho ≈ 10×</code> 这个规则——是不是过于一刀切？
+    <strong>SSSP efficiency</strong> 库里有些 PAW 其实 8× 就够，有些 hard 元素（O / F）
+    可能需要 12×；要不要按元素查表更细？</li>
+  <li>occupations 我们当前是"<strong>仅警告不强改</strong>"——你觉得 advisor 高置信
+    （source=deterministic）时应该强改吗？什么样的"<strong>合法反例</strong>"
+    应该让 LLM 能 override 这个建议？</li>
+  <li>有没有<strong>其他 hook 该加</strong>但我们没加的？例如：
+    <ul>
+      <li>磁性体系自动注入 <code>nspin=2, starting_magnetization</code> 起点</li>
+      <li>含 d/f 元素自动给个 <code>U_value</code> 候选值</li>
+      <li>k-mesh 太稀（小于 8×8×8 in 立方）自动加密</li>
+      <li>大单胞自动调 <code>mixing_beta</code> / <code>diagonalization='davidson'</code></li>
+    </ul>
+  </li>
+</ul>
+</div>
+
+
+<!-- ─────────────────────────────── §7 ─────────────────────────────── -->
+<h2 id="s7">7 · 附录：仓库路径与相关链接</h2>
+
+<p><strong>v4.2 源码</strong>（共享工作区，weilin 也可访问）：</p>
+<ul>
+  <li>主目录：<code>/srv/shared/science/solver/v4.2/</code></li>
+  <li>顶层入口：<code>solve.py</code></li>
+  <li>Orchestrator：<code>agent/orchestrator.py</code></li>
+  <li>Plan / ledger schema：<code>agent/ledger.py</code></li>
+  <li>QE system prompt（约 500 行）：<code>agent/system_prompt.py</code></li>
+  <li>Step kinds：<code>agent/step_kinds/{scf, vc_relax, relax, bands, dos, collect, physics_sanity}.py</code></li>
+  <li>config_advisor：<code>agent/subagents/config_advisor.py</code> + <code>_metals.py</code>（金属元素表）</li>
+  <li>vc_relax preflight：<code>agent/subagents/vc_relax.py</code></li>
+  <li>qe_input_lint：<code>agent/tools/qe_input_lint.py</code></li>
+  <li>bash_guard：<code>agent/tools/bash_guard.py</code></li>
+</ul>
+
+<p><strong>同主题报告</strong>：</p>
+<ul>
+  <li>工程视角全景：<a href="solver-versions-explained-2026-05-17.html">四版本 Solver Agent 设计讲解</a>（§18 集中讲 v4.2）</li>
+  <li>27 题成绩：<a href="solver-v1-v41-v42-standard27-2026-05-17.html">v1 / v4.1 / v4.2 横向对比</a></li>
+  <li>DFT/QE 工作流补习（给 agent 工程师看）：<a href="dft-and-qe-traditional-workflow-2026-05-15.html">DFT / QE 入门</a></li>
+  <li>报告首页：<a href="./">DFT-Agent bench reports</a></li>
+</ul>
+
+<p><strong>怎么把意见反馈给我</strong>：</p>
+<ul>
+  <li>邮件 / 微信直接发 §6 各小节的回答（哪怕只回 1 段也行）</li>
+  <li>或者在 GitHub 上提 issue：<code>github.com/wanweilin/dft-agent-bench</code></li>
+  <li>如果想本地起 v4.2 自己跑一题，参考
+    <a href="bench-data-exchange-howto-2026-05-13.html">bench-data-exchange-howto</a> §3 的最小启动命令。</li>
+</ul>
+
+<p style="margin-top: 30px; color: #7f8c8d; font-size: 13px; text-align: center; border-top: 1px solid #d5dbdb; padding-top: 14px;">
+本报告 self-contained · 由 shijie 起草 · 2026-05-18
+</p>
+
+</body>
+</html>
