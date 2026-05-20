@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>标准档 4 失败案例深挖 · Rb / Ge / WO3 / CoSb3 — 2026-05-20</title>
+<style>
+:root {
+  --fg: #2c3e50;
+  --muted: #7f8c8d;
+  --accent: #3498db;
+  --bench: #c0392b;
+  --solver: #d35400;
+  --fix: #27ae60;
+  --code-bg: #f6f8fa;
+  --note-bg: #fff8e1;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+               'Microsoft YaHei', sans-serif;
+  max-width: 880px; margin: 40px auto; padding: 0 24px;
+  color: var(--fg); line-height: 1.65;
+}
+h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 28px;
+     color: #34495e; border-bottom: 3px solid var(--accent); padding-bottom: 10px; }
+h2 { font-family: Georgia, serif; font-size: 22px;
+     color: #34495e; margin-top: 42px; padding-top: 8px;
+     border-top: 1px dashed #d0d7de; }
+h3 { font-size: 17px; color: #34495e; margin-top: 28px; }
+h4 { font-size: 15px; color: #34495e; margin-top: 20px; }
+a { color: #2980b9; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 13px;
+       background: var(--code-bg); padding: 1px 5px; border-radius: 3px;
+       color: #24292f; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px;
+      overflow-x: auto; font-size: 12.5px; line-height: 1.5;
+      border-left: 3px solid #d0d7de; }
+pre code { background: transparent; padding: 0; }
+.tldr { background: #ecf6fc; border-left: 4px solid var(--accent);
+        padding: 14px 18px; border-radius: 4px; margin: 18px 0; font-size: 14.5px; }
+.tldr table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.tldr td, .tldr th { padding: 6px 8px; text-align: left; border-bottom: 1px solid #d0e4f0; font-size: 13.5px; }
+.tldr th { color: #34495e; }
+.callout { padding: 12px 16px; border-radius: 4px; margin: 14px 0;
+           border-left: 4px solid #ccc; background: #fafafa; font-size: 14px; }
+.callout.bench  { border-left-color: var(--bench);  background: #fdedec; }
+.callout.solver { border-left-color: var(--solver); background: #fdebd0; }
+.callout.fix    { border-left-color: var(--fix);    background: #eafaf1; }
+.callout.note   { border-left-color: #f1c40f;       background: var(--note-bg); }
+.callout .tag { display: inline-block; font-size: 11.5px; font-weight: 700;
+                padding: 2px 7px; border-radius: 3px; margin-right: 8px;
+                vertical-align: middle; letter-spacing: 0.4px; }
+.tag-bench  { background: var(--bench);  color: #fff; }
+.tag-solver { background: var(--solver); color: #fff; }
+.tag-fix    { background: var(--fix);    color: #fff; }
+.diff-add  { color: #0a7d3b; }
+.diff-del  { color: #b41a1a; }
+.diff-ctx  { color: #6e7781; }
+table.runs { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+table.runs th, table.runs td { padding: 6px 9px; border-bottom: 1px solid #e1e4e8; text-align: left; }
+table.runs th { background: #f6f8fa; font-weight: 600; }
+table.runs .pass { color: var(--fix); font-weight: 600; }
+table.runs .fail { color: var(--bench); font-weight: 600; }
+table.runs .partial { color: var(--solver); font-weight: 600; }
+.toc { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px;
+       padding: 14px 18px; font-size: 14px; margin: 22px 0; }
+.toc h3 { margin: 0 0 8px 0; font-size: 14px; color: var(--muted);
+          text-transform: uppercase; letter-spacing: 0.5px; }
+.toc ol { margin: 0; padding-left: 24px; }
+.toc li { margin: 3px 0; }
+footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
+         color: var(--muted); font-size: 12.5px; }
+.kv { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<h1>标准档 4 失败案例深挖 · Rb / Ge / WO<sub>3</sub> / CoSb<sub>3</sub></h1>
+<p class="kv">2026-05-20 · v4.2 solver · 数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
+   run 数据源 <code>/srv/shared/science/web/runs_local/</code> ·
+   bench 源 <code>/home/shijie/projects/bench/</code></p>
+
+<div class="tldr">
+<strong>TL;DR — 四个 case 都查到了根因，问题分布在两侧：</strong>
+<table>
+<tr><th style="width:14%">Case</th><th style="width:18%">表征</th><th style="width:22%">根因侧</th><th>一句话</th></tr>
+<tr><td><strong>Rb bands_dos</strong></td><td>3/3 失败</td><td><span class="tag tag-bench">BENCH</span></td>
+    <td>评估器对奇数价电子（GBRV USPP Z_val=9）算错带分裂，产出 ≈ 11 eV 伪能隙</td></tr>
+<tr><td><strong>Ge bands_dos</strong></td><td>得分卡 0.63</td><td><span class="tag tag-bench">BENCH</span> + <span class="tag tag-solver">SOLVER</span></td>
+    <td>PBE 算出 0.0088 eV 骑在 1 meV 金属短路阈值边缘；advisor 又强行说半导体</td></tr>
+<tr><td><strong>WO<sub>3</sub> vc_relax</strong></td><td>14400s timeout</td><td><span class="tag tag-solver">SOLVER</span></td>
+    <td>agent 中途改用绝对路径 pw.x 绕过 GPU wrapper，CPU 跑了 2 小时被 bash 砍</td></tr>
+<tr><td><strong>CoSb<sub>3</sub> bands_dos</strong></td><td>14400s timeout</td><td><span class="tag tag-solver">SOLVER</span></td>
+    <td>agent 把 dos_nscf 的 timeout_s 反复设成 120s / 600s，4 次都自砍</td></tr>
+</table>
+不是显存不够、不是被 OOM-killer 清掉。两侧各有 2 个独立修复点，下面逐一拆。
+</div>
+
+<div class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#bg">背景与数据源</a></li>
+  <li><a href="#rb">Case A — Rb：bench 评估器对奇数 nelec 的失效</a></li>
+  <li><a href="#ge">Case B — Ge：PBE 准金属骑在阈值边</a></li>
+  <li><a href="#wo3">Case C — WO<sub>3</sub>：agent 绕过 GPU wrapper</a></li>
+  <li><a href="#cosb3">Case D — CoSb<sub>3</sub>：agent 自设 dos_nscf timeout 太短</a></li>
+  <li><a href="#ghost">附：05-20 03:27 / 03:28 那两条无 exit_code 的失败</a></li>
+  <li><a href="#fix">修复总清单与优先级</a></li>
+</ol>
+</div>
+
+<h2 id="bg">1. 背景与数据源</h2>
+
+<p>2026-05-19 至 05-20，用 v4.2 solver（commit <code>7b1f73f</code>，含 physics_sanity step kind、structured replan diagnosis、experience library 等新特性）跑标准档。下面 4 个材料的任务反复失败或得分异常。</p>
+
+<p>本报告所有数字均来自实跑工件，路径如下，可自行覆核：</p>
+
+<pre><code>Rb bands_dos （3 次失败）
+  /srv/shared/science/web/runs_local/2026-05-19T04-47-26Z_M1_T2_Rb_bands_dos/
+  /srv/shared/science/web/runs_local/2026-05-19T15-22-14Z_M1_T2_Rb_bands_dos/
+  /srv/shared/science/web/runs_local/2026-05-19T15-40-09Z_M1_T2_Rb_bands_dos/   ← 详查样本
+
+Ge bands_dos
+  /srv/shared/science/web/runs_local/2026-05-19T16-14-06Z_M1_T2_Ge_bands_dos/   ← 失败
+  /srv/shared/science/web/runs_local/2026-05-20T06-46-38Z_M1_T2_Ge_bands_dos/   ← 0.631
+
+WO3 vc_relax
+  /srv/shared/science/web/runs_local/2026-05-19T16-48-35Z_M2_T1_WO3_roomT_vc_relax/
+
+CoSb3 bands_dos
+  /srv/shared/science/web/runs_local/2026-05-19T18-17-00Z_M2_T2_CoSb3_bands_dos/
+
+得分库
+  /srv/shared/science/web/runs_local/state.db
+  → SELECT task_id, status, total_score, wall_time_sec, exit_code FROM runs
+    WHERE task_id LIKE '%Rb%' OR task_id LIKE '%Ge%'
+       OR task_id LIKE '%WO3%' OR task_id LIKE '%CoSb3%' ORDER BY created_at;</code></pre>
+
+<h2 id="rb">2. Case A — Rb bands_dos（bench 评估器 bug）</h2>
+
+<h3>2.1 现象：三次跑完全一致</h3>
+
+<p>三次 Rb 跑都在 <code>physics_sanity_1</code> 步耗尽 replan 配额后退出，提取到的"能隙"读数惊人地稳定：</p>
+
+<table class="runs">
+<tr><th>Run</th><th>提取的 band_gap_ev</th><th>提取的 gap_type</th><th>结局</th></tr>
+<tr><td>2026-05-19T04:47</td><td><code>10.988</code></td><td><code>direct</code></td><td class="fail">replan 耗尽</td></tr>
+<tr><td>2026-05-19T15:22</td><td><code>10.989</code></td><td><code>direct</code></td><td class="fail">replan 耗尽</td></tr>
+<tr><td>2026-05-19T15:40</td><td><code>10.989</code></td><td><code>direct</code></td><td class="fail">replan 耗尽</td></tr>
+</table>
+
+<p>三次提取数字几乎一字不差——这本身就说明问题与 agent 的随机决策无关，是确定性的下游评估错误。</p>
+
+<p>对比 GT：<code>/home/shijie/projects/bench/tools/gt_selfrun/canonical_gt_t2/M1_T2_Rb_bands_dos.json</code> 期望 <code>band_gap_ev=0</code>、<code>gap_type=metal</code>、<code>dos_e_fermi=2.0011 eV</code>。agent 实跑 vc-relax 收敛后的 Fermi 能 = 1.99 eV，DOS NSCF 后 Fermi = 2.0475 eV，物理上完全正确。所以问题**不在 QE 计算**。</p>
+
+<h3>2.2 证据链：在 Γ 点直接读 bands.dat</h3>
+
+<p>看 <code>workdir/bands_1/bands.dat.gnu</code> 在 Γ 点（k 横坐标 = 0）的本征值：</p>
+
+<pre><code>k_path    energy_eV
+0.0000    -26.9415   ← band 1 (4s 半芯)
+0.0000    -10.9841   ← band 2 (4p 半芯)
+0.0000    -10.9841   ← band 3 (4p 半芯)
+0.0000    -10.9841   ← band 4 (4p 半芯顶)   ← evaluator 取这本作 VBM
+0.0000    +0.0045    ← band 5 (5s 金属带底)  ← evaluator 取这本作 CBM
+0.0000    +5.6366
+...</code></pre>
+
+<p>"伪能隙"= 0.0045 - (-10.984) = <strong>10.989 eV</strong> —— 与 bench 提取出的数字到三位有效数字一致。</p>
+
+<h3>2.3 根因：奇数 Z<sub>valence</sub> 把 bands 切错位</h3>
+
+<p>GBRV USPP 的 Rb 包含半芯态：<code>4s² 4p⁶ 5s¹ → Z<sub>valence</sub> = 9</code>。<code>workdir/bands_1/bands.out</code> 头部能直接看到 <code>number of electrons = 9.00</code>。</p>
+
+<p>bands NSCF 用了 <code>smearing='mv'</code>，QE 不打印 <code>highest_occupied</code>/<code>lowest_unoccupied</code> 行，<code>evaluator.py</code> 走 electron-count 分支：</p>
+
+<pre><code><span class="diff-ctx"># /home/shijie/projects/bench/harness/lib/evaluator.py:492-534
+def _find_vbm_cbm_via_electron_count(eigenvalues_per_k, nelec, lsda):
+    ...
+    # line 515  当前实现：只拒绝非整数 nelec
+    if lsda or abs(nelec - round(nelec)) > 1e-3:
+        return None
+    # line 517  Python banker's rounding：round(4.5) = 4
+    n_val = int(round(nelec / 2))    # ← 9.0 → 4.5 → 4
+    ...
+    valence_top.append(s[n_val - 1])  # 第 4 本征值 = 4p 半芯顶
+    conduction_bot.append(s[n_val])   # 第 5 本征值 = 5s 金属带底
+    ...
+    # line 530  仅当 VBM ≥ CBM 才兜底为 None
+    if vbm_e &gt;= cbm_e:
+        return None
+    # 半芯远在金属带下方 → 兜底不触发 → 返回伪能隙 10.989 eV</span></code></pre>
+
+<div class="callout bench">
+<span class="tag tag-bench">BENCH</span>
+<strong>问题在评估器</strong>：非自旋极化 DFT 下，奇数电子数物理上<em>不可能</em>有整数带占据——必然是金属。<code>_find_vbm_cbm_via_electron_count</code> 缺一道对奇数 <code>nelec</code> 的拒绝，导致它把 4p 半芯顶当 VBM、5s 金属带底当 CBM。
+</div>
+
+<h3>2.4 影响范围</h3>
+
+<p>查一下 GBRV USPP 池里奇数 Z<sub>valence</sub> 的元素：</p>
+
+<pre><code>/home/shijie/projects/bench/pseudos/GBRV_USPP_PBE_v1.5/*.upf
+  Li :  3   (1s² 2s¹)
+  Na :  9   (2s² 2p⁶ 3s¹)
+  K  :  9   (3s² 3p⁶ 4s¹)
+  Rb :  9   (4s² 4p⁶ 5s¹)
+  Cs :  9   (5s² 5p⁶ 6s¹)
+  Au : 11   (5d¹⁰ 6s¹)
+  Cu : 19   (3s² 3p⁶ 3d¹⁰ 4s¹)
+  Ag : 19   (4s² 4p⁶ 4d¹⁰ 5s¹)</code></pre>
+
+<p>所有这些元素跑 T2 bands_dos 都会踩同一个坑。当前标准档里只有 Rb 进了 T2，所以只看到 Rb 翻车；K / Cs / Au / Cu / Ag 没跑 T2 是侥幸。</p>
+
+<h3>2.5 次要：v4.2 physics_sanity 误诊把 agent 推向死胡同</h3>
+
+<p>v4.2 端的 <code>physics_sanity</code> 检测到 advisor 说 metal、bench 报 direct gap 后，给了 agent 一条**错的修复建议**：</p>
+
+<pre><code><span class="diff-ctx"># /srv/shared/science/solver/v4.2/agent/step_kinds/physics_sanity.py:194-202
+result["diagnosis"] = (
+    f"config_advisor says metal (source=deterministic) but bench extracted "
+    f"gap_type={gap_type!r}, band_gap_ev={band_gap_num:.3f} eV. "
+    f"Likely bench fermi-slice missed a Fermi-crossing k-point. "        # ← 错诊
+    f"Fix the bands NSCF step: (1) increase `nbnd` to >= 2x the current "
+    f"value so more bands are sampled near EF, AND/OR (2) add a k-point "
+    f"sampling near the band-crossing region of the path. ..."
+)</span></code></pre>
+
+<p>本案根本没走 fermi-slice 分支（走的是 electron-count），<code>n_val</code> 由 <code>nelec</code> 决定，agent 加多少 <code>nbnd</code>、加密多少 k-path 都改不了第 4/5 本征值的索引位置。结果 agent 在 2 次 replan 里做的全是无效改动，把配额烧光收尾。</p>
+
+<h3>2.6 推荐修复</h3>
+
+<div class="callout fix">
+<span class="tag tag-fix">FIX-1</span>
+<strong>bench 侧（3 行）</strong> · <code>/home/shijie/projects/bench/harness/lib/evaluator.py:515</code>
+<pre style="margin-top:8px"><code><span class="diff-ctx"> def _find_vbm_cbm_via_electron_count(eigenvalues_per_k, nelec, lsda):
+     ...
+</span><span class="diff-del">-    if lsda or abs(nelec - round(nelec)) > 1e-3:
+-        return None
+-    n_val = int(round(nelec / 2))
+</span><span class="diff-add">+    if lsda or abs(nelec - round(nelec)) > 1e-3:
++        return None
++    n_int = int(round(nelec))
++    if n_int % 2 == 1:        # 非 LSDA × 奇数 nelec ≡ 金属，交给 fermi-slice
++        return None
++    n_val = n_int // 2
+</span></code></pre>
+</div>
+
+<div class="callout fix">
+<span class="tag tag-fix">FIX-2</span>
+<strong>v4.2 侧</strong> · <code>physics_sanity.py:194-202</code> Rule A 的诊断模板补一句"也可能是 bench evaluator 的 odd-nelec 失效"，或干脆在 advisor 说 metal × 提取值 &gt; 5 eV 时直接把 verdict 标 <code>blocked_by_bench</code>，跳过 replan、向 user 抛出 bench-side hint。
+</div>
+
+<h2 id="ge">3. Case B — Ge bands_dos（PBE 准金属骑在阈值边）</h2>
+
+<h3>3.1 现象：得分历史像心电图</h3>
+
+<table class="runs">
+<tr><th>时间</th><th>score</th><th>状态</th><th>备注</th></tr>
+<tr><td>2026-05-07 ~ 05-10（3 次）</td><td>0.35 ~ 0.37</td><td class="partial">部分通过</td><td>physics_sanity 尚未合入</td></tr>
+<tr><td>2026-05-13 / 05-16（多次）</td><td>0.36 ~ 0.59</td><td class="partial">部分通过</td><td>抖动</td></tr>
+<tr><td>2026-05-16 20:40</td><td><strong>0.956</strong></td><td class="pass">最佳</td><td>agent 报 gap=0 → bench 短路为 metal，全中</td></tr>
+<tr><td>2026-05-19 16:14</td><td>—</td><td class="fail">replan 耗尽</td><td>physics_sanity 阻止提交</td></tr>
+<tr><td>2026-05-20 06:46</td><td><strong>0.631</strong></td><td class="partial">通过但低分</td><td>最近这一次，gap=0.0088 eV</td></tr>
+</table>
+
+<h3>3.2 关键：Ge 的 GT 标的是 metal</h3>
+
+<p>查 GT：<code>/home/shijie/projects/bench/tools/gt_selfrun/canonical_gt_t2/M1_T2_Ge_bands_dos.json</code></p>
+
+<pre><code>ground_truth:
+  band_gap_ev   = 0.0      (tolerance 0.1)
+  gap_type      = "metal"
+  vbm_k_label   = "metal"
+  cbm_k_label   = "metal"
+  dos_e_fermi   = 7.7839
+
+convergence_evidence.scan_points:
+  ecutwfc=30→80 Ry × 5 个 scan point，全部 band_gap_ev = 0.0、gap_type='metal'</code></pre>
+
+<p>这不是 GT 录错——PBE+GBRV USPP 给金刚石 Ge <em>确实</em>算出近零能隙（PBE 对 Ge 的 self-interaction 误差使间接 gap 缩水到接近 0），所以 GT 标 metal 是 PBE 实算结果的诚实反映。<strong>物理上正确的"半导体 Ge"和 PBE 实算结果"准金属 Ge"在 bench 这套范式下是冲突的。</strong></p>
+
+<h3>3.3 证据：最近一跑骑在 1 meV 阈值边</h3>
+
+<p>2026-05-20 06:46 的 <code>physics_sanity_1/sanity.json</code>：</p>
+
+<pre><code>{
+  "verdict": "pass",
+  "details": {
+    "advice_is_metal": false,                ← v4.2 advisor：半导体
+    "advice_source":  "deterministic",
+    "extracted_gap_type":  "direct",         ← bench 提取：direct gap
+    "extracted_band_gap_ev": 0.0088          ← 数值在 0.1 容差内
+  }
+}</code></pre>
+
+<p>看一下 bench 怎么决定要不要短路成 metal：</p>
+
+<pre><code><span class="diff-ctx"># /home/shijie/projects/bench/harness/lib/evaluator.py:705 / :776
+gap_value = max(0.0, lumo - homo)
+if gap_value &lt; 1e-3:                  # ← 1 meV 阈值
+    return _metal_t2_result(...)      # 返回 gap_type='metal' + labels='metal'</span></code></pre>
+
+<p>Ge 在 PBE+GBRV 下的实算 gap 在 0 ~ 10 meV 之间抖（依赖 k-mesh 细节）。<strong>2026-05-16 那次拿 0.956 的 agent 报了 gap = 0.0000 → 触发短路 → 全套 metal 标签命中</strong>；2026-05-20 这次报 0.0088 → 刚好高于 1e-3 → 标 'direct'，VBM/CBM 用 seekpath 真实标签 → 3 个标签字段全部失分，只有 band_gap 数值（在 0.1 容差内）和 dos_e_fermi 命中。</p>
+
+<h3>3.4 根因：advisor × physics_sanity × bench 三方拉扯</h3>
+
+<p>v4.2 端 <code>config_advisor</code> 走元素表把 Ge 判为半导体（物理上正确），<code>physics_sanity</code> 又把"agent 算出 metal"标记为与 advisor 矛盾的 fail（05-19 那次）。即使 agent 算对了 PBE 数值，标签字段还是要按 GT 给的 'metal' 来填——而 advisor + physics_sanity 联手禁止 agent 这么填。</p>
+
+<div class="callout solver">
+<span class="tag tag-solver">SOLVER</span>
+<strong>v4.2 这条规则在"PBE 准金属"上必然失分</strong>：advisor 给出的是物理事实（Ge 是半导体），但 bench 评估的是 PBE 实算事实（Ge 在 PBE 下 ≈ metal）。这两个事实在 Ge / α-Sn / InSb 这类 narrow-gap-becomes-metal-in-PBE 元素上不一致。
+</div>
+
+<h3>3.5 影响范围</h3>
+
+<p>PBE 准金属一族都会撞这个边界：<strong>Ge</strong>、α-Sn、InSb、HgTe、PbTe、Bi₂Se₃ 等窄带半导体在 PBE 下都接近零隙。当前标准档命中 Ge 一个。</p>
+
+<h3>3.6 推荐修复</h3>
+
+<div class="callout fix">
+<span class="tag tag-fix">FIX-3a</span>
+<strong>bench 侧（1 行）</strong> · <code>evaluator.py:705 / :776</code>：把金属短路阈值从 <code>1e-3</code> 抬到 <code>1e-2</code>（10 meV）。
+<pre style="margin-top:8px"><code><span class="diff-del">-    if gap_value &lt; 1e-3:
+</span><span class="diff-add">+    if gap_value &lt; 1e-2:    # 10 meV：吸收 PBE 准金属（Ge / α-Sn 等）的数值噪声
+</span><span class="diff-ctx">         return _metal_t2_result(...)</span></code></pre>
+理由：1 meV 比 PBE 自身的能带误差小一个数量级；10 meV 是更合理的"数值上的零"界限。Ge 报 0.0088 / 0.0045 / 0.0001 任何一种都会稳定短路为 metal。
+</div>
+
+<div class="callout fix">
+<span class="tag tag-fix">FIX-3b</span>
+<strong>v4.2 侧</strong> · <code>config_advisor</code> 给 PBE 准金属族打 <code>gap_type_uncertain=True</code> 标记，<code>physics_sanity</code> 在该标记存在时跳过 metal ⇄ semiconductor 的矛盾判定。在 advisor 的元素表里加一个 <code>pbe_near_metal</code> 字段，列入 Ge / α-Sn / InSb / HgTe / PbTe 等。
+</div>
+
+<h2 id="wo3">4. Case C — WO<sub>3</sub> vc_relax timeout（agent 绕过 GPU wrapper）</h2>
+
+<h3>4.1 不是显存</h3>
+
+<p>显存证据全在 <code>workdir/vc_relax_1/vc-relax.out</code> 头部：</p>
+
+<pre><code>[qe-gpu-wrap] acquired GPU 1 slot 0 after 0s (pool=0,1, slots/gpu=3, bin=pw.x)
+GPU acceleration is ACTIVE.  1 visible GPUs per MPI rank
+Estimated max dynamical RAM per process >       4.98 GB
+GPU memory used/free/total (MiB):  ~5000 / 76000 / 81089</code></pre>
+
+<p>每进程 5 GB，GPU 总量 81 GB，wrapper 池 <code>pool=0,1, slots/gpu=3</code> = 6 个并发槽位都是空的。run 工件里 grep <code>OOM</code> / <code>Cannot allocate</code> / <code>killed</code> 全部 0 命中。</p>
+
+<h3>4.2 故障链：4 小时 wall 烧的去向</h3>
+
+<p>从 <code>workdir/bash.log</code> 抓出 pw.x 调用的时间线：</p>
+
+<pre><code>16:50  $ pw.x -in vc_relax_1/vc-relax.in ...         timeout_s=3600
+17:52  rc=-1  wall=3600s   ← bash 工具按 1 小时砍
+18:01  $ pw.x ... (retry)                            rc=1   wall=408s    (输入有问题)
+18:03  $ pw.x ... (retry)                            rc=1   wall=4s      (路径错)
+18:08  $ pw.x ... (retry)                            rc=127 wall=225s    (command not found)
+       ↓ agent 改用绝对路径绕过 GPU wrapper
+18:21  $ /home/shijie/qe/QuantumE-7.5/bin/pw.x ...   rc=-1  wall=7200s   ← 纯 CPU 二进制，被 bash 砍
+20:43  $ pw.x ...    (回到 wrapper)                   rc=0   wall=787s    ← JOB DONE (13 min)
+20:48  $ pw.x -in scf_1/scf.in ...                   开始 SCF
+~20:48 harness 14400s timeout 整点到时 → kill</code></pre>
+
+<div class="callout solver">
+<span class="tag tag-solver">SOLVER</span>
+<strong>核心退化点在 18:21 那一步</strong>：agent 在前几次失败后判断 <code>pw.x</code> "找不到"，于是切换到 <code>/home/shijie/qe/QuantumE-7.5/bin/pw.x</code> 直接调用——绕过了 <code>$QE_GPU_WRAPPER_DIR/pw.x</code> 这个 GPU 包装器。该绝对路径是纯 CPU 二进制，没有 GPU 加速，跑了 2 小时被 bash 砍。
+</div>
+
+<h3>4.3 对照：同任务在合理预算内能完成</h3>
+
+<pre><code>SELECT created_at, total_score, wall_time_sec FROM runs
+WHERE task_id = 'M2_T1_WO3_roomT_vc_relax' AND total_score IS NOT NULL
+ORDER BY total_score DESC LIMIT 5;
+
+2026-05-16 18:39    1.000    2711s    ← 45 min, 满分
+2026-05-17 04:54    1.000    5841s    ← 1.6 h, 满分
+2026-05-09 05:57    0.894     739s
+2026-05-16 09:15    0.823    1139s
+2026-05-16 10:48    0.934    8361s</code></pre>
+
+<p>任务本身在 GPU wrapper 下 1 小时内能跑完。05-19 失败完全是 agent 在 retry 时做的<em>错误工具选择</em>。</p>
+
+<h3>4.4 推荐修复</h3>
+
+<div class="callout fix">
+<span class="tag tag-fix">FIX-4</span>
+<strong>v4.2 侧</strong> · <code>/srv/shared/science/solver/v4.2/agent/tools/bash.py</code> 在 <code>BashTool.run</code> 入口（约 line 84 之后、line 124 的 <code>check_command</code> 调用前）加一道路径检查：
+<pre style="margin-top:8px"><code><span class="diff-add">+    # Reject pw.x via absolute path that bypasses the GPU wrapper.
++    # The wrapper is on PATH as `pw.x`; any absolute path to a different
++    # binary (e.g. /home/shijie/qe/QuantumE-7.5/bin/pw.x) is CPU-only
++    # and causes 10x slowdown that drains the harness budget.
++    if re.search(r"(^|\s)/\S*?/pw\.x(\s|$)", cmd):
++        self._log(cmd, exit_code=2, wall_s=0.0)
++        return {"stdout": "", "stderr":
++            "[bash tool] absolute-path pw.x is forbidden; use the bare "
++            "`pw.x` command so $QE_GPU_WRAPPER_DIR/pw.x picks up the GPU.",
++            "exit_code": 2, "wall_s": 0.0,
++            "cwd_after": str(self.cwd), "lint_diff": ""}
+</span></code></pre>
+修完，WO<sub>3</sub> 05-19 的故障链根本不会发生——agent 第一次"找不到 pw.x"时会直接收到清晰错误，被迫去查 PATH 而不是切换二进制。
+</div>
+
+<h2 id="cosb3">5. Case D — CoSb<sub>3</sub> bands_dos timeout（dos_nscf timeout 太短）</h2>
+
+<h3>5.1 不是显存</h3>
+
+<pre><code>workdir/scf_1/scf.out:
+  Estimated max dynamical RAM per process >      15.07 GB
+  GPU memory used/free/total (MiB):    7038 / 74050 / 81089</code></pre>
+
+<p>实际只用 7 GB / 总 81 GB，无 OOM 痕迹。</p>
+
+<h3>5.2 故障链：栽在最后一步 dos_nscf</h3>
+
+<p>vc_relax → SCF → bands_nscf 三步全部 <code>JOB DONE</code>，时间分布健康：</p>
+
+<pre><code>18:17  task 启动
+~20:43 vc_relax + scf 完成 （scf wall=2451s）
+20:55  bands_nscf wall=108s   JOB DONE  （内部 PWSCF 1m29s CPU / 1m47s WALL）
+20:57  $ pw.x ... dos_nscf    timeout_s=120     rc=-1
+21:41  $ pw.x ... dos_nscf    timeout_s=2451    rc=0    （但输入文件名错）
+21:52  $ pw.x ... dos_nscf    timeout_s=600     rc=-1
+~22:17 harness 14400s 到时 → kill</code></pre>
+
+<div class="callout solver">
+<span class="tag tag-solver">SOLVER</span>
+<strong>问题</strong>：CoSb<sub>3</sub> 是 32 原子方钴矿，DOS NSCF 用 dense k-mesh（典型 24×24×24）+ tetrahedra 时，单次要 20+ 分钟。agent 反复给 dos_nscf 自定 <code>timeout_s = 120</code> / <code>600</code> —— 每次被 bash 砍掉，结果都没出 <code>JOB DONE</code>。
+</div>
+
+<h3>5.3 对照：同任务能拿高分</h3>
+
+<pre><code>SELECT created_at, total_score, wall_time_sec FROM runs
+WHERE task_id = 'M2_T2_CoSb3_bands_dos' AND total_score IS NOT NULL
+ORDER BY created_at DESC LIMIT 5;
+
+2026-05-17 04:54   0.912   11901s    ← 3.3 h
+2026-05-16 19:20   0.876    3360s    ← 56 min
+2026-05-10 23:45   0.750    2272s
+2026-05-09 08:38   0.496    2292s</code></pre>
+
+<p>任务本身在 2~3 小时预算内能拿 0.87+ 分。05-19 失败是 agent 把 dos_nscf 的 timeout 估得太死。</p>
+
+<h3>5.4 推荐修复</h3>
+
+<div class="callout fix">
+<span class="tag tag-fix">FIX-5</span>
+<strong>v4.2 侧</strong> · 在 planner（或 executor 调 BashTool 的中间层）给每个 step 注入最小 <code>timeout_s</code> 下限。粗算：
+<pre style="margin-top:8px"><code>min_timeout_s(step) = max(
+    step_kind_default,
+    base × n_atoms × (kmesh_density / 30)³ × (nbnd / 16)
+)
+
+# step_kind_default
+  scf:         300s   (5 min)
+  vc_relax:    900s   (15 min — bfgs 迭代)
+  bands_nscf:  600s   (10 min — k-path 一般稀疏)
+  dos_nscf:   1800s   (30 min — dense kmesh + tetrahedra)
+  bands_pp:     60s
+  dos_pp:       60s
+
+# base (per atom-step factor)
+  scf:       2.0
+  vc_relax:  6.0      (~3x scf, 多次迭代)
+  bands_nscf:1.5      (无 SCF 自洽循环)
+  dos_nscf:  3.0      (k-mesh 密 + tetrahedra)</code></pre>
+对 CoSb<sub>3</sub>（32 原子，kmesh≈24，nbnd≈40）算出来 dos_nscf 最小 ≈ <code>3.0 × 32 × (24/30)³ × (40/16)</code> ≈ 124s，但被 <code>step_kind_default=1800s</code> 兜住。agent 想设 120s 会被改写为 1800s，dos_nscf 一次就能跑完。
+</div>
+
+<h2 id="ghost">6. 附：05-20 03:27 / 03:28 那两条无 <code>exit_code</code> 的失败</h2>
+
+<p>查 <code>state.db</code>：</p>
+
+<pre><code>2026-05-20T03-27-23Z  M2_T2_CoSb3_bands_dos     status=failed  solver_status=NULL  exit_code=NULL  cancel_reason=NULL
+2026-05-20T03-28-51Z  M2_T1_WO3_roomT_vc_relax  status=failed  solver_status=NULL  exit_code=NULL  cancel_reason=NULL</code></pre>
+
+<p>两条都<strong>不是 harness timeout</strong>（设的是 7200s，但只跑了 4 分钟就停了）、<strong>不是 OOM</strong>（GPU 余量充足）、<strong>没有正常退出码</strong>。最可能：</p>
+
+<ul>
+<li>用户手动 cancel / 重排队列</li>
+<li>同一时刻 GPU 池被另一 user 的并发任务抢满（不过 wrapper 应该是排队不是失败）</li>
+<li>Web 后端 reschedule</li>
+</ul>
+
+<p>下次类似情况发生时，建议查 <code>state.db</code> 的 <code>cancel_requested_at</code> 字段以及 web backend 日志 <code>/tmp/dft-agent-bench-backend*.log</code>。</p>
+
+<h2 id="fix">7. 修复总清单与优先级</h2>
+
+<table class="runs">
+<tr><th>编号</th><th>侧</th><th>改动</th><th>挽救的 case</th><th>工作量</th></tr>
+<tr>
+  <td><strong>FIX-1</strong></td>
+  <td><span class="tag tag-bench">BENCH</span></td>
+  <td><code>evaluator.py:515</code> 拒 odd integer nelec（3 行）</td>
+  <td>Rb 全部 3 次；潜在 K / Cs / Au / Cu / Ag</td>
+  <td>10 min</td>
+</tr>
+<tr>
+  <td><strong>FIX-3a</strong></td>
+  <td><span class="tag tag-bench">BENCH</span></td>
+  <td><code>evaluator.py:705/776</code> 金属短路阈值 1 meV → 10 meV（1 行）</td>
+  <td>Ge 的得分波动止于 0.95+</td>
+  <td>5 min</td>
+</tr>
+<tr>
+  <td><strong>FIX-4</strong></td>
+  <td><span class="tag tag-solver">SOLVER</span></td>
+  <td><code>bash.py</code> 黑名单绝对路径 <code>pw.x</code>（~10 行）</td>
+  <td>WO<sub>3</sub> 类故障链</td>
+  <td>15 min</td>
+</tr>
+<tr>
+  <td><strong>FIX-5</strong></td>
+  <td><span class="tag tag-solver">SOLVER</span></td>
+  <td>planner 给每个 step 注入 <code>timeout_s</code> 下限（~30 行）</td>
+  <td>CoSb<sub>3</sub> + 所有重材料 dos_nscf</td>
+  <td>1 h</td>
+</tr>
+<tr>
+  <td><strong>FIX-2</strong></td>
+  <td><span class="tag tag-solver">SOLVER</span></td>
+  <td><code>physics_sanity.py</code> 改诊断模板，加 <code>blocked_by_bench</code> verdict</td>
+  <td>失败 case 不再无效 replan 烧配额</td>
+  <td>30 min</td>
+</tr>
+<tr>
+  <td><strong>FIX-3b</strong></td>
+  <td><span class="tag tag-solver">SOLVER</span></td>
+  <td>advisor 给 PBE 准金属元素打 <code>pbe_near_metal</code> 标记</td>
+  <td>Ge 兜底；α-Sn / InSb 等若进 T2 也免疫</td>
+  <td>40 min</td>
+</tr>
+</table>
+
+<p>推荐执行顺序：<strong>FIX-1</strong> 和 <strong>FIX-3a</strong> 一起做一个 bench 侧的 PR（影响标准档现场最大、代码改动最小、可独立验证）；<strong>FIX-4</strong> 和 <strong>FIX-5</strong> 一起做一个 v4.2 侧的 PR（互相不冲突，都属于"防 agent 把自己坑了"类）；<strong>FIX-2</strong> 和 <strong>FIX-3b</strong> 等前面两批落地后再做（依赖前面两批生效后才能干净验证）。</p>
+
+<div class="callout note">
+<strong>验证策略</strong>：FIX-1 落地后重跑 <code>M1_T2_Rb_bands_dos</code> 应直接看到 <code>extracted_gap_type='metal'</code>；
+FIX-3a 落地后重跑 <code>M1_T2_Ge_bands_dos</code> 不再受 agent 报 0.0088 还是 0.0001 影响；
+FIX-4 落地后让 agent 故意调用绝对路径 pw.x，应该收到 <code>rc=2 + 清晰错误信息</code>；
+FIX-5 落地后查 transcript.json，确认 agent 设 <code>timeout_s=120</code> 时 bash 工具实际用了 1800s。
+</div>
+
+<footer>
+  报告生成日 <strong>2026-05-20</strong> ·
+  数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
+  v4.2 solver commit <code>7b1f73f</code> ·
+  bench harness <code>/home/shijie/projects/bench</code> ·
+  self-contained · no external assets
+</footer>
+
+</body>
+</html>
