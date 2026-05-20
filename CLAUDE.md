@@ -9,6 +9,10 @@ DFT-agent bench 报告归档站。每份报告是一个**独立 self-contained H
 **reports 仓本身仍留在 home**——这是 shijie 个人的报告归档，不进入共享工作区。
 对应 handoff 报告：`shared-workspace-migration-2026-05-18.html`。
 
+**当前所有 `web` / `agent` (solver) 维护工作都在共享区 `/srv/shared/science/{web,solver}/`
+进行；本仓的 HTML 报告在引用 solver / web 代码路径时统一以共享区为权威源。**
+shijie 的 `~/projects/{web,solver}` 旧目录从 05-18 起不再更新；引用代码用 `/srv/shared/science/...`。
+
 ## URLs
 
 - 首页：https://pluto235.github.io/dft-agent-reports/

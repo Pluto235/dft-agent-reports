@@ -77,6 +77,15 @@
 
 <h1>v4.2 Solver 架构 · 邀请 DFT 专家评审</h1>
 
+<p style="margin: -8px 0 18px; color: #7f8c8d; font-size: 13px;">
+<strong style="background: #fef9e7; color: #7d6608; padding: 2px 10px; border-radius: 12px;
+border: 1px solid #f4d03f;">v2 · patched 2026-05-20</strong>
+&nbsp;补：<a href="#s45">§4.5 experience library（Reflexion）</a>；
+<a href="#s42">§4.2</a> 加 Rules E/F（磁性 / 残余应力）；
+<a href="#s44">§4.4</a> 加 Rule E（K_POINTS crystal_b 数据行校验）；
+<a href="#s65">§6.5</a> 新 4 个问题。
+</p>
+
 <div class="meta">
 <strong>给谁看</strong>：DFT / Quantum ESPRESSO 实战熟练、对 LLM agent 略有耳闻的合作者。<br>
 <strong>看完后请做的事</strong>：跳到 <a href="#s6">§6 请教 DFT 专家</a> 给出 4 类反馈
@@ -104,10 +113,16 @@
       <li><a href="#s42">Verifier 的物理 sanity checklist（按 step kind）</a></li>
       <li><a href="#s43">Step kinds 的切分</a></li>
       <li><a href="#s44">qe_input_lint 的默认值表 + 处理策略</a></li>
+      <li><a href="#s45"><strong>experience library（Reflexion）</strong><span style="color:#7d6608"> · v2 新增</span></a></li>
     </ol>
   </li>
   <li><a href="#s5">一个真实 trace 示例 · M1_T1 Si vc-relax</a></li>
-  <li><a href="#s6">请教 DFT 专家的具体问题</a></li>
+  <li><a href="#s6">请教 DFT 专家的具体问题</a>
+    <ol style="font-size: 13px; color: #7f8c8d; margin-top: 2px;">
+      <li>§6.1–§6.4 见上</li>
+      <li><a href="#s65"><strong>§6.5 experience library 的 methodology-only 边界</strong><span style="color:#7d6608"> · v2 新增</span></a></li>
+    </ol>
+  </li>
   <li><a href="#s7">附录：仓库路径与相关链接</a></li>
 </ol>
 </nav>
@@ -402,6 +417,40 @@ checklist 是<strong>物理 + 文件</strong>两层。</p>
 </tbody>
 </table>
 
+<p style="background: #fef9e7; border-left: 4px solid #f1c40f; padding: 10px 16px;
+margin-top: 14px; border-radius: 4px; font-size: 14px;">
+<strong>📌 v2 update（2026-05-20）</strong>：<code>physics_sanity</code> 的规则集已经从初版的
+<strong>4 条 (Rules A–D)</strong> 扩到 <strong>6 条</strong>，每次 run 都并行评估，最终 verdict
+取最高严重度：
+</p>
+<table style="font-size: 13.5px;">
+<thead><tr><th>规则</th><th>触发</th><th>处置</th></tr></thead>
+<tbody>
+<tr><td>A · metal × extracted gap&gt;0.5 eV</td><td>config_advisor 高置信 metal，但 bench 抽到 gap</td>
+    <td><strong>fail + replan</strong>（提示加大 <code>nbnd</code> + 改 k-path 覆盖 Fermi 穿越点）</td></tr>
+<tr><td>B · insulator × extracted metal</td><td>config_advisor 高置信非 metal，但 bench 抽到 metal</td>
+    <td><strong>fail + replan</strong>（提示 NSCF 应该 <code>occupations='fixed'</code> + 增 nbnd）</td></tr>
+<tr><td>C · 已知 wide-gap × extracted gap&lt;0.05 eV</td><td>advisor rationale 含 oxide/fluoride/wide-gap 但抽到几乎为 0</td>
+    <td>soft_warn（PBE 系统性低估，不 retry）</td></tr>
+<tr><td>D · 低置信 advice 出现物理矛盾</td><td>非 deterministic source 上发生 A 或 B 情形</td>
+    <td>soft_warn（advice 不够硬，不强 replan）</td></tr>
+<tr><td><strong>E · 磁性矛盾（新）</strong></td>
+    <td>task spec 声明了 <code>main_magnetic_element</code> 但 SCF 最终
+        <code>total_magnetization &lt; 0.1 µB</code></td>
+    <td><strong>fail + replan</strong>（提示 <code>nspin=2</code> +
+        <code>starting_magnetization(X)</code> 起点）</td></tr>
+<tr><td><strong>F · vc_relax 残余应力（新）</strong></td>
+    <td>preflight relax.out 最末 <code>P</code> 块的 <code>|P| &gt; 5 kbar</code>（≈0.5 GPa）</td>
+    <td>soft_warn（PBE 误差有时确实留 0.5 GPa；写进 notes，提示
+        <code>press_conv_thr</code> 或 <code>cell_dofree</code>）</td></tr>
+</tbody>
+</table>
+<p style="font-size: 14px; color: #5d6d7e;">
+Rules E + F 还在 working tree（未 commit），但 tests 已经写完；Rules A–D 已经 merge 在
+<code>731a626</code>。这两条专门<strong>请教 §6.2</strong>：阈值取得对吗？还该补哪些 deterministic
+sanity？
+</p>
+
 <p><strong>我们的理由</strong>：v1 让 LLM 自报"做完了"，经常漏字段或提交未收敛的结果；v4.2
 把"做完了"的判断从 LLM 自评<strong>挪到了独立 verifier + 物理 checklist</strong>。
 checklist 现在大多还是<strong>文件 / 字符串级别</strong>的判断，"真物理 sanity"
@@ -473,6 +522,15 @@ verifier checklist 也按切片定制。新增 step kind = 加一个模块 + 注
     <td><strong>仅警告</strong>，不自动改（advisor 在 Mott 绝缘体等边界 case 可能错）</td>
     <td>config_advisor 推荐：metal → <code>smearing</code>（mv, degauss=0.02）；
         insulator → <code>fixed</code></td></tr>
+<tr style="background: #fef9e7;"><td><strong>E · K_POINTS crystal_b 数据行校验</strong>
+    <br><span style="font-size:11px; color:#7d6608;">v2 新增 (uncommitted)</span></td>
+    <td><code>bands</code> NSCF 模式且 <code>K_POINTS crystal_b</code> / <code>tpiba_b</code></td>
+    <td>检查每段路径数据行格式：先是段数 N，随后 N 行 <code>kx ky kz weight</code>（4 列）；
+        发现段数与行数不符 / 行少于 4 列 / weight 非整数 → 拒绝 spawn pw.x，
+        把诊断回写给 LLM 让其重写 input</td>
+    <td>典型坑：LLM 把 seekpath 输出粘错 + 漏写 weight 列；或者把高对称点标签也算进段数。
+        这条之前在 Si bands 案例上踩过，pw.x crash 给 "found ... lines, expected 8"
+        但 LLM 看不懂错误码</td></tr>
 </tbody>
 </table>
 
@@ -483,6 +541,180 @@ verifier checklist 也按切片定制。新增 step kind = 加一个模块 + 注
   <li><strong>幂等 + 把 diff 回写给 LLM</strong>——不偷偷修改，让 LLM 在下一回合看到自己刚才写的
     跟最终落盘的差，逐步学会自己写对。</li>
 </ol>
+</div>
+
+
+<!-- ─────────────────────────────── §4.5 (v2 patch) ─────────────────────────────── -->
+<div class="concept" id="s45">
+<span class="lbl">§4.5</span><h4>experience library — 自动累积的"方法学教训"（v2 新增）</h4>
+
+<p style="margin-top: 10px;"><strong>做了什么</strong>：v4.2 在 05-19 加了一个全新的子系统
+（commit <code>ba9fba2</code>），让 agent <strong>把每一次"先失败、后修好"的 step 当成一次教训
+攒下来</strong>，下次同类 step 启动时把它注入对话上下文。范式上是 Reflexion（Shinn et al. 2023）
+的一个工程化变种，针对 DFT 任务做了"方法学 only / 不缓存答案"的硬约束。</p>
+
+<p>跟 §4.1–§4.4 不一样的地方：<strong>这一节里"硬编码"的不是 DFT 知识本身，而是
+"什么算合法的教训"的边界</strong>——具体 DFT 教训内容是 agent 自己学出来的。</p>
+
+<div class="svg-wrap" style="margin-top: 18px;">
+<svg viewBox="0 0 780 320" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr-exp" viewBox="0 -5 10 10" refX="10" refY="0" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,-5L10,0L0,5" fill="#7f8c8d"/>
+    </marker>
+  </defs>
+  <!-- ROW 1: this run (top) -->
+  <text x="20" y="28" font-weight="700" fill="#34495e">本次 run（某个 step，比如 vc_relax）</text>
+  <rect x="20" y="40" width="130" height="46" rx="6" fill="#fef9e7" stroke="#f1c40f" stroke-width="1.5"/>
+  <text x="85" y="60" text-anchor="middle">attempt 1</text>
+  <text x="85" y="76" text-anchor="middle" font-size="11" fill="#7d6608">verifier: fail</text>
+
+  <line x1="150" y1="63" x2="180" y2="63" stroke="#7f8c8d" stroke-width="1.5" marker-end="url(#arr-exp)"/>
+
+  <rect x="180" y="40" width="130" height="46" rx="6" fill="#eafaf1" stroke="#27ae60" stroke-width="1.5"/>
+  <text x="245" y="60" text-anchor="middle">attempt 2</text>
+  <text x="245" y="76" text-anchor="middle" font-size="11" fill="#1d8348">verifier: pass</text>
+
+  <line x1="310" y1="63" x2="345" y2="63" stroke="#7f8c8d" stroke-width="1.5" marker-end="url(#arr-exp)"/>
+
+  <rect x="345" y="40" width="170" height="46" rx="6" fill="#eaf2f8" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="430" y="60" text-anchor="middle">reflection_writer subagent</text>
+  <text x="430" y="76" text-anchor="middle" font-size="11" fill="#21618c">读 diff + diagnosis</text>
+
+  <line x1="515" y1="63" x2="550" y2="63" stroke="#7f8c8d" stroke-width="1.5" marker-end="url(#arr-exp)"/>
+
+  <rect x="550" y="40" width="200" height="46" rx="6" fill="#fdf2e9" stroke="#e67e22" stroke-width="1.5"/>
+  <text x="650" y="58" text-anchor="middle" font-weight="600">validate_lesson()</text>
+  <text x="650" y="74" text-anchor="middle" font-size="11" fill="#a04000">methodology-only regex</text>
+
+  <!-- ROW 2: write path -->
+  <line x1="650" y1="86" x2="650" y2="120" stroke="#7f8c8d" stroke-width="1.5" marker-end="url(#arr-exp)"/>
+  <rect x="540" y="120" width="220" height="46" rx="6" fill="#f4ecf7" stroke="#a569bd" stroke-width="1.5"/>
+  <text x="650" y="138" text-anchor="middle">append to JSONL</text>
+  <text x="650" y="155" text-anchor="middle" font-size="11" fill="#6c3483">
+    <tspan font-family="monospace">experience/&lt;step_kind&gt;.jsonl</tspan></text>
+
+  <!-- horizontal divider -->
+  <line x1="20" y1="200" x2="760" y2="200" stroke="#d5dbdb" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- ROW 3: next run (bottom) -->
+  <text x="20" y="220" font-weight="700" fill="#34495e">下一次 run（在共享 scope 的同 step_kind 上）</text>
+  <rect x="20" y="232" width="170" height="46" rx="6" fill="#f4ecf7" stroke="#a569bd" stroke-width="1.5"/>
+  <text x="105" y="250" text-anchor="middle">load_lessons(scope)</text>
+  <text x="105" y="266" text-anchor="middle" font-size="11" fill="#6c3483">top-5 newest dedup</text>
+
+  <line x1="190" y1="255" x2="225" y2="255" stroke="#7f8c8d" stroke-width="1.5" marker-end="url(#arr-exp)"/>
+
+  <rect x="225" y="232" width="240" height="46" rx="6" fill="#eaf2f8" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="345" y="250" text-anchor="middle">合成 read_experience tool_use pair</text>
+  <text x="345" y="266" text-anchor="middle" font-size="11" fill="#21618c">pre-seed 进 executor messages</text>
+
+  <line x1="465" y1="255" x2="500" y2="255" stroke="#7f8c8d" stroke-width="1.5" marker-end="url(#arr-exp)"/>
+
+  <rect x="500" y="232" width="260" height="46" rx="6" fill="#fef9e7" stroke="#f1c40f" stroke-width="1.5"/>
+  <text x="630" y="250" text-anchor="middle" font-weight="600">executor 第一轮就"记得"</text>
+  <text x="630" y="266" text-anchor="middle" font-size="11" fill="#7d6608">vc-relax 早期震荡 → 下调 mixing_beta…</text>
+</svg>
+</div>
+<p class="diagram-caption">experience library 闭环：fail → recover → reflection → JSONL → 下次 pre-seed。
+每个 step_kind 一条独立 JSONL；scope 决定哪些教训会被取出来注入。</p>
+
+<h4 style="margin-top: 22px;">为什么"方法学 only"</h4>
+<p>这个子系统最大的风险是<strong>无意中把答案缓存起来</strong>——比如有人写了一条
+"<em>Si 体系 ecutwfc 用 80 Ry 才能让 gap 收敛到 0.012 Ha</em>"，下次再跑 Si 直接命中，看起来
+"学会了"但本质是答案缓存。Bench 评的就是 agent 通用 DFT 能力，不是查表能力。</p>
+<p>所以 <code>validate_lesson()</code> 在写入前用 regex 三层过滤（顺序很重要）：</p>
+<pre><code>def validate_lesson(lesson, required_keys):
+    # 1. shape: {trigger, action, rationale}，每段 ≤ 200 chars
+    # 2. 先 mask QE keyword RHS，让合法的 `mixing_beta=0.3` 不触发 unit 检查
+    text   = " || ".join(lesson[f] for f in ("trigger","action","rationale"))
+    masked = _QE_KEYWORD_RE.sub(lambda m: f"{m.group(1)}=__masked__", text)
+    # 3. 在 masked 文本上拒绝以下任一：
+    #    - 任何 118 元素符号（word-boundary，含同位素后缀）
+    #    - 任何 required_keys 字面 token（bands_data / gap_type / nscf_dos_out…）
+    #    - 任何 `&lt;number&gt;&lt;unit&gt;` 形状（eV / GPa / Å / Ry / bohr / kbar）
+    return (no_violations, reasons_list)
+</code></pre>
+<p style="font-size: 14px; color: #5d6d7e;">QE keyword 白名单（<code>ecutwfc / mixing_beta / conv_thr / occupations / nbnd …</code>）
+先把 <code>ecutwfc=80</code> 这种<strong>合法的方法学陈述</strong>屏蔽掉，剩下的文本里再看到
+任何 number+unit 都视为答案泄漏。</p>
+
+<h4 style="margin-top: 22px;">scope 维度怎么定的</h4>
+<p>每条教训写入时带 scope tag；下次 <code>load_lessons</code> 按 scope 从同 step_kind 的 JSONL
+里挑出 top-5 最新（去重）。当前 scope 由这 4 个维度组成：</p>
+
+<table style="font-size: 14px;">
+<thead><tr><th>scope 维度</th><th>枚举值</th><th>为什么选它</th></tr></thead>
+<tbody>
+<tr><td><code>task_kind</code></td>
+    <td><code>vc_relax</code>（M1_T1）/ <code>bands_dos</code>（M1_T2）</td>
+    <td>不同任务类型对参数敏感度差异最大；T1 教训不该污染 T2 的 NSCF 设置</td></tr>
+<tr><td><code>crystal_system</code></td>
+    <td>cubic / tetragonal / orthorhombic / hexagonal / trigonal / monoclinic / triclinic</td>
+    <td>cubic 系统对 SpacegroupAnalyzer 漂移最敏感；六角 / 三角对 c 轴 ecutwfc 异常更敏感；
+        分对称族存放避免"立方体系下的教训用到 triclinic"</td></tr>
+<tr><td><code>n_atoms_bucket</code></td>
+    <td><code>≤2</code> / <code>3-8</code> / <code>9-32</code> / <code>&gt;32</code></td>
+    <td>大单胞需要更细 mixing_beta / 更大 diago_thr_init；小单胞反之。
+        按数量级分桶（不是连续值）避免桶过细 → 命中率太低</td></tr>
+<tr><td><code>step_kind</code></td>
+    <td>scf / vc_relax / bands / dos / collect / physics_sanity</td>
+    <td>每个 step_kind 独立 JSONL；vc_relax 的教训不会污染 bands 的 LLM 上下文</td></tr>
+</tbody>
+</table>
+
+<p>注入策略是<strong>同 4 维全匹配优先；如果 0 条，回退到 <code>{task_kind, step_kind}</code>
+两维 loose 匹配</strong>。返回时按 <code>(trigger, action)</code> 去重，最多 top-5 注入。</p>
+
+<h4 style="margin-top: 22px;">什么时候触发 reflection_writer</h4>
+<p>只在<strong>"先 fail 后 succeed"</strong>的 step 上触发。每个 step 一旦 verifier 给出 'pass'，
+orchestrator 看这个 step 的 attempts 历史：如果存在 ≥1 个 verifier='fail' 的 attempt，
+就调 <code>reflection_writer</code> subagent（独立 LLM session，便宜档），喂给它：</p>
+<ul style="font-size: 14px;">
+  <li><strong>failed attempt 的 verifier diagnosis</strong>（"BFGS 在前 3 步震荡"）</li>
+  <li><strong>fail 和 pass 之间的 write_file diff</strong>（同路径下 LLM 改了什么；
+    硬上限 4 KB，超出截断）</li>
+  <li>system prompt 里 hard rules：禁止写元素符号 / required_keys / number+unit
+    （regex 验证器会再 catch 一次，subagent 只是先一道防线）</li>
+</ul>
+
+<p>Reflection subagent 调一个 <code>submit_lesson</code> tool（schema 是 <code>trigger / action /
+rationale / decline + reason</code>）；如果它觉得这次 recover 没什么可教（比如 attempt 1
+死在打错文件名），就 <code>decline=true</code>，不写。<strong>空的 library 比毒的 library 强</strong>
+是这一节的核心约束。</p>
+
+<h4 style="margin-top: 22px;">storage 形态</h4>
+<p>每个 step_kind 一个 append-only JSONL：</p>
+<pre><code>// experience/vc_relax.jsonl 中的一行（示例）
+{
+  "id": "a3f4b1e8",
+  "scope": {"task_kind": "vc_relax", "crystal_system": "cubic",
+            "n_atoms_bucket": "≤2", "step_kind": "vc_relax"},
+  "lesson": {
+    "trigger":   "vc-relax 前 3 步 force 在 1e-2 量级震荡，BFGS 一直拒接受",
+    "action":    "把 mixing_beta 从默认 0.7 调到 0.3，并加 electron_maxstep=200",
+    "rationale": "强电子相关或大原子序数时 charge mixing 易振荡；
+                  小 beta 牺牲收敛速度换稳定性"
+  },
+  "written_at": "2026-05-19T14:23:11.582901+00:00"
+}</code></pre>
+<p style="font-size: 14px; color: #5d6d7e;">永远 append，从不删；id 是 4 字节 hex；written_at
+微秒精度（一秒内多次写入也能稳定排序）。仓库一致性靠 newest-first + dedup 投影实现，<strong>不靠
+删除旧条目</strong>——这样不同节点 / 不同 run 的 library 可以独立成长，事后做 union merge。</p>
+
+<div class="note" style="margin-top: 20px;">
+<strong>同期顺手做的几个小改（不单独成节）</strong>：
+<ul style="margin: 6px 0;">
+<li><code>max_replans</code> 默认 2 → 5（<code>eb06826</code>）——给 planner 更多 recovery 预算。
+    早期 v4.2 跑 standard27 时观察到 2 replan 后还在挣扎的 case 占失败的 ~15%。</li>
+<li>所有 subagent (executor / verifier / reflection_writer) 的 LLM 调用都<strong>双写到
+    主 <code>workdir/transcript.json</code></strong>（<code>7368bc5</code>）——以前每个 subagent
+    自己写自己的 transcript.json，web 端 cost reconciler 看不到总 token 花费；现在统一审计。</li>
+<li>Planner 在 <code>submit_plan</code> 里声明的 <strong>bonus keys</strong>（required keys 之外
+    的额外输出）现在也会出现在 <code>result.json</code> 里（<code>250ad38</code>）——以前被
+    audit 过滤掉，导致 bench 端"没看见"agent 多交付的字段（比如自检图）。</li>
+</ul>
+</div>
 </div>
 
 
@@ -581,9 +813,13 @@ v1 的"纵深防御"。</p>
   </li>
   <li>有哪些是<strong>用 grep 几个关键词就能加进 checklist</strong> 的（最好实现），
     哪些必须 read+解析？</li>
-  <li>physics_sanity 现在只覆盖了"已知 metal 被 fermi-slice 误判成 gap" 这一种失配；
-    其他 metal/insulator 失配场景（比如 Mott / Kondo / 半金属 / topological metal）
-    要不要也写进规则？</li>
+  <li>physics_sanity 现在覆盖了"已知 metal 被 fermi-slice 误判成 gap" + insulator/metal
+    倒置（Rules A/B）；<strong>📌 v2 update</strong>：05-20 又在 working tree 加了
+    <strong>Rule E（磁性矛盾）</strong>和 <strong>Rule F（vc_relax 残余应力）</strong>
+    （详见 §4.2 v2 update 表）。这两条阈值——<code>total_magnetization &lt; 0.1 µB</code>
+    判磁性塌缩、<code>|P| &gt; 5 kbar</code> 判 vc_relax 残余——选得对吗？
+    其他 metal/insulator 失配场景（Mott / Kondo / 半金属 / topological metal）要不要也写进规则？
+    哪些只该 soft_warn 哪些必须 fail？</li>
 </ul>
 </div>
 
@@ -633,6 +869,61 @@ v1 的"纵深防御"。</p>
       <li>大单胞自动调 <code>mixing_beta</code> / <code>diagonalization='davidson'</code></li>
     </ul>
   </li>
+  <li><strong>📌 v2 update</strong>：05-20 已经加了 <strong>Rule E（K_POINTS crystal_b 数据行
+    校验）</strong>（详见 §4.4 表）——专门接住 LLM 把 seekpath 输出粘错的常见情况。
+    这条规则<strong>逻辑没人审过</strong>，请你看：拒绝 spawn 然后回写诊断 vs 自动改写 vs 仅警告，
+    哪个动作更合理？另外，<strong>K_POINTS automatic</strong> / <strong>K_POINTS gamma</strong>
+    这两种是否也该加 sanity（automatic 的 6 个数 / gamma 的 0 个数）？</li>
+</ul>
+</div>
+
+
+<!-- ─────────────────────────────── §6.5 (v2 patch) ─────────────────────────────── -->
+<div class="qbox" id="q5" style="border-left-color: #f4d03f; background: #fef9e7;">
+<h4 id="s65" style="color: #7d6608;">§6.5 · experience library 的 methodology-only 边界（v2 新增）</h4>
+<p><strong>请审 §4.5 整节</strong>——这是 05-19 加的全新子系统，所有边界都是 shijie 一个人定的，
+最需要 DFT 同行的眼睛。</p>
+<ul>
+  <li><strong>validate_lesson 的 regex 边界</strong>：
+    <ul>
+      <li>当前的 3 层过滤（元素符号 / required_keys / number+unit）能不能拦住"<em>在 Si 上把
+        ecutwfc 调到 80 才让 gap 收敛</em>"这类伪装成方法学的答案缓存？我们怕的是：
+        LLM 学会用同义表达绕过 regex（比如<em>"原子序数 14 的体系"</em>代替 <em>Si</em>，
+        或者<em>"高密度截断"</em>代替 <em>ecutwfc=80</em>）。</li>
+      <li>QE keyword 白名单只覆盖 <strong>20 来个</strong>常用参数；
+        Hubbard U / 磁性 / DFT+D 系列、ph.x 的输入参数都没加。要不要扩成两表
+        （核 + 扩展，扩展只在对应 task_kind 触发）？</li>
+      <li>"<strong>number+unit 一律视为答案</strong>"对不对？合法反例：
+        <em>"超过 0.5 GPa 的残余应力"</em>这种"<strong>阈值描述</strong>"算方法学还是答案？
+        当前会被 regex 误判成答案。</li>
+    </ul>
+  </li>
+  <li><strong>scope 4 维够不够</strong>：当前 <code>{task_kind, crystal_system,
+    n_atoms_bucket, step_kind}</code>。物理上是否漏了：
+    <ul>
+      <li><strong>spin / magnetism</strong>（有磁 vs 无磁，教训共享性差异巨大）</li>
+      <li><strong>元素组成</strong>（含 d/f / 含轻 / 含重 / 纯 sp）</li>
+      <li><strong>赝势家族</strong>（GBRV USPP vs SSSP-mixed vs PseudoDojo NC）</li>
+      <li><strong>电子相关强度</strong>（Hubbard U / hybrid / DMFT...）</li>
+    </ul>
+    维度多 → 命中率低（多数 scope 上 0 条教训），维度少 → 教训误用。
+    你的 DFT 经验里，哪几个维度上同一条教训"<strong>不能跨</strong>"？</li>
+  <li><strong>教训长寿命问题</strong>：JSONL 永远 append、不过期。一条 2026 年写的"<em>用
+    occupations='tetrahedra' 配 deltaE=0.01 eV</em>"教训，半年后 QE 升级到 7.6（假设默认
+    smearing 算法变了）还成立吗？要不要：
+    <ul>
+      <li>带 QE 版本戳，下次 load 时按版本过滤？</li>
+      <li>每条教训带个"<strong>命中计数</strong>"，命中 N 次还没失效再升权重？</li>
+      <li>就接受 stale 风险（反正 reflection 还能再写新教训覆盖旧的）？</li>
+    </ul>
+  </li>
+  <li><strong>触发条件偏严</strong>：只在 verifier "先 fail 后 pass" 的 step 上触发反思。
+    一次性 pass 的"好运行"<strong>不</strong>写教训。你觉得：
+    <ul>
+      <li>好运行也该提炼"<strong>关键配置回放</strong>"（哪些参数选对了）？</li>
+      <li>还是这种过度提炼反而容易蜕变成答案缓存？</li>
+    </ul>
+  </li>
 </ul>
 </div>
 
@@ -652,6 +943,12 @@ v1 的"纵深防御"。</p>
   <li>vc_relax preflight：<code>agent/subagents/vc_relax.py</code></li>
   <li>qe_input_lint：<code>agent/tools/qe_input_lint.py</code></li>
   <li>bash_guard：<code>agent/tools/bash_guard.py</code></li>
+  <li style="background: #fef9e7; padding: 4px 8px; margin: 4px -8px; border-radius: 4px;">
+    <strong>v2 新增：</strong>
+    experience library：<code>agent/experience.py</code>（API + validator）·
+    <code>agent/structure_features.py</code>（scope 提取）·
+    <code>agent/subagents/reflection_writer.py</code>（recover 时写教训的子 agent）·
+    存储目录 <code>experience/&lt;step_kind&gt;.jsonl</code></li>
 </ul>
 
 <p><strong>同主题报告</strong>：</p>
@@ -671,7 +968,8 @@ v1 的"纵深防御"。</p>
 </ul>
 
 <p style="margin-top: 30px; color: #7f8c8d; font-size: 13px; text-align: center; border-top: 1px solid #d5dbdb; padding-top: 14px;">
-本报告 self-contained · 由 shijie 起草 · 2026-05-18
+本报告 self-contained · 由 shijie 起草 · 2026-05-18 · v2 patched 2026-05-20
+（experience library + physics_sanity Rules E/F + qe_input_lint Rule E）
 </p>
 
 </body>
