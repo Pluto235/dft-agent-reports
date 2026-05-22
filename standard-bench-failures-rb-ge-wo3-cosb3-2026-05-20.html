@@ -77,10 +77,10 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
 <body>
 
 <h1>标准档 4 失败案例深挖 · Rb / Ge / WO<sub>3</sub> / CoSb<sub>3</sub></h1>
-<p class="kv">2026-05-20（<strong>updated 2026-05-22</strong>）· v4.2 solver · 原始数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
+<p class="kv">2026-05-20（<strong>updated 2026-05-22</strong> · 二次增补加入 <a href="#bn-dos">Case E</a>）· v4.2 solver · 原始数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
    2026-05-22 增补 cutoff <code>2026-05-22T02:30 UTC</code> ·
    run 数据源 <code>/srv/shared/science/web/runs_local/</code> ·
-   bench 源 <code>/home/shijie/projects/bench/</code></p>
+   bench 源 <code>/home/shijie/projects/bench/</code> · <code>/srv/shared/science/bench/</code></p>
 
 <div class="callout bench" style="margin:18px 0 22px 0; border-left-width:6px;">
 <span class="tag tag-bench">2026-05-22 UPDATE</span>
@@ -110,8 +110,12 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
     <td>agent 中途改用绝对路径 pw.x 绕过 GPU wrapper，CPU 跑了 2 小时被 bash 砍</td></tr>
 <tr><td><strong>CoSb<sub>3</sub> bands_dos</strong></td><td>14400s timeout</td><td><span class="tag tag-solver">SOLVER</span></td>
     <td>agent 把 dos_nscf 的 timeout_s 反复设成 120s / 600s，4 次都自砍</td></tr>
+<tr><td><strong>BN<sub>hex</sub> bands_dos</strong> <span class="kv">（2026-05-22 新增）</span></td>
+    <td>得分 0.80（<code>dos_curve</code> 0.63）<br>非失败、分数蒙混过</td>
+    <td><span class="tag tag-bench">BENCH</span> + <span class="tag tag-solver">SOLVER</span></td>
+    <td>agent prompt 里直接写"<code>ngauss=0 degauss=0.0015 # match GT smearing</code>"——但 GT 04-30 已切到 tetrahedra；叠加 per-cell/per-fu 标签 + nbnd 截断三层</td></tr>
 </table>
-不是显存不够、不是被 OOM-killer 清掉。两侧各有 2 个独立修复点，下面逐一拆。
+不是显存不够、不是被 OOM-killer 清掉。前四个 case 两侧各 2 个修复点，第五个（BN）暴露了 prompt 与 GT 协议失同步的系统性问题，下面逐一拆。
 </div>
 
 <div class="toc">
@@ -125,6 +129,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
   <li><a href="#ghost">附：05-20 03:27 / 03:28 那两条无 exit_code 的失败</a></li>
   <li><a href="#fix">修复总清单与优先级</a></li>
   <li><a href="#post-fix"><strong>2026-05-22 post-fix 跟进</strong>（部署 gap + 重跑现状 + 预测表）</a></li>
+  <li><a href="#bn-dos"><strong>Case E — BN<sub>hex</sub> T2 DOS</strong>：prompt 与 GT 协议失同步 + 归一化 + nbnd（2026-05-22 新增）</a></li>
 </ol>
 </div>
 
@@ -767,12 +772,230 @@ $ sed -n '515p' /home/shijie/projects/bench/harness/lib/evaluator.py
 <li><strong>查 scheduler reap</strong>：本次报告新发现的 WO<sub>3</sub> / CoSb<sub>3</sub> 共同症状，与 FIX-2/-3b/-4/-5 都无关。需要在 web 后端 / GPU pool 调度策略层面排查。</li>
 </ol>
 
+<h2 id="bn-dos">9. Case E — BN<sub>hex</sub> bands_dos（prompt 与 GT 协议失同步 + 归一化 + nbnd 三层叠加）<span style="font-size:14px; color:var(--muted)"> (2026-05-22 新增)</span></h2>
+
+<div class="callout note">
+<span class="tag" style="background:#f1c40f; color:#5a4500;">NOT-A-FAILURE</span>
+BN<sub>hex</sub> 这道题<strong>跑通了</strong>、agent 综合得分 <code>0.80</code>——它不在"4 失败案例"之列。
+但 <code>per_field_scores.dos_curve = 0.6332</code>（满分 0.2 权重里只拿 0.127），
+而且 web 端 result 页的 DOS 对比图<strong>视觉上"一眼看出错"</strong>：agent 曲线
+剧烈抖动，GT 平滑得多。本节是顺着 2026-05-22 上 band-plot GT 对比的 PR
+（<code>commit 4a99800</code>）查出来的"分数能蒙混过去、实际有协议 bug"的代表案例。
+按现有分类逻辑列为 Case E。
+</div>
+
+<h3>9.1 现象 — 量化对比 BN<sub>hex</sub> agent vs GT</h3>
+
+<p>样本：</p>
+<pre><code>agent run    /srv/shared/science/web/runs_local/2026-05-22T00-13-26Z_M1_T2_BN_hex_bands_dos/
+GT DOS ref   /srv/shared/science/bench/questions/M1_T2/gt_data/M1_T2_BN_hex_bands_dos/dos_reference.dat
+GT 任务规格  /srv/shared/science/bench/questions/M1_T2/M1_T2_BN_hex_bands_dos.json</code></pre>
+
+<p>正确对齐（<code>agent E_rel = E_abs − VBM_agent</code>，VBM=2.81 eV）后的核心指标：</p>
+
+<table class="runs">
+<tr><th style="width:30%">指标</th><th>agent</th><th>GT</th><th>比率</th></tr>
+<tr><td>nscf k-mesh</td><td><code>20×20×6</code> (2400 pts)</td><td><code>24×24×6</code> (3456 pts)</td><td>GT 密 1.44×</td></tr>
+<tr><td>dos.x 积分方法</td><td>Gaussian σ≈0.02 eV<br>(<code>ngauss=0, degauss=0.0015 Ry</code>)</td><td>tetrahedra<br>（不指定 <code>ngauss/degauss</code>）</td><td>—</td></tr>
+<tr><td>valence 最高峰 D</td><td>6.57</td><td>2.42</td><td class="fail">2.72×</td></tr>
+<tr><td>roughness <code>Σ|ΔD|/ΣD</code> on [−5,+5]</td><td>0.236</td><td>0.0064</td><td class="fail">37.1×</td></tr>
+<tr><td>导带 E=+6 eV 处 DOS</td><td>0.48</td><td>1.78</td><td class="fail">agent 塌</td></tr>
+</table>
+
+<p>关键能点抽样（E 相对 VBM 对齐后）：</p>
+
+<table class="runs">
+<tr><th>E<sub>rel</sub> (eV)</th><th>agent D</th><th>GT D</th><th>比率</th><th>位置</th></tr>
+<tr><td>−2.0</td><td>2.463</td><td>1.409</td><td>1.75×</td><td>价带深处</td></tr>
+<tr><td>−1.6</td><td>0.855</td><td>1.412</td><td>0.61×</td><td>价带（agent 漏一截）</td></tr>
+<tr><td>−1.2</td><td>1.630</td><td>1.276</td><td>1.28×</td><td>价带</td></tr>
+<tr><td>−0.5</td><td>1.265</td><td>0.969</td><td>1.31×</td><td>价带顶附近</td></tr>
+<tr><td>+1.0</td><td>0.000</td><td>0.000</td><td>—</td><td class="pass">gap 内（都对）</td></tr>
+<tr><td>+3.0</td><td>0.000</td><td>0.000</td><td>—</td><td class="pass">gap 内（都对）</td></tr>
+<tr><td>+4.5</td><td>0.004</td><td>0.426</td><td>0.01×</td><td>CBM 附近</td></tr>
+<tr><td>+5.0</td><td>1.699</td><td>1.782</td><td>0.95×</td><td>导带（一致）</td></tr>
+<tr><td>+6.0</td><td>0.481</td><td>1.782</td><td>0.27×</td><td class="fail">导带（agent 塌）</td></tr>
+</table>
+
+<p><strong>gap 位置完全对得上（agent 报 gap 4.471 eV，GT 4.3835 eV，<code>band_gap_ev</code> 拿满分 1.0）</strong>——
+说明 agent 的 QE 计算并没有跑错；问题在 dos.x 阶段的协议选择和归一化。</p>
+
+<h3 id="bn-dos-layer1">9.2 Layer 1：agent prompt 写死了"假装 match GT smearing"——但 GT 早已切换</h3>
+
+<div class="callout bench">
+<span class="tag tag-bench">BENCH/SOLVER 协议失同步</span>
+<strong>solver 的 system_prompt 直接告诉 agent 用 Gaussian，并声称"matches GT"</strong>。
+看 <code>/srv/shared/science/solver/v4.2/agent/system_prompt.py:514-531</code>：
+</div>
+
+<pre><code>          - `ngauss = 0` + `degauss = 0.0015` Ry (= 0.02 eV) — Gaussian
+            smearing<span class="diff-del">, matches GT</span>. Without this, dos.x falls back to
+            tetrahedra integration on the NSCF; the resulting DOS is
+            sharper than GT and shape RMSE/norm lands at ~0.4 (well past
+            the 0.1 tolerance). <span class="diff-del">Verified on AlAs P1 run.</span>
+          ...
+        ```python
+        from qe_tools import write_dos_input
+        write_dos_input(prefix="job", outdir="./out", fildos="dos.dat",
+                        emin=E_F - 5, emax=E_F + 5, deltaE=0.01,
+                        ngauss=0, degauss=0.0015,    <span class="diff-del"># match GT smearing</span>
+                        filename="dos.in")
+        ```</code></pre>
+
+<p>实际 GT 生成脚本 <code>/srv/shared/science/bench/scripts/regen_t2_dos_with_tetrahedra.py:141-156</code>：</p>
+
+<pre><code>def write_dos_in(dos_in: Path) -&gt; None:
+    """tetrahedra-based dos.x：不指定 degauss / ngauss，
+       让 dos.x 用 NSCF 的 tetrahedra 积分。"""
+    dos_in.write_text(
+        "&amp;DOS\n"
+        "    prefix = 'pwscf'\n"
+        "    outdir = '../e80_d50/nscf/tmp'\n"
+        "    fildos = 'dos.dat'\n"
+        "    DeltaE = 0.01\n"
+        "    Emin = -25.0\n"
+        "    Emax = 25.0\n"
+        "/\n"   <span class="diff-add">! NO ngauss / NO degauss</span>
+    )</code></pre>
+
+<p>对照题目元数据 <code>M1_T2_BN_hex_bands_dos.json</code>:</p>
+
+<pre><code>"metadata": {
+  "gt_qe_version": "7.5CN-GPU",
+  "gt_quality": "self_run_converged",
+  "gt_switched_at": <span class="diff-add">"2026-04-30"</span>,
+  "notes": "... v1.3 T2 GT switched MP→self-run 2026-04-30 ..."
+}</code></pre>
+
+<p>GT 协议在 2026-04-30 从 MP（Gaussian 残留）切换到 self-run + tetrahedra，但 solver 这段
+prompt 没有同步更新——"<code># match GT smearing</code>"现在是<strong>反事实声明</strong>。
+"Verified on AlAs P1 run" 这条历史验证基于切换前的 GT，结论也不再有效。</p>
+
+<p><strong>物理解释</strong>：tetrahedron 方法把每个四面体内的本征值线性插值后做解析积分，
+内禀平滑；Gaussian σ=0.02 eV 在 20³×6 这种稀网格上，每个本征值是一个窄钟形，
+靠得近的堆出尖刺、远的中间凹陷 → 视觉斑驳 + 假峰拔高 ~30%。</p>
+
+<h3 id="bn-dos-layer2">9.3 Layer 2：per-cell vs per-fu 归一化标签</h3>
+
+<div class="callout bench">
+<span class="tag tag-bench">BENCH 评分链路</span>
+<strong>GT header 标 <code>per_fu</code>，agent QE 输出是 per primitive cell，bench 评分链路<u>不归一化</u></strong>。
+</div>
+
+<p>GT reference 文件 header：</p>
+
+<pre><code># E_eV(relative_to_VBM)  DOS_states_per_eV_per_fu
+-4.993400  1.625000
+...</code></pre>
+
+<p>QE 的 <code>dos.x</code> 输出按惯例是<strong>每原胞</strong>（per primitive cell）；
+BN<sub>hex</sub> 的 hex 原胞 = 4 原子 = <strong>2 f.u.</strong>（两对 BN）。所以 agent 的数值
+天然是 GT 的 ~2 倍。</p>
+
+<p>bench 评分链路 <code>/srv/shared/science/bench/harness/lib/evaluator.py:673-683</code> 只做能量轴 shift：</p>
+
+<pre><code>def _build_dos_curve(target_reference_ev):
+    if not dos["energy_ev"]:
+        return None
+    if dos_dat_already_relative:
+        shift = nscf_ef - target_reference_ev
+        energies_rel = [e + shift for e in dos["energy_ev"]]
+    else:
+        energies_rel = [e - target_reference_ev for e in dos["energy_ev"]]
+    return {"energy_ev": energies_rel, <span class="diff-del">"dos": list(dos["dos"])</span>}
+                                       <span class="diff-ctx"># ← 没除 n_fu</span></code></pre>
+
+<p>评分用 F1 area overlap，curve 是面积归一化的，所以 2× 标签错只是<strong>部分</strong>被吸收，
+不会让得分直接归零（NaCl 这种典型例子还能拿 0.63）。但 web 端 result 页上是<strong>直接画原始数值</strong>，
+视觉上 agent 曲线"明显比 GT 高一截"。</p>
+
+<h3 id="bn-dos-layer3">9.4 Layer 3：nbnd 默认值导致导带尾巴截断</h3>
+
+<div class="callout solver">
+<span class="tag tag-solver">SOLVER 配置</span>
+<strong>agent 让 QE 自动选 nbnd，默认 <code>nbnd ≈ Z<sub>val</sub>/2 + few</code></strong>，
+对 BN<sub>hex</sub>（8 价电子/f.u. × 2 f.u. = 16 价电子）出来 12-16 条带。
+覆盖 VBM 之上 5 eV 没问题，<strong>到 +6 eV 就开始漏</strong>。
+</div>
+
+<p>实测：能点表显示 agent 在 E<sub>rel</sub>=+6 eV 处 DOS=<code>0.48</code>，GT 仍是 plateau <code>1.78</code>。
+GT 的 canonical scan 用 <code>nbnd=12</code> 但能覆盖到 +5 eV 是因为它把 emin/emax
+设得更宽（−25 / +25）让 dos.x 自己 clip，而 agent 把 emin/emax 卡在 [E_F−5, E_F+5]，
+高能态本来就少 → 一旦超出 plateau 起点（约 +5.5 eV）就只剩零星 contribution。</p>
+
+<h3 id="bn-dos-arithmetic">9.5 三层叠合 → 2.72× 峰高差</h3>
+
+<div class="callout note">
+<span class="tag" style="background:#f1c40f; color:#5a4500;">数值分解</span>
+观测到的 valence peak ratio = <strong>6.57 / 2.42 ≈ 2.72</strong>。三个独立因子相乘：
+<table style="margin-top:8px; width:auto;">
+<tr><th>因子</th><th>估算</th><th>来源</th></tr>
+<tr><td>per-cell ÷ per-fu</td><td>×2.00</td><td>Layer 2（BN 原胞 = 2 f.u.）</td></tr>
+<tr><td>Gaussian artifact peak inflation</td><td>×1.30</td><td>Layer 1（稀 k 上窄高斯堆尖刺）</td></tr>
+<tr><td>k-mesh density</td><td>×1.05</td><td>20×20×6 vs 24×24×6 的细微差</td></tr>
+<tr><td><strong>合积</strong></td><td><strong>×2.73</strong></td><td>≈ 实测 2.72 ✓</td></tr>
+</table>
+</div>
+
+<h3 id="bn-dos-fix">9.6 修复方向</h3>
+
+<div class="callout fix">
+<span class="tag tag-fix">SOLVER-FIX-6</span>
+<strong>立即可做（agent 侧零 wall-time 代价）</strong>
+</div>
+
+<table class="runs">
+<tr><th style="width:14%">Fix</th><th style="width:42%">位置</th><th>改什么</th><th style="width:18%">预期</th></tr>
+<tr><td><strong>FIX-6</strong></td>
+    <td><code>/srv/shared/science/solver/v4.2/agent/system_prompt.py:514-531</code></td>
+    <td>删除 <code>ngauss=0 + degauss=0.0015 # match GT smearing</code> 段；
+        改成"<strong>不要写 <code>ngauss</code> 和 <code>degauss</code></strong>，让 dos.x 复用 NSCF 的 tetrahedra 积分（GT 协议）"。
+        agent 的 nscf 已经在用 <code>occupations='tetrahedra'</code>（见 BN run 里
+        <code>workdir/dos_1/dos_nscf.in</code>），所以只改 dos.x 输入，无需改 nscf。
+        附带：建议 <code>nbnd</code> 至少取 <code>(Z<sub>val</sub> + 20) / 2</code> 防 9.4 的导带塌</td>
+    <td>roughness ↓ ~30×<br>dos_curve 得分 0.63 → 接近 1.0</td></tr>
+</table>
+
+<div class="callout bench" style="margin-top:18px;">
+<span class="tag tag-bench">BENCH-DISCUSS</span>
+<strong>三个待与合作者讨论的 talking point</strong>（FIX-6 之前不动 bench 侧）
+</div>
+
+<ol>
+<li><strong>GT 协议应在题目 JSON 里"显式声明"</strong>。当前
+    <code>convergence_evidence.dos_params: {sigma_ev: 0.02, de_ev: 0.01}</code> 字段
+    暗示 GT 用 Gaussian σ=0.02——<strong>与实际不符</strong>（2026-04-30 已切 tetrahedra）。
+    后果就是 solver 那段 prompt 误读 GT 协议、写错 dos.in。建议加 <code>dos_method: "tetrahedra"</code>
+    或注释，让 agent / 复核者一眼能看出。</li>
+<li><strong>per-fu 归一化的归属</strong>。当前 GT header 标 <code>per_fu</code>，agent 输出 <code>per_cell</code>，
+    harness <code>_build_dos_curve</code> 不做归一化（详 9.3）。建议在 <code>_build_dos_curve</code>
+    加一行除以 <code>atoms_per_primitive_cell / atoms_per_fu</code>，或评分时改成
+    normalized cross-correlation 看形状。</li>
+<li><strong><code>dos_curve</code> 用 F1 是否仍是合适评分指标</strong>。当前 NaCl 这种 agent 协议错的 case 还能拿 0.63，
+    说明面积重叠对协议错容忍度太高 —— 等价于 agent "形状对就行" 而协议偷懒不扣分。
+    要不要换更严格的指标（如 KL divergence 或带 bandwidth penalty 的 shape similarity）。</li>
+</ol>
+
+<div class="callout note" style="margin-top:14px;">
+<span class="tag" style="background:#f1c40f; color:#5a4500;">DEPLOY-GAP</span>
+<strong>bench-side 任何修复都得先解决 §8.8 第 1 项的部署同步</strong>——bench config 仍指向
+旧的 <code>~/projects/solver/v4.2/</code>。FIX-6 也一样：得改的是 bench 实际跑的那份 solver。
+</div>
+
+<h3 id="bn-dos-tldr">9.7 一句话总结</h3>
+
+<p>BN<sub>hex</sub> 没 fail——但它<strong>不该是 0.80，应该是 0.95+</strong>。dos_curve 子项丢的
+0.07 分（满分 0.2 里只拿 0.127）是 solver prompt 里写死的"Gaussian # match GT"假设
+跟实际 GT 协议失同步的直接代价；BN 只是<strong>175 道题里最显眼的一个样本</strong>，
+所有 T2 bands_dos 任务（86 道）都受同一根因影响。FIX-6 单点改 prompt 就能根治，
+零 wall-time 代价。</p>
+
 <footer>
-  报告生成日 <strong>2026-05-20</strong> · 增补 <strong>2026-05-22</strong> ·
+  报告生成日 <strong>2026-05-20</strong> · 增补 <strong>2026-05-22</strong>（含 Case E）·
   原始数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
   增补数据 cutoff <code>2026-05-22T02:30 UTC</code> ·
   v4.2 solver commit <code>abc93e9</code>（fix 提交位置）/ <code>731a626</code>（bench 实跑位置）·
-  bench harness <code>/home/shijie/projects/bench</code> ·
+  bench harness <code>/srv/shared/science/bench</code> ·
   self-contained · no external assets
 </footer>
 
