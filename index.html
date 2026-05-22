@@ -35,7 +35,7 @@ a:hover { text-decoration: underline; }
     <b><a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">
       v4.2 Solver 架构 · 邀请 DFT 专家评审
     </a></b>
-    <small>2026-05-18（<strong>v4 增量更新 2026-05-22</strong>）· 给 DFT 合作者看的 v4.2 架构讲解 · 按 QE 工作流叙事 · 3 个 LLM 角色接力 + <strong>6 类硬编码 DFT 决策</strong>（v4 新加 <strong>§4.2 材料家族 playbook</strong>：alkali metal / silicate / low-symmetry oxide / polar III-V 4 份）+ 自动累积"踩坑笔记" · physics_sanity 加 <code>blocked_by_bench</code> verdict + <code>pbe_near_metal</code> 软化 · §3 表加 4 行（绝对路径拦截 / timeout 下限 / qe_facts cache / upcoming-steps hint）· §6 6 类请教问题 · 2 张 SVG · self-contained</small>
+    <small>2026-05-18（<strong>v5 增量更新 2026-05-22 (PM)</strong>）· 给 DFT 合作者看的 v4.2 架构讲解 · 按 QE 工作流叙事 · 3 个 LLM 角色接力 + 6 类硬编码 DFT 决策（含 v4 §4.2 材料家族 playbook）+ 自动累积"踩坑笔记" · <strong>v5 新加：FIX-6/7 pw.x wall-time estimator（公式 T ∝ nat²·nk·ecut^1.5）+ FIX-8 pbe_near_metal 强制 smearing（is_metal=False 但仍用 smearing 走 bench 5 meV eps）+ system_prompt 默认值全面升 GT canonical（ecutwfc 50→80, kmesh 6³→ceil(50/a)）+ physics_sanity 加 Rule B' (FIX-8)</strong> · §6 6 类请教问题 · 2 张 SVG · self-contained</small>
   </li>
   <li>
     <b><a href="shared-workspace-migration-2026-05-18.html">
