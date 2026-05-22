@@ -77,9 +77,26 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
 <body>
 
 <h1>标准档 4 失败案例深挖 · Rb / Ge / WO<sub>3</sub> / CoSb<sub>3</sub></h1>
-<p class="kv">2026-05-20 · v4.2 solver · 数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
+<p class="kv">2026-05-20（<strong>updated 2026-05-22</strong>）· v4.2 solver · 原始数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
+   2026-05-22 增补 cutoff <code>2026-05-22T02:30 UTC</code> ·
    run 数据源 <code>/srv/shared/science/web/runs_local/</code> ·
    bench 源 <code>/home/shijie/projects/bench/</code></p>
+
+<div class="callout bench" style="margin:18px 0 22px 0; border-left-width:6px;">
+<span class="tag tag-bench">2026-05-22 UPDATE</span>
+<strong>部署 gap 通报 · 本仓 §7 提的 4 项 v4.2 fix 全部未生效</strong>
+<p style="margin:8px 0 4px 0">2026-05-21 / 22 user 在同 4 个 case 上重跑标准档，<strong>失败模式与 0520 报告一字不差</strong>——原因是 bench 配置仍指向旧 solver 路径：</p>
+<table class="runs" style="margin:8px 0">
+<tr><th>路径</th><th>HEAD sha</th><th>是否含 FIX-2/-3b/-4/-5</th></tr>
+<tr><td><code>/home/shijie/projects/solver/v4.2/</code><br>（bench config.toml 实际指向）</td>
+    <td><code>731a626</code><br>2026-05-18</td>
+    <td class="fail">全部缺失</td></tr>
+<tr><td><code>/srv/shared/science/solver/v4.2/</code><br>（fix 提交到的位置）</td>
+    <td><code>abc93e9</code><br>2026-05-20</td>
+    <td class="pass">全部已落地</td></tr>
+</table>
+<p style="margin:8px 0 0 0">两个目录是<strong>独立 git 仓</strong>（inode / git log 不同），2026-05-18 共享工作区迁移后 bench config 未同步。新增章节 <a href="#post-fix">§ 8</a> 给出 post-fix 现场实锤 + 部署后预期表。</p>
+</div>
 
 <div class="tldr">
 <strong>TL;DR — 四个 case 都查到了根因，问题分布在两侧：</strong>
@@ -107,6 +124,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
   <li><a href="#cosb3">Case D — CoSb<sub>3</sub>：agent 自设 dos_nscf timeout 太短</a></li>
   <li><a href="#ghost">附：05-20 03:27 / 03:28 那两条无 exit_code 的失败</a></li>
   <li><a href="#fix">修复总清单与优先级</a></li>
+  <li><a href="#post-fix"><strong>2026-05-22 post-fix 跟进</strong>（部署 gap + 重跑现状 + 预测表）</a></li>
 </ol>
 </div>
 
@@ -541,10 +559,219 @@ FIX-4 落地后让 agent 故意调用绝对路径 pw.x，应该收到 <code>rc=2
 FIX-5 落地后查 transcript.json，确认 agent 设 <code>timeout_s=120</code> 时 bash 工具实际用了 1800s。
 </div>
 
+<h2 id="post-fix">8. 2026-05-22 post-fix 跟进 <span style="font-size:14px; color:var(--muted)">(updated)</span></h2>
+
+<p>2026-05-20 在 <code>/srv/shared/science/solver/v4.2/</code> 实施了 §7 的 4 项 fix（commits <code>b4d4573</code> / <code>dab3d0f</code> / <code>47bc58f</code> / <code>e7c66d2</code>，推到 <code>origin/v4.2 abc93e9</code>）。user 在 2026-05-21 / 22 重跑标准档，发现<strong>同 4 个 case 依然失败</strong>。本章节呈现根因调查 + 部署后预期。</p>
+
+<h3>8.1 部署 gap 实锤</h3>
+
+<p>bench 启动 solver 的路径写在：</p>
+
+<pre><code><span class="diff-ctx"># /srv/shared/science/web/config.toml
+[[agents]]
+id          = "v4_2"
+</span>solver_path = "/home/shijie/projects/solver/v4.2/solve.py"   ← 旧路径
+python_path = "/home/shijie/projects/solver/v4.2/.venv/bin/python"</code></pre>
+
+<p>这个路径在 2026-05-18 共享工作区迁移时未跟着搬。两个目录是独立 git 仓：</p>
+
+<table class="runs">
+<tr><th>路径</th><th>HEAD sha</th><th>commit 主题（最新）</th><th>FIX-2/-3b/-4/-5</th></tr>
+<tr><td><code>/home/shijie/projects/solver/v4.2/</code></td><td><code>731a626</code></td>
+    <td>feat(v4.2): physics_sanity step kind for bands_dos cross-check</td>
+    <td class="fail">缺失</td></tr>
+<tr><td><code>/srv/shared/science/solver/v4.2/</code></td><td><code>abc93e9</code></td>
+    <td>docs(devlog): append entries for FIX-4/-5/-3b/-2</td>
+    <td class="pass">已落地</td></tr>
+</table>
+
+<p>直接验证：</p>
+
+<pre><code>$ python -c "
+from agent.subagents.config_advisor import _deterministic_classify
+d = _deterministic_classify('For Ge (diamond, ...) Pseudopotentials: GBRV_USPP_PBE_v1.5')
+print('pbe_near_metal =', d.get('pbe_near_metal'))
+"
+
+# /srv/.../solver/v4.2/  → pbe_near_metal = True   ✓ fix 代码正确
+# bench post-fix run     → .config_advice.json 里 NO 'pbe_near_metal' 字段  ✗ 没走到这条代码</code></pre>
+
+<div class="callout note">
+<span class="tag" style="background:#f1c40f; color:#fff">CAUSE</span>
+fix 代码本身正确（直接调可复现 <code>pbe_near_metal=True</code>），<strong>是 bench config.toml 的 <code>solver_path</code> 没更新到 <code>/srv/...</code></strong>，所以 bench 永远在跑旧 commit。
+</div>
+
+<h3>8.2 Rb · 三次新跑全部"同款失败"</h3>
+
+<table class="runs">
+<tr><th>run</th><th>status</th><th>wall</th><th>提取 gap</th><th>verdict</th></tr>
+<tr><td>2026-05-21T02-52-48Z</td><td class="fail">failed</td><td>—</td>
+    <td><code>10.989 eV (direct)</code></td><td>fail × 2 replan 耗尽</td></tr>
+<tr><td>2026-05-21T08-17 (running)</td><td class="partial">running 24h+</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>2026-05-22T01-09-40Z</td><td class="partial">running</td><td>—</td><td>—</td><td>—</td></tr>
+</table>
+
+<p>2026-05-21T02-52 的 sanity.json 文本与 0520 报告 §2.1 引用的 3 次 0519 跑<strong>完全一致</strong>：</p>
+
+<pre><code>{
+  "verdict": "fail",
+  "diagnosis": "config_advisor says metal (source=deterministic) but bench
+                extracted gap_type='direct', band_gap_ev=10.989 eV.
+                Likely bench fermi-slice missed a Fermi-crossing k-point.
+                Fix the bands NSCF step: (1) increase `nbnd` ...",
+  "details": {
+    "extracted_band_gap_ev": 10.989,
+    "extracted_gap_type": "direct"
+    // ← 注意：没有 "advice_pbe_near_metal" 字段（FIX-2 新增字段不存在）
+  }
+}</code></pre>
+
+<div class="callout bench">
+<span class="tag tag-bench">BENCH</span>
+即便 FIX-2 已部署，根因——bench evaluator odd-nelec bug（§2.3）——仍然原地。FIX-1（bench 仓 <code>evaluator.py:515</code> 加 odd-nelec 拒绝）是 <strong>真正的修复点，不在 user 范围</strong>，需要给合作者讨论。FIX-2 部署只会把 <code>verdict=fail</code> 转 <code>blocked_by_bench</code>、让 agent submit 一份 ~ 0 分结果，<strong>不能挽回得分</strong>。
+</div>
+
+<h3>8.3 Ge · 老问题原样复现</h3>
+
+<table class="runs">
+<tr><th>run</th><th>status</th><th>score</th><th>提取 gap</th><th>对应 0520 报告 §3 模式</th></tr>
+<tr><td>2026-05-21T03-28-46Z</td><td class="fail">fail</td><td>—</td>
+    <td><code>0.0 eV (metal)</code></td><td>"replan 耗尽" 那次（§3.1 第 5 行）</td></tr>
+<tr><td>2026-05-22T00-39-17Z</td><td class="pass">done</td><td><strong>0.606</strong></td>
+    <td><code>0.0088 eV (direct)</code></td><td>"得分 0.631" 那次（§3.1 第 6 行）</td></tr>
+</table>
+
+<p>0521 那次 sanity.json：</p>
+
+<pre><code>{
+  "verdict": "fail",
+  "diagnosis": "config_advisor says insulator/semiconductor (source=deterministic)
+                but bench extracted gap_type='metal'. Check the bands NSCF input:
+                was `occupations='fixed'` used ...",
+  "details": {
+    "advice_is_metal": false,
+    "advice_source": "deterministic",
+    "extracted_gap_type": "metal",
+    "extracted_band_gap_ev": 0.0
+    // ← 没有 "advice_pbe_near_metal" 字段
+  }
+}</code></pre>
+
+<p>对应的 <code>.config_advice.json</code> 里也没有 <code>pbe_near_metal</code> 字段——这是 FIX-3b 新增的字段，<strong>缺失证明 ~/projects/solver/v4.2/ 跑的是 731a626 的旧代码</strong>。FIX-3b + FIX-2 部署后这条 case 应该走 Rule B 的 soft_warn 分支、agent 顺利 submit、最终得分应该跟 0522 那次一样 ~ 0.6（受 bench 1 meV 阈值卡死，FIX-3a 是 bench 仓事）。</p>
+
+<h3>8.4 WO<sub>3</sub> · 新失败模式：scheduler reap + QE_GPU_LOCKDIR env</h3>
+
+<p>0521 04-05 run：</p>
+
+<pre><code>state.db: status=failed, error="process died (reaped by scheduler)"
+solver_timeout_sec=14400  wall_time_sec=14400  exit_code=NULL
+
+bash.log 关键时点：
+[2026-05-21T04:09:30Z] $ mkdir -p vc_relax_1/out && QE_GPU_LOCKDIR=./my-qe-locks \
+                          mpirun --allow-run-as-root -np 1 pw.x \
+                          -in vc_relax_1/vc-relax.in &gt; vc_relax_1/vc-relax.out 2>&1
+[2026-05-21T06:09:30Z] rc=-1 wall=7200.06s    ← bash 工具按 7200s 砍
+[2026-05-21T06:14:02Z] $ tail -50 vc_relax_1/vc-relax.out  (vc-relax 实际跑到 BFGS 收敛)
+... 大量 grep / sed 检查 ...
+[harness 14400s 到时，process 被 web scheduler reaped]</code></pre>
+
+<p>本次 agent 用的是<strong>裸 <code>pw.x</code></strong>（没有走绝对路径），但卡在 <code>QE_GPU_LOCKDIR</code> 环境变量上——bench 的 GPU wrapper（<code>/home/shijie/qe/qe-gpu-wrapper-flock/pw.x</code>）要求这个 env 才能跑，agent 不知道该把它指到哪。</p>
+
+<div class="callout solver">
+<span class="tag tag-solver">SOLVER</span>
+<strong>FIX-4 对本次失败无影响</strong>——agent 没用绝对路径。<strong>反而要警惕</strong>：FIX-4 当前实现拒绝任何含 <code>/pw.x</code> basename 的绝对路径 token，<strong>会误伤合法 wrapper 路径</strong> <code>/home/shijie/qe/qe-gpu-wrapper-flock/pw.x</code>（如果 agent 想 cat 检查这个 wrapper 脚本内容也会被 guard 拦下）。建议 FIX-4 部署前给 <code>$QE_GPU_WRAPPER_DIR</code> 内的路径开白名单。
+</div>
+
+<div class="callout note">
+<span class="tag" style="background:#f1c40f; color:#fff">UNKNOWN</span>
+"process died (reaped by scheduler)" 不是 OOM、不是 harness 14400s timeout（exit_code=NULL），最可能是 web 后端的 supervisor / monitor 杀的。需要查 <code>/srv/shared/science/web/backend</code> 的调度策略。本次报告不展开。
+</div>
+
+<h3>8.5 CoSb<sub>3</sub> · agent 仍然给 SCF 设过短 timeout</h3>
+
+<p>0521 05-37 run：</p>
+
+<pre><code>state.db: status=failed, error="process died (reaped by scheduler)"
+
+bash.log 关键 SCF 步：
+$ ... pw.x -in scf_1/scf.in    rc=-1 wall=600.05s    ← agent 自定 timeout_s=600
+$ ... pw.x -in scf_1/scf.in    rc=-1 wall=600.05s    (重试)
+$ ... pw.x -in scf_1/scf.in    rc=-1 wall=600.02s    (重试)
+$ ... pw.x -in scf_1/scf.in    rc=-1 wall=1800.04s   (终于上调到 1800)
+$ ... pw.x -in scf_1/scf_restart.in   rc=0 wall=377.32s   ← JOB DONE</code></pre>
+
+<p>失败模式与 0520 报告 §5.2 描述的 CoSb<sub>3</sub> dos_nscf 几乎一样，只不过这次是 <strong>SCF 步</strong>而不是 dos_nscf。agent 自定 600s 砍三次才上调。</p>
+
+<div class="callout solver">
+<span class="tag tag-solver">SOLVER</span>
+<strong>FIX-5 floor 表当前 <code>scf=300s</code></strong>（见 <code>agent/step_timeout_floor.py:33</code>）。LLM 选 600s 时 <code>max(600, 300) = 600</code>，<strong>不触发 raise</strong>。FIX-5 部署后这条 CoSb<sub>3</sub> 故障仍会重演。<strong>floor 需要按 n_atoms 缩放</strong>——CoSb<sub>3</sub> 32 原子 SCF 实际耗时 ~ 400s，应至少给 900s floor。也是给 user 后续 patch 的 hint。
+</div>
+
+<h3>8.6 部署 ~/projects/solver/v4.2 → abc93e9 之后预期</h3>
+
+<table class="runs">
+<tr><th>Case</th><th>当前观察</th><th>同步部署后预期</th><th>得分回收</th></tr>
+<tr><td><strong>Rb</strong></td>
+    <td>physics_sanity fail × 2 replan 耗尽 → incomplete</td>
+    <td>FIX-2 命中：<code>verdict=blocked_by_bench</code>、<code>fix_actions=[]</code>、不再 replan → agent submit</td>
+    <td class="fail">~ 0（仍受 bench odd-nelec bug）</td></tr>
+<tr><td><strong>Ge</strong></td>
+    <td>fail 1 次 / 完成 0.606 一次</td>
+    <td>FIX-3b + FIX-2 命中：<code>pbe_near_metal=True</code> → Rule B 降为 <code>soft_warn</code> → 不再 replan 耗尽。fail 那种会变成"完成低分"</td>
+    <td class="partial">~ 0.6（仍受 bench 1 meV 阈值）</td></tr>
+<tr><td><strong>WO<sub>3</sub></strong></td>
+    <td><code>process died (reaped by scheduler)</code></td>
+    <td>FIX-4 对本次故障无关；潜在<strong>误伤</strong>风险见 §8.4</td>
+    <td class="fail">无变化</td></tr>
+<tr><td><strong>CoSb<sub>3</sub></strong></td>
+    <td>SCF 自定 600s × 3 + scheduler reap</td>
+    <td>FIX-5 floor <code>scf=300s</code> &lt; 600s，不触发 raise；故障重演</td>
+    <td class="fail">无变化</td></tr>
+</table>
+
+<p>结论：<strong>4 个 case 中只有 Rb / Ge 在部署后会有可见行为改变（fail→done），但得分基本不变</strong>。WO<sub>3</sub> 和 CoSb<sub>3</sub> 的本次失败需要更多 work（FIX-4 加 wrapper 白名单、FIX-5 加按 n_atoms 缩放、查 scheduler reap）。</p>
+
+<h3>8.7 待与合作者讨论的 bench-side 清单</h3>
+
+<table class="runs">
+<tr><th>编号</th><th>位置</th><th>改动</th><th>挽回</th></tr>
+<tr><td><strong>FIX-1</strong></td>
+    <td><code>/home/shijie/projects/bench/harness/lib/evaluator.py:515</code></td>
+    <td>3 行：在整数 nelec 检查后增 <code>if n_int % 2 == 1: return None</code></td>
+    <td>Rb 全部跑（详 §2.6）</td></tr>
+<tr><td><strong>FIX-3a</strong></td>
+    <td><code>/home/shijie/projects/bench/harness/lib/evaluator.py:705 / :776</code></td>
+    <td>1 行：金属短路阈值 <code>1e-3</code> → <code>1e-2</code>（10 meV）</td>
+    <td>Ge 从 0.6 回到 0.95+（详 §3.6）</td></tr>
+<tr><td colspan="4" style="font-style:italic; color:var(--muted)">额外：scheduler reap 触发条件——非 OOM、非 harness timeout，需查 <code>/srv/shared/science/web/backend</code> supervisor / monitor 策略。本次报告不展开。</td></tr>
+</table>
+
+<p>bench 仓 evaluator HEAD 已经核对：</p>
+
+<pre><code>$ git -C /home/shijie/projects/bench log --oneline -3
+abc620c Merge remote-tracking branch 'upstream/main'
+2140f9e fix(prompt): 拆开 band_gap / gap_type / vbm_cbm_label 字段说明
+f7984d9 Merge remote-tracking branch 'upstream/main'
+
+$ sed -n '515p' /home/shijie/projects/bench/harness/lib/evaluator.py
+    if lsda or abs(nelec - round(nelec)) > 1e-3:
+        return None        ← FIX-1 未落地：缺 odd-nelec 拒绝</code></pre>
+
+<h3>8.8 user 侧后续 action（先不动）</h3>
+
+<ol>
+<li><strong>同步部署路径</strong>：把 <code>/srv/.../web/config.toml</code> 里 <code>solver_path</code> 改成 <code>/srv/shared/science/solver/v4.2/solve.py</code>，或者把 <code>/srv/.../solver/v4.2/</code> 同步到 <code>~/projects/solver/v4.2/</code>。前者更干净（遵守 2026-05-18 迁移约定）。</li>
+<li><strong>给合作者上 FIX-1 / FIX-3a</strong>：bench 仓两行 diff（详细见 §2.6、§3.6）。</li>
+<li><strong>FIX-4 复核</strong>：给 <code>$QE_GPU_WRAPPER_DIR</code> 路径开白名单（§8.4 中已点出）。</li>
+<li><strong>FIX-5 增强</strong>：floor 按 n_atoms 缩放，CoSb<sub>3</sub>-class（≥ 30 原子）的 SCF 给 900s+。</li>
+<li><strong>查 scheduler reap</strong>：本次报告新发现的 WO<sub>3</sub> / CoSb<sub>3</sub> 共同症状，与 FIX-2/-3b/-4/-5 都无关。需要在 web 后端 / GPU pool 调度策略层面排查。</li>
+</ol>
+
 <footer>
-  报告生成日 <strong>2026-05-20</strong> ·
-  数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
-  v4.2 solver commit <code>7b1f73f</code> ·
+  报告生成日 <strong>2026-05-20</strong> · 增补 <strong>2026-05-22</strong> ·
+  原始数据 cutoff <code>2026-05-20T08:03 UTC</code> ·
+  增补数据 cutoff <code>2026-05-22T02:30 UTC</code> ·
+  v4.2 solver commit <code>abc93e9</code>（fix 提交位置）/ <code>731a626</code>（bench 实跑位置）·
   bench harness <code>/home/shijie/projects/bench</code> ·
   self-contained · no external assets
 </footer>
