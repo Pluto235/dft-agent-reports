@@ -26,6 +26,12 @@ a:hover { text-decoration: underline; }
 
 <ul>
   <li>
+    <b><a href="standard-bench-failures-5fail-2026-05-22.html">
+      标准档 27 题 / 5 失败案例深挖 · 含 v4.2 历史回溯
+    </a></b>
+    <small>2026-05-22 / 23 · WO<sub>3</sub> / CsPbI<sub>3</sub> / CoSb<sub>3</sub> / Ti<sub>3</sub>O<sub>5</sub> / LiAlSi<sub>2</sub>O<sub>6</sub> 五案例 · 含 v4.2 全生命周期历史时间线（每个 task 自 2026-05-04 起所有 run）· <strong>核心发现：FIX-6 pw_wall_estimator 公式常数 C=4e-4 高估实测 10-240×</strong>（WO<sub>3</sub> 估 177949s vs 历史最快 740s）· timeout 被抬到 49h → <code>Popen.communicate</code> 等到 harness 4h wall 才砍 → bash tool 永不 return tool_result · 4/5 fail 是这个 hang 模式 · Case E LiAlSi<sub>2</sub>O<sub>6</sub> 是 <code>agent/loop.py:186</code> 没处理 deepseek thinking-only 响应（content=[]）导致下一轮 API 400 · 含 FIX-10/-11/-12/-13 具体行号提案</small>
+  </li>
+  <li>
     <b><a href="standard-bench-failures-rb-ge-wo3-cosb3-2026-05-20.html">
       标准档 4 失败案例深挖 · Rb / Ge / WO3 / CoSb3
     </a></b>

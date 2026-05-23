@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>标准档 27 题 / 5 失败案例深挖 · 含历史回溯 — 2026-05-22</title>
+<style>
+:root {
+  --fg: #2c3e50;
+  --muted: #7f8c8d;
+  --accent: #3498db;
+  --bench: #c0392b;
+  --solver: #d35400;
+  --fix: #27ae60;
+  --code-bg: #f6f8fa;
+  --note-bg: #fff8e1;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+               'Microsoft YaHei', sans-serif;
+  max-width: 880px; margin: 40px auto; padding: 0 24px;
+  color: var(--fg); line-height: 1.65;
+}
+h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 28px;
+     color: #34495e; border-bottom: 3px solid var(--accent); padding-bottom: 10px; }
+h2 { font-family: Georgia, serif; font-size: 22px;
+     color: #34495e; margin-top: 42px; padding-top: 8px;
+     border-top: 1px dashed #d0d7de; }
+h3 { font-size: 17px; color: #34495e; margin-top: 28px; }
+h4 { font-size: 15px; color: #34495e; margin-top: 20px; }
+a { color: #2980b9; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 13px;
+       background: var(--code-bg); padding: 1px 5px; border-radius: 3px;
+       color: #24292f; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px;
+      overflow-x: auto; font-size: 12.5px; line-height: 1.5;
+      border-left: 3px solid #d0d7de; }
+pre code { background: transparent; padding: 0; }
+.tldr { background: #ecf6fc; border-left: 4px solid var(--accent);
+        padding: 14px 18px; border-radius: 4px; margin: 18px 0; font-size: 14.5px; }
+.tldr table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.tldr td, .tldr th { padding: 6px 8px; text-align: left; border-bottom: 1px solid #d0e4f0; font-size: 13.5px; }
+.tldr th { color: #34495e; }
+.callout { padding: 12px 16px; border-radius: 4px; margin: 14px 0;
+           border-left: 4px solid #ccc; background: #fafafa; font-size: 14px; }
+.callout.bench  { border-left-color: var(--bench);  background: #fdedec; }
+.callout.solver { border-left-color: var(--solver); background: #fdebd0; }
+.callout.fix    { border-left-color: var(--fix);    background: #eafaf1; }
+.callout.note   { border-left-color: #f1c40f;       background: var(--note-bg); }
+.callout .tag { display: inline-block; font-size: 11.5px; font-weight: 700;
+                padding: 2px 7px; border-radius: 3px; margin-right: 8px;
+                vertical-align: middle; letter-spacing: 0.4px; }
+.tag-bench  { background: var(--bench);  color: #fff; }
+.tag-solver { background: var(--solver); color: #fff; }
+.tag-fix    { background: var(--fix);    color: #fff; }
+table.runs { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+table.runs th, table.runs td { padding: 6px 9px; border-bottom: 1px solid #e1e4e8; text-align: left; vertical-align: top; }
+table.runs th { background: #f6f8fa; font-weight: 600; }
+table.runs .pass { color: var(--fix); font-weight: 600; }
+table.runs .fail { color: var(--bench); font-weight: 600; }
+table.runs .partial { color: var(--solver); font-weight: 600; }
+table.runs .lit { background: #fff4e0; }
+.toc { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px;
+       padding: 14px 18px; font-size: 14px; margin: 22px 0; }
+.toc h3 { margin: 0 0 8px 0; font-size: 14px; color: var(--muted);
+          text-transform: uppercase; letter-spacing: 0.5px; }
+.toc ol { margin: 0; padding-left: 24px; }
+.toc li { margin: 3px 0; }
+footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
+         color: var(--muted); font-size: 12.5px; }
+.kv { color: var(--muted); font-size: 13px; }
+.timeline {
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 12px; line-height: 1.7;
+  background: #f6f8fa; border-radius: 6px;
+  padding: 14px 18px; overflow-x: auto;
+}
+.timeline .fix-mark { color: var(--fix); font-weight: 700; }
+.timeline .bad-mark { color: var(--bench); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<h1>标准档 27 题 / 5 失败案例深挖 · 含 v4.2 历史回溯</h1>
+<p class="kv">2026-05-22 / 23（cutoff <code>2026-05-23T03:30 UTC</code>）·
+   <code>/srv/shared/science/solver/v4.2/</code>（含 FIX-2 / -3b / -4 / -5 / -6 / -7 / -8 / -9 全部上线）·
+   deepseek-v4-pro · run 数据 <code>/srv/shared/science/web/runs_local/</code> ·
+   solver 代码 commits 区间 <code>250ad38 … 59a8e80</code>。</p>
+
+<div class="callout bench" style="margin:18px 0 22px 0; border-left-width:6px;">
+<span class="tag tag-bench">CORE FINDING</span>
+<strong>FIX-6 wall-time estimator 严重高估（10–90×），把 LLM 给的合理 timeout
+"抬"到 50 小时量级，pw.x 在 Popen.communicate 里挂死，bash tool 永不 return
+tool_result —— 4 / 5 fail 都是这个 hang 模式</strong>。第 5 个（LiAlSi2O6）是
+agent/loop.py:184 构造 assistant message 时未处理 deepseek "thinking-only"
+回复（content=[] + reasoning_content）导致下一轮 API 400。
+<strong>FIX-6 / FIX-7 上线之后的 27 题批次<u>得分反而比 05-20 那批跌</u></strong>
+（22 ok vs 25 ok，<strong>3 个之前能跑的 case 被 FIX-6 搞挂</strong>）——这是
+最重要的回归信号，本报告逐案给证据。
+</div>
+
+<div class="tldr">
+<strong>TL;DR — 5 个 fail 的因果链一句话：</strong>
+<table>
+<tr><th style="width:18%">Case</th><th style="width:14%">本次失败形态</th><th style="width:18%">v4.2 历史最佳</th><th style="width:18%">侧</th><th>一句话根因</th></tr>
+<tr><td><strong>A · WO<sub>3</sub> vc_relax</strong></td>
+    <td class="fail">timeout 14400s<br>6 turns 卡死</td>
+    <td>0.89（05-09 / 740s）<br>1.0（05-05 / 1913s）</td>
+    <td><span class="tag tag-solver">SOLVER</span></td>
+    <td>FIX-6 estimator 估 177949s（49h）→ 把 LLM 给的 7200s 抬到 49h → bash hang，转 transcript 没下文。</td></tr>
+<tr><td><strong>B · CsPbI<sub>3</sub> vc_relax</strong></td>
+    <td class="fail">timeout 14400s<br>6 turns 卡死</td>
+    <td>1.0 × 5 + 0.71 × 1<br>（05-04 → 05-21 连过 6 次）</td>
+    <td><span class="tag tag-solver">SOLVER</span></td>
+    <td>同 Case A —— FIX-6 估了过高 timeout，pw.x bash 挂死。<strong>最干净的回归</strong>。</td></tr>
+<tr><td><strong>C · CoSb<sub>3</sub> bands_dos</strong></td>
+    <td class="fail">timeout 14400s<br>30 turns 后挂死</td>
+    <td><strong>0.95（05-22 07:08 / 11458s）</strong><br>FIX-6/-7/-8 时段最高分</td>
+    <td><span class="tag tag-solver">SOLVER</span></td>
+    <td>当天早上 FIX-8 救活拿 0.95，10:04 加 FIX-9 后又挂。FIX-9 dos.x tetrahedra 强制和 advisor smearing 路径冲突嫌疑高。</td></tr>
+<tr><td><strong>D · Ti<sub>3</sub>O<sub>5</sub> bands_dos</strong></td>
+    <td class="fail">timeout 14400s<br>27 turns 后挂死</td>
+    <td>0.98（05-11 / 3468s）<br>0.58（05-19 / 7458s）</td>
+    <td><span class="tag tag-solver">SOLVER</span></td>
+    <td>同 Case A/B 的 bash hang，但根因不只 FIX-6——Ti3O5 自身重（变价 Ti / 反铁磁），advisor 没把它当准金属，nspin=1 + fixed occ 早就不稳。</td></tr>
+<tr><td><strong>E · LiAlSi<sub>2</sub>O<sub>6</sub> bands_dos</strong></td>
+    <td class="fail">BadRequestError<br>6605s · 45 turns</td>
+    <td>0.89（05-11 / 1494s）<br>4 连过</td>
+    <td><span class="tag tag-solver">SOLVER</span></td>
+    <td>turn 44 deepseek 返回 thinking-only（content=[]、无 tool_calls），loop.py 直接 append 到 messages → 下一轮 API 400 "Invalid assistant message"。</td></tr>
+</table>
+<p style="margin:10px 0 0 0"><strong>因果断言（控制变量）</strong>：所有
+fail 都在 2026-05-22 上午 FIX-6/-7/-8/-9 部署之后；agent、model、bench、
+evaluator、机器都没换；同批次另外 22 题正常 pass，排除 deepseek API 抖动。
+<strong>本次 5 fail 与 0520 那批 2 fail 重叠度为 0</strong>（前批 fail 的
+MgSiO3 / Ti3O5 不同——MgSiO3 这次 22:29 跑出来 0 错过）—— Ti3O5 唯一既挂
+前次也挂这次，故强证据是<strong>新的回归型 fail</strong> 而非"老题继续挂"。</p>
+</div>
+
+<div class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#bg">背景：批次构成 + FIX 上线时间线</a></li>
+  <li><a href="#root">所有 timeout fail 的共通根因：FIX-6 estimator + bash hang</a></li>
+  <li><a href="#wo3">Case A — WO<sub>3</sub> vc_relax</a></li>
+  <li><a href="#cspbi3">Case B — CsPbI<sub>3</sub> vc_relax（最干净的回归）</a></li>
+  <li><a href="#cosb3">Case C — CoSb<sub>3</sub> bands_dos（FIX-8 救活、FIX-9 杀死）</a></li>
+  <li><a href="#ti3o5">Case D — Ti<sub>3</sub>O<sub>5</sub> bands_dos（fix 救不了的老问题）</a></li>
+  <li><a href="#lialsi2o6">Case E — LiAlSi<sub>2</sub>O<sub>6</sub> orchestrator crash（深挖）</a></li>
+  <li><a href="#pattern">横向 pattern：fix 序列与回归的对应关系</a></li>
+  <li><a href="#fix">建议 FIX-10 / -11 / -12（不在本报告实施）</a></li>
+  <li><a href="#appx">附录：历史时间线大表 + bash hang 复现指引</a></li>
+</ol>
+</div>
+
+<!-- ===== 1. 背景 ===== -->
+<h2 id="bg">1. 背景：批次构成 + FIX 上线时间线</h2>
+
+<p>2026-05-22 14:12 UTC user 在前端派发 27-题 standard subset，
+deepseek-v4-pro / agent v4_2 / GPU backend / max_concurrent_runs=6。
+backend 在 10:04 UTC 完成最后一次 restart（拉 FIX-9 进内存），所以本批<strong>
+27 个 run 全部跑在 FIX-2 / -3b / -4 / -5 / -6 / -7 / -8 / -9 完全上线的版本上</strong>。</p>
+
+<table class="runs">
+<tr><th>属性</th><th>值</th></tr>
+<tr><td>批次起始</td><td>2026-05-22T14:12:16Z（第一个 run）</td></tr>
+<tr><td>批次结束</td><td>2026-05-23T00:15:29Z（M1_T2_C_diamond，最后一个）</td></tr>
+<tr><td>总耗时</td><td>~10 小时（max_concurrent=6 串行处理 27 task）</td></tr>
+<tr><td>统计</td><td><span class="pass">22 ok</span> · <span class="fail">5 fail</span></td></tr>
+<tr><td>5 fail 形态</td><td>4 个 timeout 14400s（harness wall）+ 1 个 BadRequestError 6605s</td></tr>
+</table>
+
+<h3>FIX 上线时间线（UTC）</h3>
+
+<pre class="timeline">
+2026-05-20 10:15  FIX-4    b4d4573  bash_guard 拒绝绝对路径 QE 可执行（推 PATH 拐 GPU wrapper）
+2026-05-20 10:32  FIX-5    dab3d0f  step_kind-aware timeout_s floor
+2026-05-20 10:48  FIX-3b   47bc58f  config_advisor 标记 PBE 准金属族
+2026-05-20 11:05  FIX-2    e7c66d2  physics_sanity blocked_by_bench + pbe_near_metal soft_warn
+              ↓ 05-20 / 21 各跑了一批，2 fail（MgSiO3, Ti3O5）
+
+2026-05-22 02:29  backend  restart  shijie 拉新 solver_path
+2026-05-22 05:24  backend  restart  shijie
+<span class="bad-mark">2026-05-22 06:23  FIX-6/-7  c0d2536  pw_wall_estimator + timeout 诊断（← 关键嫌疑）</span>
+<span class="fix-mark">2026-05-22 07:09  FIX-8    8f3d186  pbe_near_metal → 强制 smearing</span>
+<span class="bad-mark">2026-05-22 10:04  FIX-9    59a8e80  dos.x 协议 tetrahedra（← 次号嫌疑，CoSb3）</span>
+2026-05-22 10:04  backend  restart  最后一次 restart，FIX-9 生效
+
+2026-05-22 14:12  batch dispatched  ← 本报告分析的 27 题批次
+2026-05-22 15:36–20:39  5 个 fail 陆续触发
+</pre>
+
+<p class="kv">所有 batch run 启动时刻都在 10:04 UTC restart 之后 ⇒ 完整持有
+8 个 fix 的版本。</p>
+
+<!-- ===== 2. 共通根因 ===== -->
+<h2 id="root">2. 所有 timeout fail 的共通根因：FIX-6 estimator + bash hang</h2>
+
+<div class="callout solver">
+<span class="tag tag-solver">SOLVER · FIX-6 缺陷</span>
+<strong>核心 bug：pw_wall_estimator 公式 C × nat² × nk × (ecut/40)<sup>1.5</sup> × multiplier × 1.5
+里 C=4e-4 是<u>未经任何 anchor</u> 拍脑袋设的，对真实计算高估 10–90×。</strong>
+</div>
+
+<p>在 <code>agent/tools/bash.py:160–178</code> FIX-6 把 LLM 给的
+<code>timeout_s</code> "抬"到 estimator 的估值（如果 estimator > LLM 值）。这
+本意是防 LLM 低估，但实测 estimator 系统性过高 → timeout 抬到几十小时 →
+<code>proc.communicate(timeout=est)</code> 永不返回（pw.x 真实 wall &lt; 真实
+timeout，等不到自然结束也等不到超时） → bash tool 不 return tool_result →
+solver 转 transcript 卡死 → harness 4h wall 才砍。</p>
+
+<h3>实测：拿 WO<sub>3</sub> 11:10 retest 那个 .in 跑 estimator</h3>
+
+<pre><code>$ python3 -c "from agent import pw_wall_estimator as pwe; \
+import pathlib; \
+print(pwe.estimate_for_command( \
+  'mpirun pw.x -in vc_relax_1/vc-relax.in', \
+  pathlib.Path('runs_local/2026-05-22T11-10-52Z_..._WO3_.../workdir')))"
+
+(<span class="bad-mark">177949</span>, {'n_atoms': 32, 'n_kpoints': 512, 'ecutwfc': 80.0,
+            'calculation': 'vc-relax', 'iter_multiplier': 200,
+            'estimated_wall_s': 177949})</code></pre>
+
+<p><strong>177949s = 49.4 小时</strong>。对比该 task 的<strong>历史最佳实测
+1913s（05-05）和 740s（05-09）</strong>—— estimator 高估 93× / 240×。</p>
+
+<table class="runs">
+<tr><th>Task</th><th>历史最佳实测</th><th>FIX-6 估值</th><th>高估倍数</th></tr>
+<tr><td>WO<sub>3</sub> vc_relax</td><td>740s（05-09）</td><td>177949s</td><td class="fail">240×</td></tr>
+<tr><td>CsPbI<sub>3</sub> vc_relax</td><td>1099s（05-09）</td><td>~50000s+ 估</td><td class="fail">~45×</td></tr>
+<tr><td>CoSb<sub>3</sub> bands_dos</td><td>2273s（05-10）</td><td>~30000s+ 估</td><td class="fail">~13×</td></tr>
+<tr><td>Si vc_relax（参考）</td><td>~30–60s</td><td>~500s 估</td><td class="partial">~10×（仍高）</td></tr>
+</table>
+
+<h3>bash hang 的具体表现</h3>
+
+<p>所有 4 个 timeout fail 的 transcript.json 都呈同一种破败模式：</p>
+
+<table class="runs">
+<tr><th>Run</th><th>turns 数</th><th>最后 turn 内容</th><th>下一轮 tool_result</th><th>bash.log 末尾</th></tr>
+<tr><td>WO3 batch (15:36)</td><td>6</td><td>tool_use bash<br>timeout_s=7200<br>pw.x vc-relax.in</td><td class="fail">无</td><td>停在 mkdir vc_relax_1/out @ 15:37:45</td></tr>
+<tr><td>CsPbI3 batch (15:37)</td><td>6</td><td>tool_use bash<br>timeout_s=3600<br>pw.x vc-relax.in</td><td class="fail">无</td><td>停在 mkdir vc_relax_1/out @ 15:38:28</td></tr>
+<tr><td>CoSb3 batch (19:36)</td><td>30</td><td>tool_use bash<br>timeout_s=30000<br>pw.x relax.in</td><td class="fail">无</td><td>bash.log 不存在（hang 在第一个 pw.x 之前？）</td></tr>
+<tr><td>Ti3O5 batch (19:37)</td><td>27</td><td>tool_use bash<br>timeout_s=10800<br>pw.x relax.in</td><td class="fail">无</td><td>bash.log 不存在</td></tr>
+</table>
+
+<p>解读：LLM 在最后一个 turn 给 pw.x 配了一个 timeout（3600 / 7200 / 10800 /
+30000），bash tool 进入 Popen，FIX-6 estimator 把 timeout 默默抬到 17–50 小时
+（因为 est 一律高于 LLM 值），然后 <code>proc.communicate(timeout=...)</code>
+等到 harness 4 小时 wall 砍 solver 才算完事。LLM 从来没拿到 tool_result，所以
+也无法触发 FIX-7 的"timeout × 3 重发"诊断（FIX-7 的代码在 TimeoutExpired
+异常分支里，没异常它不会跑）。</p>
+
+<div class="callout note">
+<strong>FIX-6 设计 vs 实际效果背离</strong>：FIX-6 文档说"防 LLM 给的 timeout
+过短导致 pw.x 被砍"——但常数 C=4e-4 没做 calibration。结果是：本来 LLM 给
+7200s 是合理的（实测最快 740s 完成），FIX-6 把它抬到 50 小时，反而触发了
+solver 进程的硬挂死，比"被砍重试"还差。<strong>FIX-7 timeout 诊断成了
+死代码——hang 路径下不会进 TimeoutExpired 分支</strong>。
+</div>
+
+<!-- ===== 3. Case A — WO3 ===== -->
+<h2 id="wo3">3. Case A — WO<sub>3</sub> vc_relax</h2>
+
+<h3>历史时间线</h3>
+<table class="runs">
+<tr><th>日期 / 时刻 UTC</th><th>结果</th><th>wall</th><th>score</th><th>注</th></tr>
+<tr><td>2026-05-04T04:28</td><td class="fail">FAIL exit 1</td><td>1368s</td><td>—</td><td>没产 result.json，最早记录</td></tr>
+<tr><td>2026-05-05T05:54</td><td class="pass">PASS</td><td>1913s</td><td><strong>1.00</strong></td><td>17 turn 一次过</td></tr>
+<tr><td>2026-05-09T05:57</td><td class="pass">PASS</td><td>740s</td><td><strong>0.89</strong></td><td>更快</td></tr>
+<tr><td>2026-05-10T21:43</td><td class="fail">turn_budget_exceeded</td><td>8061s</td><td>—</td><td>撞 max_turns=100</td></tr>
+<tr><td>2026-05-19T16:48</td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td><td>首次撞 harness wall（pre-fix-6）</td></tr>
+<tr><td>2026-05-22T05:40</td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td><td>FIX-2/-5 上线后；FIX-6 commit 还没</td></tr>
+<tr class="lit"><td>2026-05-22T11:10</td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td><td><strong>session 内重发对照</strong>；FIX-6/-7/-8 已上线但未跑过 restart，实际拿到的还是 FIX-2/-5 版（见后注）</td></tr>
+<tr class="lit"><td><strong>2026-05-22T15:36</strong></td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td><td><strong>本批次主案例</strong>；FIX-6/-7/-8/-9 全 live</td></tr>
+</table>
+
+<p class="kv">注：11:10 那条按 backend restart 时间线，是<u>不确定有没有拿到
+FIX-6/-7</u>—— 10:04 restart 之后 backend 持有的代码确实有 FIX-9，但 11:10
+派发的 solver 子进程读到的是 spawn 时的 solver 镜像，行为与 15:36 batch
+run 一致（同样 hang 形态、turns=9 vs 6），说明本批次的 hang 不是
+FIX-6 独有，是 FIX-6 与之前累积代码组合的产物。</p>
+
+<h3>本批次（15:36）失败现场</h3>
+
+<table class="runs">
+<tr><th>turn</th><th>动作</th><th>输出</th></tr>
+<tr><td>0</td><td>system + user prompt 注入</td><td>—</td></tr>
+<tr><td>1</td><td>LLM 探查 pseudos / mpirun --version</td><td>OK</td></tr>
+<tr><td>2</td><td>mkdir vc_relax_1/out</td><td>OK · bash.log 最后一条</td></tr>
+<tr><td>3</td><td>python3 算晶胞矩阵（pymatgen）</td><td>OK</td></tr>
+<tr><td>4</td><td>write_file vc_relax_1/vc-relax.in</td><td>OK · lint.log "vc-relax 已达 v3 阈值"</td></tr>
+<tr><td><strong>5</strong></td><td>bash <code>timeout_s=7200</code><br><code>mpirun pw.x -in vc_relax_1/vc-relax.in</code></td><td class="fail">tool_result 无 · transcript 截止</td></tr>
+<tr><td>—</td><td>14400 - 1830 = ~12500s 卡死后被 harness 砍</td><td>solver_status=timeout，exit -1</td></tr>
+</table>
+
+<p>关键证据：<code>vc-relax.out</code> 文件 mtime 是 <strong>2026-05-23T03:14</strong>
+（solver 启动 12 小时后还在写）——pw.x 实际<strong>没被 SIGTERM 干净杀掉</strong>，
+变成 orphan 一直跑到 03:14 才自己结束。</p>
+
+<pre><code>$ ls -la runs_local/2026-05-22T15-36-26Z_..._WO3_.../workdir/vc_relax_1/
+total 256
+-rw-rw-rw-+ 1 weilin weilin 228203 May 23 03:14 vc-relax.out  ← 12h after spawn
+-rw-rw-rw-+ 1 weilin weilin   1936 May 22 15:38 vc-relax.in
+drwxrwxrwx+ 3 weilin weilin   4096 May 22 15:38 out/</code></pre>
+
+<div class="callout solver">
+<span class="tag tag-solver">FIX-10 提议</span>
+<strong>(1)</strong> 重新校 estimator 公式常数：用历史 run 数据做线性回归，
+得到 nat² × nk × ecut<sup>α</sup> 的真实 α 和 C；至少应该让 Si scf 实测
+30–60s ↔ 估值 60–120s 量级。<br>
+<strong>(2)</strong> 加 cap：<code>est_s = min(est_s, harness_wall * 0.8)</code>
+—— 哪怕 estimator 真的低估了，也不要把 timeout 抬到 harness wall 之上，
+否则 bash hang。<br>
+<strong>(3)</strong> 给 bash tool 加<u>最终 watchdog</u>：用 threading.Timer
+固定 N 分钟（如 7200s）后强制 killpg，独立于 Popen.communicate 的 timeout
+机制，确保即使 communicate hang 也能强制 return。
+</div>
+
+<!-- ===== 4. Case B — CsPbI3 ===== -->
+<h2 id="cspbi3">4. Case B — CsPbI<sub>3</sub> vc_relax（最干净的回归）</h2>
+
+<h3>历史时间线（6 连过 → 一次挂）</h3>
+<table class="runs">
+<tr><th>日期</th><th>结果</th><th>wall</th><th>score</th></tr>
+<tr><td>2026-05-04T07:33</td><td class="partial">OK</td><td>1643s</td><td>0.71</td></tr>
+<tr><td>2026-05-05T05:42</td><td class="pass">PASS</td><td>1132s</td><td><strong>1.00</strong></td></tr>
+<tr><td>2026-05-09T04:18</td><td class="pass">PASS</td><td>1099s</td><td><strong>1.00</strong></td></tr>
+<tr><td>2026-05-10T20:13</td><td class="pass">PASS</td><td>1101s</td><td><strong>1.00</strong></td></tr>
+<tr><td>2026-05-19T17:03</td><td class="pass">PASS</td><td>3883s</td><td><strong>1.00</strong></td></tr>
+<tr><td>2026-05-21T04:09</td><td class="pass">PASS</td><td>0s（cached）</td><td><strong>1.00</strong></td></tr>
+<tr class="lit"><td><strong>2026-05-22T15:37</strong></td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td></tr>
+</table>
+
+<p><strong>6 连 PASS 中 5 个 1.00 分</strong>，第 6 次（05-22）直接挂——这是
+本批次最干净的回归。控制变量：</p>
+
+<ul>
+<li>model 自始至终 <code>deepseek-v4-pro</code>，没换</li>
+<li>bench evaluator 自 05-04 起就是当前版本（GT 没变）</li>
+<li>机器是同一台（CPU pw.x，shared GPU wrapper）</li>
+<li>solver 路径自 05-22 02:29 之后一直是 <code>/srv/shared/science/solver/v4.2/</code></li>
+</ul>
+
+<p>唯一变量：<strong>FIX-6/-7/-8/-9 在 05-22 上午陆续上线</strong>。</p>
+
+<h3>失败现场：与 WO<sub>3</sub> 完全同形</h3>
+
+<table class="runs">
+<tr><th>turn</th><th>动作</th><th>结果</th></tr>
+<tr><td>0–4</td><td>planner → executor → 写 vc-relax.in → mkdir out</td><td>OK</td></tr>
+<tr><td><strong>5</strong></td><td>bash <code>timeout_s=3600</code><br>pw.x vc-relax.in</td><td class="fail">tool_result 无</td></tr>
+</table>
+
+<p>注意：CsPbI<sub>3</sub> 是 5 原子 γ 相，FIX-6 estimator 应该不会过分高估。
+但 ecutwfc=80（GT 配方）+ kmesh 12³ = 1728 k-pts → 估值还是会到几十小时。
+这是一个 estimator 公式不区分 "k-pts 多但 vc-relax 步数少" 的盲点：vc-relax
+默认乘 200（电子 maxstep），但 CsPbI<sub>3</sub> 这种简单结构 BFGS 5–10 步
+就收敛，实际只需要乘 50–100。</p>
+
+<div class="callout solver">
+<span class="tag tag-solver">FIX-10 提议 · CsPbI3 子条款</span>
+<strong>estimator 应该感知 BFGS 步数预期：</strong>晶体对称性高的简单立方 /
+四方 / γ-钙钛矿一般 vc-relax 5–15 步就收敛，<code>iter_multiplier</code>
+应按 <code>min(nstep_in_input, expected_bfgs_steps)</code> 取值，而不是死设 200。
+</div>
+
+<!-- ===== 5. Case C — CoSb3 ===== -->
+<h2 id="cosb3">5. Case C — CoSb<sub>3</sub> bands_dos（FIX-8 救活、FIX-9 杀死的戏剧）</h2>
+
+<h3>历史时间线（最戏剧性的曲线）</h3>
+<table class="runs">
+<tr><th>日期 / 时刻 UTC</th><th>结果</th><th>wall</th><th>score</th><th>FIX 状态</th></tr>
+<tr><td>2026-05-09T08:38</td><td class="partial">OK</td><td>2293s</td><td>0.50</td><td>无 fix</td></tr>
+<tr><td>2026-05-10T23:45</td><td class="pass">PASS</td><td>2273s</td><td><strong>0.93</strong></td><td>无 fix</td></tr>
+<tr><td>2026-05-19T18:17</td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td><td>无 fix</td></tr>
+<tr class="lit"><td><strong>2026-05-22T07:08</strong></td><td class="pass">PASS</td><td><strong>11458s</strong></td><td><strong>0.95</strong></td><td>FIX-6/-7/-8（未含 FIX-9）</td></tr>
+<tr class="lit"><td><strong>2026-05-22T19:36</strong></td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td><td>FIX-6/-7/-8/-9 全 live</td></tr>
+</table>
+
+<p>关键对比：<strong>07:08 那条拿了历史最高 0.95 分</strong>，wall 11458s（接
+近 harness 14400s 但够用）；<strong>19:36 那条加上 FIX-9 之后又挂了</strong>。
+当天唯一变化是 10:04 UTC 上线的 FIX-9（dos.x 默认协议从 smearing 切到 tetrahedra，
+让 dos 曲线与 GT 对齐）。</p>
+
+<h3>FIX-9 改了什么</h3>
+
+<p>看 commit <code>59a8e80</code>（FIX-9 fix(prompt): dos.x 协议跟 GT 同步到
+tetrahedra）：system_prompt 里描述 dos.x 输入文件时强调 dos NSCF 要用
+<code>occupations='tetrahedra'</code>。但 CoSb<sub>3</sub> 是<strong>窄
+带半导体（PBE-near-metal）</strong>——FIX-3b 已经把它标了 pbe_near_metal=True，
+FIX-8 强制 scf/bands NSCF 用 smearing。问题来了：</p>
+
+<ul>
+<li>bands NSCF：smearing（FIX-8 强制）</li>
+<li>dos NSCF：tetrahedra（FIX-9 强制）</li>
+<li>scf：smearing（FIX-8 强制）</li>
+</ul>
+
+<p>这里其实没<u>直接冲突</u>（dos 和 bands 是不同 NSCF），但 dos.x 读 dos NSCF
+产出后再用 tetrahedra 积分，而 dos NSCF 的 k-mesh 通常较稀，tetrahedra 在
+窄带半导体 fermi 附近的 dos 计算容易抛错（tetrahedra 要求规整 dense Monkhorst-Pack
+k-mesh，含 kshift 时格式有 corner case）。我们没拿到 19:36 那次的 bash.log
+来确认是不是 dos NSCF 那一步挂的（bash.log 文件不存在 = bash tool 第一个 pw.x
+之前 hang 了，所以也无法 forensic）。</p>
+
+<div class="callout note">
+<strong>不完全成立的指控</strong>：FIX-9 与 19:36 失败的相关性很强（同一天
+唯一的变量），但 bash.log 缺失阻止了直接因果断言。我们能 100% 锁定的是：
+07:08 那条用 FIX-6/-7/-8 三件套拿了最高分 0.95，证明 FIX-8 单独看是正向；
+10:04 上 FIX-9 后又挂了——要么是 FIX-9 真有副作用，要么是 FIX-6 在 dos NSCF
+那步触发了和 Case A/B 同样的 estimator hang（CoSb3 24 原子，n_kpt 容易大）。
+</div>
+
+<div class="callout solver">
+<span class="tag tag-solver">FIX-12 提议</span>
+<strong>(1)</strong> 在 advisor 给的 dos NSCF input 模板里，对
+pbe_near_metal=True 的 material 强制保留 smearing（不走 FIX-9 的 tetrahedra
+覆盖）—— GT 的 dos curve 比较是 broaden 后曲线，smearing 出来的 dos 也
+能匹配。<br>
+<strong>(2)</strong> 端到端 audit：把 FIX-6/-7/-8/-9 单独 ablation 跑 5 次
+CoSb3 / Ti3O5，看哪个 fix 单独 enable / disable 时回归。
+</div>
+
+<!-- ===== 6. Case D — Ti3O5 ===== -->
+<h2 id="ti3o5">6. Case D — Ti<sub>3</sub>O<sub>5</sub> bands_dos（fix 救不了的老问题）</h2>
+
+<h3>历史时间线</h3>
+<table class="runs">
+<tr><th>日期</th><th>结果</th><th>wall</th><th>score</th></tr>
+<tr><td>2026-05-09T14:14</td><td class="partial">OK</td><td>4341s</td><td>0.45</td></tr>
+<tr><td>2026-05-11T02:38</td><td class="pass">PASS</td><td>3468s</td><td><strong>0.98</strong></td></tr>
+<tr><td>2026-05-19T18:23</td><td class="partial">OK</td><td>7458s</td><td>0.58（退步）</td></tr>
+<tr><td>2026-05-22T10:10</td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td></tr>
+<tr class="lit"><td><strong>2026-05-22T19:37</strong></td><td class="fail">TIMEOUT</td><td>14400s</td><td>—</td></tr>
+</table>
+
+<p>Ti<sub>3</sub>O<sub>5</sub> 与前三个 case 不同：<strong>05-21 起一贯挂</strong>，
+不是 FIX-6 引入的回归。但 FIX-2/-3b/-4/-5/-8 也救不了——因为 Ti<sub>3</sub>O<sub>5</sub>
+不是 PBE-near-metal 名单上的（advisor 没标 pbe_near_metal=True），所以 FIX-8
+不触发 smearing；又因为是变价钛 + 反铁磁，<code>nspin=1, occupations='fixed'</code>
+的 SCF 极难收敛。05-11 那次 0.98 是<u>跑出来撞大运</u>—— Ti<sub>3</sub>O<sub>5</sub>
+PBE 自洽是 multi-basin 问题，每次随机初始化的方向不同。</p>
+
+<h3>本批次（19:37）失败现场</h3>
+
+<table class="runs">
+<tr><th>turn</th><th>动作</th></tr>
+<tr><td>24</td><td>cp relax.out relax_failed.out（前面已经跑过多轮 relax 失败）</td></tr>
+<tr><td>25</td><td>write_file 新 relax.in（调参再试）</td></tr>
+<tr><td><strong>26</strong></td><td>bash <code>timeout_s=10800</code> pw.x relax.in</td></tr>
+<tr><td>—</td><td>tool_result 无 · 同样的 bash hang</td></tr>
+</table>
+
+<p>所以 Ti<sub>3</sub>O<sub>5</sub> 看起来像是被 FIX-6 hang 砍死，但本质问题
+是材料 + advisor 协议落差：advisor 没把它标为难收敛材料，executor 反复重写
+input 浪费了 26 个 turn。</p>
+
+<div class="callout solver">
+<span class="tag tag-solver">FIX-13 提议</span>
+扩 <code>_metals.py:PBE_NEAR_METAL_FORMULAS</code> 加入<strong>变价过渡金属
+氧化物 / 反铁磁体</strong>子名单：Ti<sub>3</sub>O<sub>5</sub>、VO<sub>2</sub>、
+Mn<sub>3</sub>O<sub>4</sub>、Fe<sub>3</sub>O<sub>4</sub>、NiO 等，
+触发 <code>nspin=2, occupations='smearing', degauss=0.01</code> 的更稳路径。
+</div>
+
+<!-- ===== 7. Case E — LiAlSi2O6 ===== -->
+<h2 id="lialsi2o6">7. Case E — LiAlSi<sub>2</sub>O<sub>6</sub> orchestrator crash（深挖）</h2>
+
+<h3>历史时间线</h3>
+<table class="runs">
+<tr><th>日期</th><th>结果</th><th>wall</th><th>score</th></tr>
+<tr><td>2026-05-09T10:06</td><td class="pass">PASS</td><td>4037s</td><td>0.81</td></tr>
+<tr><td>2026-05-11T00:12</td><td class="pass">PASS</td><td>1494s</td><td><strong>0.89</strong></td></tr>
+<tr><td>2026-05-19T18:46</td><td class="pass">PASS</td><td>4041s</td><td>0.89</td></tr>
+<tr><td>2026-05-21T06:20</td><td class="pass">PASS</td><td>0s（cached）</td><td>0.68</td></tr>
+<tr class="lit"><td><strong>2026-05-22T20:39</strong></td><td class="fail">CRASH</td><td>6605s</td><td>—</td></tr>
+</table>
+
+<p>4 连过 → 突然 6605s 时崩溃。与 Case A/B 不同：<strong>这不是 timeout、
+不是 pw.x hang</strong>——是 LLM 的对话协议在 turn 44 处把 deepseek API 喂炸。</p>
+
+<h3>traceback 锁定到 agent/loop.py:166 → agent/llm.py:337</h3>
+
+<pre><code>Traceback (most recent call last):
+  File "/srv/shared/science/solver/v4.2/solve.py", line 372, in main
+    result = orchestrator.run()
+  File ".../orchestrator.py", line 302, in run
+  File ".../orchestrator.py", line 432, in _execute_plan
+  File ".../orchestrator.py", line 492, in _execute_step
+  File ".../subagents/executor.py", line 263, in resume
+    payload = run_loop(...)
+  File ".../agent/loop.py", line 166, in run_loop      <span class="bad-mark">← 错点 1</span>
+    resp: NormalizedResponse = client.call(...)
+  File ".../agent/llm.py", line 287, in call
+    return self._call_openai_compat(...)
+  File ".../agent/llm.py", line 337, in _call_openai_compat
+    resp = self.client.chat.completions.create(**kwargs)
+  ...
+openai.BadRequestError: Error code: 400 - {'error': {
+    'message': 'Invalid assistant message: content or tool_calls must be set',
+    'type': 'invalid_request_error', ...}}</code></pre>
+
+<h3>turn 44 LLM 返回了什么</h3>
+
+<table class="runs">
+<tr><th>字段</th><th>turn 42（正常）</th><th>turn 43（正常）</th><th>turn 44（凶手）</th></tr>
+<tr><td>stop_reason</td><td>tool_calls</td><td>tool_calls</td><td class="fail">stop</td></tr>
+<tr><td>content type</td><td>list (有 text + tool_use)</td><td>list (有 text + tool_use)</td><td class="fail">[] 空列表</td></tr>
+<tr><td>tool_calls</td><td>1 个 bash</td><td>1 个 bash</td><td class="fail">无</td></tr>
+<tr><td>reasoning_content</td><td>有</td><td>有</td><td>有（"Now I understand. The wrapper script:..."）</td></tr>
+</table>
+
+<p>turn 44 LLM 只产了 thinking（reasoning_content），没产 visible text，没产
+tool_call。这是 deepseek <u>合法</u> 的返回——thinking-only 模式下模型决定不
+说话也不调工具，进入"在思考下一步该做什么"的状态。但 <code>agent/loop.py</code>
+里的 message 拼装逻辑没考虑这种情况：</p>
+
+<pre><code># agent/loop.py:183–202 — 凶手代码
+asst_msg: dict[str, Any] = {
+    "role": "assistant",
+    "content": resp.text or None,   <span class="bad-mark">← resp.text="" → None</span>
+}
+if resp.tool_calls:
+    asst_msg["tool_calls"] = [...]  <span class="bad-mark">← tool_calls=[] → 不挂</span>
+if resp.reasoning_content:
+    asst_msg["reasoning_content"] = resp.reasoning_content
+messages.append(asst_msg)            <span class="bad-mark">← 喂下一轮 API</span>
+
+if not resp.tool_calls:
+    return {"incomplete": True, ...}</code></pre>
+
+<p>关键 BUG：<code>messages.append(asst_msg)</code> 在 <strong>return 之前</strong>
+就执行了。所以即使 loop 退出，这条<u>畸形 assistant message</u> 已经写进 messages
+列表。但 orchestrator 的 outer 流程在 verifier 触发后会用 <code>executor.resume()</code>
+继续 loop（loop.py:160 注释提到 "continue-session" 路径）—— resume 时
+<code>client.call(messages=...)</code> 就把上次留下的空 assistant message
+也发出去了 → 400。</p>
+
+<div class="callout solver">
+<span class="tag tag-solver">FIX-11 提议（具体行号）</span>
+在 <code>agent/loop.py:186</code>，把：
+<pre style="margin:8px 0"><code>"content": resp.text or None,</code></pre>
+改为：
+<pre style="margin:8px 0"><code>"content": resp.text or (
+    "(internal: thinking step, continuing without visible output)"
+    if not resp.tool_calls else None
+),</code></pre>
+即：当模型既无 text 又无 tool_calls 时填一个占位 content，避免 API 拒绝。
+另外在 <code>orchestrator.resume()</code> 入口处<u>剪一下</u> messages 列表
+末尾的畸形 assistant message（防御性）。这是 deepseek-v4-pro 的 thinking
+模式独有特性，sonnet / haiku 不会触发；要在 README 标记 deepseek 兼容性。
+</div>
+
+<!-- ===== 8. Pattern ===== -->
+<h2 id="pattern">8. 横向 pattern：fix 序列与回归的对应关系</h2>
+
+<table class="runs">
+<tr><th>Task</th><th>最近 PASS 日</th><th>最近 PASS 分</th><th>本批结果</th><th>判定</th></tr>
+<tr><td>CsPbI<sub>3</sub></td><td>2026-05-21</td><td>1.00</td><td class="fail">TIMEOUT</td><td><strong>真回归（FIX-6 引入）</strong></td></tr>
+<tr><td>LiAlSi<sub>2</sub>O<sub>6</sub></td><td>2026-05-21</td><td>0.68</td><td class="fail">CRASH</td><td><strong>真回归（agent/loop.py 没处理 thinking-only）</strong></td></tr>
+<tr><td>CoSb<sub>3</sub></td><td>2026-05-22 07:08</td><td>0.95</td><td class="fail">TIMEOUT</td><td>同日早晨拿过最高分，10:04 之后挂——<strong>FIX-9 + FIX-6 嫌疑</strong></td></tr>
+<tr><td>WO<sub>3</sub></td><td>2026-05-09</td><td>0.89</td><td class="fail">TIMEOUT</td><td>05-19 起就一贯 timeout（不是 FIX-6 引入），但 FIX-6 让本可救的"砍 + 重试"也死路一条</td></tr>
+<tr><td>Ti<sub>3</sub>O<sub>5</sub></td><td>2026-05-19</td><td>0.58</td><td class="fail">TIMEOUT</td><td>持续性退步，本质是 advisor 协议未识别变价钛 + AFM；fix 没动这块</td></tr>
+</table>
+
+<h3>嫌疑排名</h3>
+
+<ol>
+<li><strong>FIX-6 wall-time estimator</strong>（头号）—— 影响 CsPbI<sub>3</sub> /
+WO<sub>3</sub> / CoSb<sub>3</sub> / Ti<sub>3</sub>O<sub>5</sub> 全部 4 个 timeout fail。
+公式常数错误 + 没有 cap 兜底，把 LLM 的合理 timeout 抬到几十小时 → bash hang。</li>
+
+<li><strong>agent/loop.py:186 message 拼装</strong>（二号）—— 影响 LiAlSi<sub>2</sub>O<sub>6</sub>。
+deepseek thinking-only 模式下 content/tool_calls 都为空时未填占位。</li>
+
+<li><strong>FIX-9 dos.x tetrahedra 强制</strong>（三号，待 ablation 确认）——
+CoSb<sub>3</sub> 戏剧性反转的同日变量。可能在 pbe_near_metal 材料的 dos NSCF
+路径上引入 conflict。</li>
+
+<li><strong>advisor 名单不足</strong>（四号）—— Ti<sub>3</sub>O<sub>5</sub>
+不在 PBE_NEAR_METAL_FORMULAS 也不在变价 / AFM hint 里。</li>
+</ol>
+
+<!-- ===== 9. FIX-10/-11/-12/-13 清单 ===== -->
+<h2 id="fix">9. 建议 FIX-10 / -11 / -12 / -13（本报告<u>不</u>实施）</h2>
+
+<table class="runs">
+<tr><th>编号</th><th>目标</th><th>主要落点</th><th>优先级</th></tr>
+<tr><td><strong>FIX-10</strong></td>
+    <td>修 pw_wall_estimator 公式 + 加 timeout 上限 + bash 加 watchdog</td>
+    <td><code>agent/pw_wall_estimator.py</code>（公式 + cap）<br><code>agent/tools/bash.py:160-178</code>（estimator 调用处加 <code>min(est, harness_wall*0.8)</code>）<br><code>agent/tools/bash.py:192-244</code>（独立 threading.Timer watchdog 防 communicate hang）</td>
+    <td class="fail">P0（4 / 5 fail）</td></tr>
+<tr><td><strong>FIX-11</strong></td>
+    <td>修 loop.py 对 thinking-only 响应的处理</td>
+    <td><code>agent/loop.py:186</code>（content 填占位）<br><code>agent/subagents/executor.py:263</code>（resume 入口防御性裁剪）</td>
+    <td class="fail">P0（1 / 5 fail，确定性 crash）</td></tr>
+<tr><td><strong>FIX-12</strong></td>
+    <td>audit FIX-9 dos.x tetrahedra 对 pbe_near_metal 材料的影响</td>
+    <td><code>agent/system_prompt.py</code>（dos NSCF 对 pbe_near_metal 保留 smearing）<br>ablation 跑 5 次 CoSb<sub>3</sub></td>
+    <td class="partial">P1</td></tr>
+<tr><td><strong>FIX-13</strong></td>
+    <td>advisor 名单扩到变价 / 反铁磁过渡金属氧化物</td>
+    <td><code>agent/subagents/_metals.py</code>（加 Ti<sub>3</sub>O<sub>5</sub> / VO<sub>2</sub> / Fe<sub>3</sub>O<sub>4</sub> / NiO / Mn<sub>3</sub>O<sub>4</sub>）<br>新触发器：<code>recommend_magnetic = nspin=2</code></td>
+    <td class="partial">P1</td></tr>
+</table>
+
+<p class="kv">推荐落地顺序：FIX-10（4 个 fail 一锅端） → FIX-11（修 crash type） →
+FIX-12（解释 CoSb<sub>3</sub> 戏剧反转） → FIX-13（扫尾 Ti<sub>3</sub>O<sub>5</sub> 类）。
+做完 FIX-10/-11 重跑 27 题，期望 25–26 ok。</p>
+
+<!-- ===== 10. 附录 ===== -->
+<h2 id="appx">10. 附录</h2>
+
+<h3>A · 每个 fail task 的完整 v4.2 历史（按日期）</h3>
+
+<table class="runs">
+<tr><th>Task</th><th>Date</th><th>Wall</th><th>Score</th><th>Status</th></tr>
+<tr><td rowspan="8">WO<sub>3</sub></td>
+    <td>2026-05-04 04:28</td><td>1368s</td><td>—</td><td class="fail">FAIL exit 1</td></tr>
+<tr><td>2026-05-05 05:54</td><td>1913s</td><td><strong>1.00</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-09 05:57</td><td>740s</td><td><strong>0.89</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-10 21:43</td><td>8061s</td><td>—</td><td class="fail">turn_budget</td></tr>
+<tr><td>2026-05-19 16:48</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+<tr><td>2026-05-22 05:40</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+<tr><td>2026-05-22 11:10</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+<tr class="lit"><td>2026-05-22 15:36</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+
+<tr><td rowspan="7">CsPbI<sub>3</sub></td>
+    <td>2026-05-04 07:33</td><td>1643s</td><td>0.71</td><td class="partial">OK</td></tr>
+<tr><td>2026-05-05 05:42</td><td>1132s</td><td><strong>1.00</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-09 04:18</td><td>1099s</td><td><strong>1.00</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-10 20:13</td><td>1101s</td><td><strong>1.00</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-19 17:03</td><td>3883s</td><td><strong>1.00</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-21 04:09</td><td>0s</td><td><strong>1.00</strong></td><td class="pass">PASS</td></tr>
+<tr class="lit"><td>2026-05-22 15:37</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+
+<tr><td rowspan="5">CoSb<sub>3</sub></td>
+    <td>2026-05-09 08:38</td><td>2293s</td><td>0.50</td><td class="partial">OK</td></tr>
+<tr><td>2026-05-10 23:45</td><td>2273s</td><td><strong>0.93</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-19 18:17</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+<tr><td>2026-05-22 07:08</td><td>11458s</td><td><strong>0.95</strong></td><td class="pass">PASS</td></tr>
+<tr class="lit"><td>2026-05-22 19:36</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+
+<tr><td rowspan="5">Ti<sub>3</sub>O<sub>5</sub></td>
+    <td>2026-05-09 14:14</td><td>4341s</td><td>0.45</td><td class="partial">OK</td></tr>
+<tr><td>2026-05-11 02:38</td><td>3468s</td><td><strong>0.98</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-19 18:23</td><td>7458s</td><td>0.58</td><td class="partial">OK</td></tr>
+<tr><td>2026-05-22 10:10</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+<tr class="lit"><td>2026-05-22 19:37</td><td>14400s</td><td>—</td><td class="fail">TIMEOUT</td></tr>
+
+<tr><td rowspan="5">LiAlSi<sub>2</sub>O<sub>6</sub></td>
+    <td>2026-05-09 10:06</td><td>4037s</td><td>0.81</td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-11 00:12</td><td>1494s</td><td><strong>0.89</strong></td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-19 18:46</td><td>4041s</td><td>0.89</td><td class="pass">PASS</td></tr>
+<tr><td>2026-05-21 06:20</td><td>0s</td><td>0.68</td><td class="pass">PASS</td></tr>
+<tr class="lit"><td>2026-05-22 20:39</td><td>6605s</td><td>—</td><td class="fail">CRASH</td></tr>
+</table>
+
+<h3>B · bash hang 现象复现指引</h3>
+
+<pre><code>cd /srv/shared/science/solver/v4.2
+python3 -c "
+from agent import pw_wall_estimator as pwe
+import pathlib
+
+# 任意一个本批次 fail 的 vc-relax.in
+inp = '/srv/shared/science/web/runs_local/2026-05-22T11-10-52Z_M2_T1_WO3_roomT_vc_relax/workdir/vc_relax_1/vc-relax.in'
+est_s, dbg = pwe.estimate_for_command(
+    'mpirun pw.x -in vc_relax_1/vc-relax.in', pathlib.Path(inp).parent.parent)
+print(f'estimated wall_s = {est_s}s ({est_s/3600:.1f} h)')
+print(f'  debug = {dbg}')
+"
+# 预期输出：
+#   estimated wall_s = 177949s (49.4 h)
+#   debug = {'n_atoms': 32, 'n_kpoints': 512, 'ecutwfc': 80.0,
+#            'calculation': 'vc-relax', 'iter_multiplier': 200, ...}
+</code></pre>
+
+<p>估值 ÷ 历史最快实测 = <strong>177949 / 740 ≈ 240×</strong>。这就是
+estimator 公式失准的硬证据。FIX-10 的最简补丁：把 estimator 的 multiplier
+按 calculation 类型重 calibration（vc-relax 200 → 50，bands 8 → 4，
+DOS NSCF 8 → 6）+ 加 <code>min(est, harness_wall_s * 0.8)</code> cap。</p>
+
+<h3>C · 本批次 22 个 PASS 列表（供对照）</h3>
+
+<table class="runs">
+<tr><th>Task</th><th>Wall</th></tr>
+<tr><td>M1_T1_NaCl_vc_relax</td><td>2499s</td></tr>
+<tr><td>M1_T1_Si_vc_relax</td><td>1404s</td></tr>
+<tr><td>M1_T1_Cd_vc_relax</td><td>2065s</td></tr>
+<tr><td>M1_T1_GaAs_vc_relax</td><td>2511s</td></tr>
+<tr><td>M1_T2_Si_bands_dos</td><td>1888s</td></tr>
+<tr><td>M1_T2_Rb_bands_dos</td><td>3644s</td></tr>
+<tr><td>M1_T2_BN_hex_bands_dos</td><td>3372s</td></tr>
+<tr><td>M2_T2_SiO2_alpha_quartz_bands_dos</td><td>2999s</td></tr>
+<tr><td>M1_T2_Ge_bands_dos</td><td>2351s</td></tr>
+<tr><td>M1_T2_MgO_bands_dos</td><td>2919s</td></tr>
+<tr><td>M2_T2_HfO2_monoclinic_bands_dos</td><td>8959s</td></tr>
+<tr><td>M1_T2_AlN_bands_dos</td><td>1390s</td></tr>
+<tr><td>M1_T2_NaCl_bands_dos</td><td>5977s</td></tr>
+<tr><td>M1_T2_LiCl_bands_dos</td><td>1678s</td></tr>
+<tr><td>M1_T2_KF_bands_dos</td><td>3126s</td></tr>
+<tr><td>M1_T2_GaN_bands_dos</td><td>3529s</td></tr>
+<tr><td>M2_T2_CaTiO3_tet_bands_dos</td><td>4121s</td></tr>
+<tr><td>M2_T2_MgSiO3_bridgmanite_bands_dos</td><td>6328s</td></tr>
+<tr><td>M1_T2_CdSe_bands_dos</td><td>3411s</td></tr>
+<tr><td>M1_T2_AlAs_bands_dos</td><td>1735s</td></tr>
+<tr><td>M1_T2_InP_bands_dos</td><td>3967s</td></tr>
+<tr><td>M1_T2_C_diamond_bands_dos</td><td>2277s</td></tr>
+</table>
+
+<p class="kv">22 个 PASS 多半是简单结构 + 单胞小（5–10 原子）+ k-mesh 适中——estimator
+即便高估几倍也<u>仍低于 harness 4h wall</u>，没触发 hang。所以 FIX-6 的 bug
+是<strong>选择性影响</strong>：单胞大 + k-mesh 密的复杂 M2 材料才中招。</p>
+
+<footer>
+<p>报告 cutoff: 2026-05-23T03:30 UTC ·
+原始 run 数据 <code>/srv/shared/science/web/runs_local/</code>（共享 devs 组可读）·
+solver 代码 <code>/srv/shared/science/solver/v4.2/</code> @
+<a href="https://github.com/Pluto235/dft-bench-solver">Pluto235/dft-bench-solver</a> ·
+本报告源仓 <a href="https://github.com/Pluto235/dft-agent-reports">Pluto235/dft-agent-reports</a>。</p>
+</footer>
+
+</body>
+</html>
