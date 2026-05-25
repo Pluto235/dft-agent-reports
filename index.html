@@ -26,6 +26,12 @@ a:hover { text-decoration: underline; }
 
 <ul>
   <li>
+    <b><a href="bench-side-asks-for-dft-2026-05-25.html">
+      给 DFT 合作者的 bench 侧讨论清单 · 标准档失败深挖衍生
+    </a></b>
+    <small>2026-05-25 · 会议讨论稿 · 从《Rb/Ge/WO<sub>3</sub>/CoSb<sub>3</sub> 4 失败深挖》里挑出<strong>属于 bench 侧、且需 DFT 合作者参与</strong>的 4 项议题 · 行号全部对齐权威仓 <code>/srv/shared/science/bench</code>（<code>config.toml</code> 实跑的那份）· 出会前逐条复核：① 金属短路阈值 <code>1e-3</code>（Ge + Rb 残留，请决策判据）② DOS per-fu/per-cell 归一化（一行 diff，请合并）③ GT 协议元数据失同步（JSON 还写 σ=0.02 但 GT 已切 tetrahedra，请声明 <code>dos_method</code>）④ <code>dos_curve</code> F1 指标太宽松 · <strong>复核新发现：FIX-1（Rb 奇数电子伪能隙）在权威仓已被重构掉、Rb 现已恢复 0.64，作废不进讨论；"部署 gap" 叙事已被推翻</strong></small>
+  </li>
+  <li>
     <b><a href="standard-bench-failures-5fail-2026-05-22.html">
       标准档 27 题 / 5 失败案例深挖 · 含 v4.2 历史回溯
     </a></b>
