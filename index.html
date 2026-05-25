@@ -47,7 +47,7 @@ a:hover { text-decoration: underline; }
     <b><a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">
       v4.2 Solver 架构 · 邀请 DFT 专家评审
     </a></b>
-    <small>2026-05-18（<strong>v5 增量更新 2026-05-22 (PM)</strong>）· 给 DFT 合作者看的 v4.2 架构讲解 · 按 QE 工作流叙事 · 3 个 LLM 角色接力 + 6 类硬编码 DFT 决策（含 v4 §4.2 材料家族 playbook）+ 自动累积"踩坑笔记" · <strong>v5 新加：FIX-6/7 pw.x wall-time estimator（公式 T ∝ nat²·nk·ecut^1.5）+ FIX-8 pbe_near_metal 强制 smearing（is_metal=False 但仍用 smearing 走 bench 5 meV eps）+ system_prompt 默认值全面升 GT canonical（ecutwfc 50→80, kmesh 6³→ceil(50/a)）+ physics_sanity 加 Rule B' (FIX-8)</strong> · §6 6 类请教问题 · 2 张 SVG · self-contained</small>
+    <small>2026-05-18（<strong>v6 增量更新 2026-05-25</strong>）· 给 DFT 合作者看的 v4.2 架构讲解 · 按 QE 工作流叙事 · 3 个 LLM 角色接力 + 6 类硬编码 DFT 决策 + 自动累积"踩坑笔记" · <strong>v6 校正了 v5 关于 ecutwfc / kmesh / DOS occupations / pbe_near_metal 名单 4 处描述</strong>（v5 "全升 80" 被 FIX-20 撤回成 T1/T2 分流；DOS NSCF 默认 tetrahedra 加 pbe_near_metal 例外；pbe_near_metal 8→9 加 CoSb₃）· <strong>新加：§4.1 occupations 矩阵（5 材料类型 × 4 阶段）+ §4.4 跨阶段 invariant（seekpath primitive cell / K_POINTS basis 禁 transform / DOS NSCF 双分支）+ §4.2 第 5 份 playbook layered-vdw（BN_hex/MoS₂/石墨）+ §2 verifier default-pass 旁注（FIX-17）+ §4.5 lint Rule F</strong> · <strong>FIX-9~22 共 14 commit 收编</strong>（含 MAGNETIC_TM_OXIDES 11 种 / METALLIC_TM_OXIDES Ti₃O₅）· <strong>⚠ 顶部声明：FIX-9~22 已落地 /srv/shared/science/solver/v4.2/ 但 web/config.toml 仍指 9 天前的 home 路径，机制未经 bench 验证</strong> · 2 张 SVG · self-contained</small>
   </li>
   <li>
     <b><a href="shared-workspace-migration-2026-05-18.html">
