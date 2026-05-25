@@ -103,7 +103,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
 <tr><th style="width:6%">#</th><th style="width:30%">议题</th><th style="width:18%">需要你们</th><th>一句话</th></tr>
 <tr><td><strong>1</strong></td><td>金属短路阈值 <code>1e-3</code></td>
     <td><span class="tag tag-decide">请决策</span></td>
-    <td>PBE 准金属（Ge）和半芯金属（Rb）的实算 gap 骑在阈值边，被误标成 direct/indirect → 标签字段集体失分。阈值定多少 / 用什么判据，是物理判断。</td></tr>
+    <td>评测器自相矛盾：连续量 <code>band_gap_ev</code> 用 ±100 meV 容差接受 Ge 的 23 meV 为"≈0/金属"，分类量 <code>gap_type</code> 却用 100× 更严的 1 meV 悬崖把同一个数判成半导体 → 3 个标签字段集体归零（Ge 0.635）。阈值定多少 / 用什么判据，是物理判断。</td></tr>
 <tr><td><strong>2</strong></td><td>DOS per-fu vs per-cell 归一化</td>
     <td><span class="tag tag-merge">请复核+合并</span></td>
     <td>GT 标 <code>per_fu</code>，agent 输出 per primitive cell，评分链路不归一化 → 系统性 ~2× 偏差。一行 diff，但要确认 n_fu 取数来源。</td></tr>
@@ -140,14 +140,40 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
         if gap_value &lt; 1e-3:                       <span class="diff-ctx"># ← 1 meV</span>
             return _metal_t2_result(dos_e_fermi, dos_curve)</code></pre>
 
-<h3>证据：两个材料骑在这条边上</h3>
+<h3>核心矛盾（本议题要害）：连续量与分类量对"gap 是不是零"用了相差 100× 的标准</h3>
+<p>同一个 T2 评测，对"这个 gap 算不算零"这个<u>同一物理问题</u>，给了两套<strong>互相打架</strong>的判据：</p>
+<ul>
+  <li><strong>连续量 <code>band_gap_ev</code></strong>（<code>absolute</code> rule，容差 <strong>±0.1 eV = 100 meV</strong>）：算出的 gap 落在 0.1 eV 内就算命中 GT 的 <code>0.0</code> —— 等价于评测器在说"<strong>≤ 100 meV 都当零、基本算金属，接受</strong>"。</li>
+  <li><strong>分类量 <code>gap_type</code> / <code>vbm_k_label</code> / <code>cbm_k_label</code></strong>（<code>exact</code> rule）：要被标成 <code>metal</code>，gap 必须 <strong>&lt; 1 meV</strong>（<code>evaluator.py:697</code> 主路径 / <code>:750</code> fallback 的短路阈值），否则就走 seekpath 给出真实的 direct/indirect + Γ 等 k 标签。</li>
+</ul>
+<p>两条判据对"零"的界定<strong>差了 100×</strong>（100 meV vs 1 meV）。于是当 PBE 把窄隙材料算成几~几十 meV 的<strong>小而非零</strong>的 gap 时，<strong>同一个数</strong>会<u>同时</u>满足连续量（"≈ 0，匹配 metal GT"）又踩中分类量（"&gt; 1 meV，是 direct 半导体"）—— 评测器自相矛盾，3 个分类字段必然连锁失分。<strong>这就是分类标准与连续量标准不一致导致的失分，不是 agent / QE 算错。</strong></p>
+
+<p><strong>Ge 实锤</strong>（<code>M1_T2_Ge_bands_dos</code> · run <code>2026-05-22T14-53-56Z</code> · <code>report.json</code> · total_score = <strong>0.635</strong>）—— 注意所有行都源于<u>同一个 0.023 eV</u>：</p>
+<table class="runs">
+<tr><th>字段</th><th>GT</th><th>rule / 容差</th><th>agent 实测</th><th>对 0.023 eV 的裁决</th><th>得分</th></tr>
+<tr><td><code>band_gap_ev</code></td><td>0.0</td><td>absolute / ±0.1</td>
+    <td><code>0.023 eV</code></td><td>|0.023−0| = 0.023 &lt; 0.1 → 当作 ≈ 0</td><td class="pass">1.0 PASS</td></tr>
+<tr><td><code>gap_type</code></td><td>metal</td><td>exact（短路要 &lt; 1 meV）</td>
+    <td><code>direct</code></td><td>23 meV &gt; 1 meV → 判半导体</td><td class="fail">0.0 FAIL</td></tr>
+<tr><td><code>vbm_k_label</code></td><td>metal</td><td>exact</td>
+    <td><code>GAMMA</code></td><td>≠ metal</td><td class="fail">0.0 FAIL</td></tr>
+<tr><td><code>cbm_k_label</code></td><td>metal</td><td>exact</td>
+    <td><code>GAMMA</code></td><td>≠ metal</td><td class="fail">0.0 FAIL</td></tr>
+<tr><td><code>dos_e_fermi</code></td><td>7.7839</td><td>absolute / ±0.1</td>
+    <td><code>7.7983</code></td><td>差 0.014 &lt; 0.1</td><td class="pass">1.0 PASS</td></tr>
+<tr><td><code>dos_curve</code></td><td>—</td><td>F1 形状</td>
+    <td>—</td><td>形状基本对</td><td class="partial">0.93</td></tr>
+</table>
+<p><strong>同一个 0.023 eV：连续量判据给满分（把它当 ≈ 0 / 金属），分类量判据判 0 分（把它当直接带隙半导体）。</strong>3 个分类字段集体归零，把 total 从满分拖到 <strong>0.635</strong>。该 run 的 <code>notes</code> 字段已自我诊断到这一点："<em>…smearing 路径下 fermi-splitter eps=5 meV 容差未能覆盖…仍跨过 evaluator 1 meV 阈值…等 bench 侧 FIX-3a（主路径阈值 <code>1e-3 → 1e-2</code>）</em>"。</p>
+<div class="callout note">
+<span class="tag" style="background:#f1c40f; color:#5a4500;">区分两个量</span>
+fermi-splitter 里的简并容差 <strong><code>eps = 5e-3</code>（5 meV，<code>evaluator.py:524</code>）</strong>跟这里的短路阈值 <code>1e-3</code> 是<u>两个不同的量</u>：<code>eps</code> 是"把哪些带归到 VBM/CBM 候选"的<strong>分带容差</strong>（吸收 bands.dat 1 meV 舍入噪声）；<code>1e-3</code> 是"算出来的 gap 小到什么程度就当金属"的<strong>判零阈值</strong>。本议题谈的是后者；前者在 Ge 这例里没能把 23 meV 的近简并带兜住，所以也没救成。
+</div>
+
+<h3>同根的第二例：Rb（说明单抬阈值不够）</h3>
 <table class="runs">
 <tr><th>材料</th><th>GT 标</th><th>agent 实算 gap</th><th>评估器判定</th><th>后果</th></tr>
-<tr><td><strong>Ge</strong>（金刚石）</td><td>metal（PBE 实算近零隙，诚实反映）</td>
-    <td><code>0.0088 eV</code>（k-mesh 依赖，0~10 meV 抖）</td>
-    <td>0.0088 &gt; 1e-3 → <code>direct</code></td>
-    <td class="partial">3 个标签字段全失分 → 0.6（曾经 agent 报 0.0000 触发短路时拿 0.956）</td></tr>
-<tr><td><strong>Rb</strong>（半芯金属）</td><td>metal</td>
+<tr><td><strong>Rb</strong>（半芯金属，非 pbe_near_metal）</td><td>metal</td>
     <td><code>0.020 / 0.043 eV</code>（2026-05-22 三次新跑实测）</td>
     <td>&gt; 1e-3 → <code>direct/indirect</code></td>
     <td class="partial">gap_type / 标签失分 → 稳定 0.64</td></tr>
