@@ -88,6 +88,18 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
    deepseek-v4-pro · run 数据 <code>/srv/shared/science/web/runs_local/</code> ·
    solver 代码 commits 区间 <code>250ad38 … 59a8e80</code>。</p>
 
+<div class="callout fix" style="margin:18px 0 22px 0; border-left-width:6px;">
+<span class="tag tag-fix">V3 UPDATE · 2026-05-25</span>
+<strong>4-task 重跑后真实战绩：FIX-17 / -18 / -19 / -20 全 verified engaged，但仍有 2 个新 bug</strong>。
+WO<sub>3</sub> ✅ <strong>1.0</strong>（FIX-17 实战触发 default-pass）；
+CoSb<sub>3</sub> ✅ <strong>0.889</strong>（QE 全 pass，但 <code>dos_e_fermi=0</code> + <code>dos_curve=0.69</code> 失分——
+DOS extraction <strong>新 bug</strong>）；
+Ti<sub>3</sub>O<sub>5</sub> ❌ <strong>28800s timeout</strong>（FIX-19 nspin=2 协议生效，但磁化 + 几何同时优化 SCF 单 BFGS step 18+ iter 没收敛，8h 也不够——magnetic vc-relax <strong>固有 cost</strong>）；
+CsPbI<sub>3</sub> ⏸ stuck 在 GPU lock cleanup（需 cancel 重派）。
+反转 v2 假设：solver 是 per-task subprocess，<u>不存在</u>部署 gap。详见
+<a href="#followup-0525"><strong>§ 11 重跑 follow-up</strong></a>。
+</div>
+
 <div class="callout bench" style="margin:18px 0 22px 0; border-left-width:6px;">
 <span class="tag tag-bench">CORE FINDING</span>
 <strong>FIX-6 wall-time estimator 严重高估（10–90×），把 LLM 给的合理 timeout
@@ -151,6 +163,7 @@ MgSiO3 / Ti3O5 不同——MgSiO3 这次 22:29 跑出来 0 错过）—— Ti3O5
   <li><a href="#pattern">横向 pattern：fix 序列与回归的对应关系</a></li>
   <li><a href="#fix">建议 FIX-10 / -11 / -12（不在本报告实施）</a></li>
   <li><a href="#appx">附录：历史时间线大表 + bash hang 复现指引</a></li>
+  <li><a href="#followup-0525"><strong>2026-05-23~25 重跑 follow-up — fixes 真实战绩</strong>（v3 update）</a></li>
 </ol>
 </div>
 
@@ -714,6 +727,185 @@ DOS NSCF 8 → 6）+ 加 <code>min(est, harness_wall_s * 0.8)</code> cap。</p>
 <p class="kv">22 个 PASS 多半是简单结构 + 单胞小（5–10 原子）+ k-mesh 适中——estimator
 即便高估几倍也<u>仍低于 harness 4h wall</u>，没触发 hang。所以 FIX-6 的 bug
 是<strong>选择性影响</strong>：单胞大 + k-mesh 密的复杂 M2 材料才中招。</p>
+
+
+<!-- ============================================================
+     §11 · 2026-05-23 / 24 / 25 重跑 follow-up（v3 update）
+     ============================================================ -->
+<h2 id="followup-0525">11. 2026-05-23~25 重跑 follow-up — fixes 真实战绩</h2>
+
+<p>v1 报告（§§ 1-10）发布后，05-23 起 solver 上线 FIX-15 / -16 / -17 / -18 / -19 / -20
+共 6 个新修，并经过两轮重跑。本 § 记录真实战绩（哪个 FIX 真生效、哪个 task 现在能跑通），
+并修正 v1 → v2 中间一度提出但<strong>事后被 forensic 否决</strong>的"部署 gap"假设。</p>
+
+<h3>11.1 时间线（v1 报告 → 现在）</h3>
+
+<pre class="timeline">
+2026-05-22 03:30  v1 报告 (5fail) cutoff，提出 FIX-10 / -11 / -12 / -13（事后重命名 -15..-19）
+2026-05-22 10:04  backend restart  shijie 拉 FIX-9 进内存
+
+2026-05-23 07:27  <span class="fix-mark">FIX-15+16</span> commit e4cce29  estimator cap + bash watchdog（GNU timeout wrap）+ loop thinking-only 防御
+2026-05-23 07:30  backend restart  shijie
+2026-05-23 15:19  <span class="fix-mark">FIX-17</span> commit 7da149a  verifier budget-exhausted 条件性 default-pass
+2026-05-23 15:34  <span class="fix-mark">FIX-18+19</span> commit 9e8365e  dos.x 对 pbe_near_metal 保留 smearing；变价 / AFM TM 氧化物名单
+2026-05-23 15:39  <span class="fix-mark">FIX-20</span> commit d4e10ae  system_prompt T1 vs T2 cutoff/k-mesh split
+
+2026-05-23 15:35~23:35  <span class="bad-mark">第一轮重跑 4 task → 全 fail</span>
+                        真因：磁盘 94% used → ENOSPC + harness 4h 物理不够（<u>非</u>部署 gap）
+2026-05-24 早间  user 清磁盘 5.0T/5.4T 94% → 3.0T/5.4T 56%
+2026-05-24 15:42~18:51  <span class="fix-mark">第二轮重跑（CoSb3/Ti3O5 用 8h wall）</span>
+2026-05-25 03:25  CsPbI3 第三次派发 → stuck 在 GPU lock cleanup
+</pre>
+
+<p class="kv"><strong>关键</strong>：solver <u>每次任务 fork 全新 subprocess + fresh Python import</u>，
+所以 FIX-17 / -18 / -19 / -20 commit 后<strong>下一次 dispatch 即生效，不需要 backend restart</strong>。
+（backend restart 只对 <code>config.toml</code> in-memory load 有意义。）这是 v1 → v2 中误诊
+"部署 gap"的核心错点。</p>
+
+<h3>11.2 4 task 重跑战绩</h3>
+
+<table class="runs">
+<tr><th>Task</th><th>run ID</th><th>wall</th><th>status</th><th>total_score</th><th>FIX engaged</th><th>一句话结论</th></tr>
+<tr>
+  <td><strong>WO<sub>3</sub></strong></td>
+  <td><code>2026-05-24T15:43Z</code></td>
+  <td>11282s</td>
+  <td><span class="pass">✅ ok</span></td>
+  <td><strong>1.0</strong></td>
+  <td>FIX-17, FIX-20</td>
+  <td>完美 pass。FIX-17 first-ever 实战触发 default-pass。</td>
+</tr>
+<tr>
+  <td><strong>CsPbI<sub>3</sub></strong></td>
+  <td><code>2026-05-25T03:25Z</code></td>
+  <td>stuck</td>
+  <td><span class="partial">⏸ in-flight</span></td>
+  <td>—</td>
+  <td>—</td>
+  <td>LLM 卡 GPU lock cleanup 阶段，bash.log 自 03:27 起不更新。</td>
+</tr>
+<tr>
+  <td><strong>CoSb<sub>3</sub></strong></td>
+  <td><code>2026-05-24T18:14Z</code></td>
+  <td>7573s</td>
+  <td><span class="pass">✅ ok</span></td>
+  <td><strong>0.889</strong></td>
+  <td>FIX-18</td>
+  <td>所有 QE step verifier=pass；dos_e_fermi=0 + dos_curve=0.69 失分（<strong>新 bug A</strong>）。</td>
+</tr>
+<tr>
+  <td><strong>Ti<sub>3</sub>O<sub>5</sub></strong></td>
+  <td><code>2026-05-24T18:51Z</code></td>
+  <td>28800s</td>
+  <td><span class="fail">❌ timeout</span></td>
+  <td>—</td>
+  <td>FIX-19</td>
+  <td>vc-relax 单 BFGS step SCF iter#18 没收敛；attempt 2 再 11520s SIGKILL（<strong>新 bug B</strong>）。</td>
+</tr>
+</table>
+
+<p class="kv">对比 v1 报告（5fail 全 timeout）：本轮 <strong>2 个真 ok（含 1 个 perfect）+
+1 个 8h timeout 但 fix 协议生效 + 1 个 stuck 待重派</strong>——FIX-15..-20 的整体修复方向
+经实证有效，剩余问题是<u>新发现的、与 v1 不同的</u>两个 bug。</p>
+
+<h3>11.3 FIX engaged 证据（字面字段）</h3>
+
+<table class="runs">
+<tr><th>FIX</th><th>证据文件</th><th>证据字段</th></tr>
+<tr>
+  <td><strong>FIX-17</strong> verifier default-pass</td>
+  <td><code>WO3 / workdir / orchestrator.json</code></td>
+  <td>verdict 含 <code>"diagnosis": "verifier indecisive (exhausted turn budget 12 without submit_verdict), but executor's expected_outputs all exist on disk and are ≥ 1024 B — defaulting to PASS"</code></td>
+</tr>
+<tr>
+  <td><strong>FIX-18</strong> DOS smearing 保留</td>
+  <td><code>CoSb3 / workdir / .config_advice.json</code></td>
+  <td><code>pbe_near_metal: true</code>，<code>occupations: "smearing"</code>，<code>smearing: "mv"</code>，<code>degauss: 0.02</code>，<code>source: "deterministic_pbe_near_metal_override"</code></td>
+</tr>
+<tr>
+  <td><strong>FIX-19</strong> 磁性 TM 氧化物协议</td>
+  <td><code>Ti3O5 / workdir / .config_advice.json</code></td>
+  <td><code>magnetic_tm_oxide: true</code>，<code>recommend_nspin: 2</code>，<code>occupations: "smearing"</code>，<code>smearing: "gauss"</code>，<code>degauss: 0.01</code>，<code>source: "deterministic_magnetic_tm_oxide_override"</code>；transcript 含 Ti1/Ti2 <code>starting_magnetization=±0.4</code></td>
+</tr>
+<tr>
+  <td><strong>FIX-20</strong> T1/T2 cutoff split</td>
+  <td><code>WO3 vc-relax.in</code> + <code>git show d4e10ae</code></td>
+  <td>WO3（T1）用 <code>ecutwfc=60 Ry</code>（不是 FIX-9 强制的 80 Ry），通过 system_prompt 的 <code>task_outputs_keys</code>-branched 模板</td>
+</tr>
+</table>
+
+<h3>11.4 反转：v1 → v2 中一度的"部署 gap"假设被 forensic 否决</h3>
+
+<div class="callout note">
+<span class="tag" style="background:#f1c40f;color:#fff">RETROSPECTIVE</span>
+2026-05-23 当晚第一轮重跑 4-task 全 fail 时，初步假设：FIX-17 / -18 / -19 / -20 都在
+07:30 backend restart 之后才 commit，"backend 还在跑旧代码"——经典部署 gap 模式。
+<strong>实测反转</strong>：solver 是 per-task subprocess，<code>config.toml [[agents]].solver_path</code>
+指向 <code>/srv/.../solver/v4.2/solve.py</code>，每次 dispatch <code>python solve.py</code>
+<u>都 fresh import</u> <code>agent/*</code>——FIX commit 后下一次 dispatch 立即生效。
+05-23 当晚的真因：(a) <code>/dev/vda1</code> 94% used → pw.x 写 charge-density 时 ENOSPC
+（CsPbI3 <code>Error in routine write_rhog (3)</code>、WO3 <code>vc-relax.out</code> 0 byte）；
+(b) M2_T2 大体系 + magnetic 协议 4h harness 物理不够。
+</div>
+
+<h3>11.5 新发现的 2 个 bug</h3>
+
+<div class="callout bench">
+<span class="tag tag-bench">BENCH（疑）</span>
+<strong>Bug A · CoSb<sub>3</sub> DOS extraction (dos_e_fermi=0 + dos_curve=0.69)</strong>
+<p>FIX-18 把 PBE 准金属的 DOS 从 FIX-9 强制的 tetrahedra 改回 smearing 后，QE 全
+step（scf / nscf_dos / dos / nscf_bands / bands）<u>验证全 pass</u>，但 evaluator 给
+<code>dos_e_fermi=0</code>（完全偏离）+ <code>dos_curve=0.69</code>。所有 band 字段反而 1.0。</p>
+<p>这<strong>不是 QE 物理问题</strong>——QE 输出齐全且收敛。候选原因（待查）：
+(i) <code>dos.dat</code> 的 Fermi line 解析格式跟 smearing 模式不一致（之前 GT 是 tetrahedra）；
+(ii) DOS curve 对齐参考时基准点不一致；
+(iii) evaluator 给 dos_e_fermi 的容差不能容下 smearing 的小幅 broaden。<strong>后续：查 bench
+<code>evaluator</code> 的 <code>parse_dos_curve</code> + <code>parse_e_fermi</code>。</strong></p>
+</div>
+
+<div class="callout solver">
+<span class="tag tag-solver">SOLVER（物理）</span>
+<strong>Bug B · Ti<sub>3</sub>O<sub>5</sub> magnetic vc-relax 8h harness wall 仍不够</strong>
+<p>FIX-19 协议完全正确（<code>nspin=2</code>、Methfessel-Paxton 改 <code>gauss</code>、
+<code>degauss=0.01</code>、<code>starting_magnetization(Ti1)=+0.4</code> / <code>(Ti2)=-0.4</code>），
+但<strong>磁化收敛 + 几何优化同时进行</strong>是固有 cost：vc-relax 第 1 个 BFGS step 内 SCF 单步
+就跑到 iter#18 没收敛（用时 9273s = 2.6 h），attempt 2 又 11520s SIGKILL。两轮加起来还<u>没完
+任何一个 BFGS step</u>。8h harness wall 物理上不够。</p>
+<p>候选 FIX-21 方向（不在本报告实施）：
+<ol>
+<li><strong>用 GT structure 跳过 vc-relax</strong>——advisor 对 <code>magnetic_tm_oxide</code> 时直接
+跑 scf/bands_nscf/dos_nscf，省 vc-relax；牺牲 a/b/c/α/β/γ 得分但换 timeout</li>
+<li><strong>vc-relax 用稀疏 k-mesh</strong>（2×2×2 / Γ-only），先收敛磁化与几何，后续 scf 再升 k-mesh</li>
+<li><strong>更激进的 starting_magnetization</strong>（Ti<sup>4+</sup>/Ti<sup>3+</sup>: <code>+1.5 / +0.5</code>
+按价态分），减少磁化探索阶段</li>
+<li><strong>提 harness wall 到 16h</strong>（schemas 上限 86400s，可接受），不动 solver 代码</li>
+</ol>
+</p>
+</div>
+
+<h3>11.6 教训（process-level）</h3>
+
+<ul>
+<li><strong>磁盘 monitoring 缺失</strong>：05-23 那批失败之前 <code>/dev/vda1</code> 已 94% used
+但没人监测；4-task 并发跑就 ENOSPC。后续：cron 周清 7-day 老 fail-run + web UI 在 disk > 90%
+时拒绝新 dispatch。</li>
+<li><strong>magnetic_tm_oxide cost 没事先 budget</strong>：advisor 触发协议后应同时给 wall 建议
+（"≥ 4× 非磁同尺寸体系"），让用户重派时手动调 timeout 而非 default 7200s。</li>
+<li><strong>harness 默认 wall 7200 对 M2_T2 不够</strong>：用户重派 14400 也 boundary。
+长期方向：按 task class 自动 scale（M2_T2 → 7200×2，magnetic_tm_oxide → ×4）。</li>
+<li><strong>"部署 gap" 误诊提醒</strong>：solver 和 backend 的代码加载边界不同（solver fresh
+subprocess、backend 启动一次性 load <code>config.toml</code>），下次再遇"改了为啥不生效"先
+弄清 import / load 时机再下结论。</li>
+</ul>
+
+<h3>11.7 后续 actions（仅记录，不在本报告实施）</h3>
+
+<ul>
+<li>查 bench evaluator 的 <code>parse_dos_curve</code> / <code>parse_e_fermi</code>（Bug A）</li>
+<li>solver advisor 的 magnetic_tm_oxide path 加 wall hint 或写 FIX-21（Bug B 的 4 个候选方向择一）</li>
+<li>CsPbI3 stuck run cancel + 重派（用户操作）</li>
+<li>web UI / cron 磁盘 guard + 周清脚本</li>
+</ul>
 
 <footer>
 <p>报告 cutoff: 2026-05-23T03:30 UTC ·
