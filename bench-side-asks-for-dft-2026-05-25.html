@@ -91,7 +91,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
 这份清单<strong>只挑出原报告里属于 bench 侧、且需要 DFT 合作者参与的项</strong>，并在出会前
 对着权威仓<strong>逐条复核了一遍现状</strong>。复核改了两件事，请留意：
 <ul style="margin:8px 0 0 0">
-  <li>原报告的 <strong>FIX-1（Rb 奇数电子伪能隙）已经在权威仓里失效——它指的那段代码被重构掉了，Rb 现已不再失败</strong>。所以 FIX-1 <strong>不在本次讨论范围</strong>，仅作"已解决"记录（§5）。</li>
+  <li>原报告的 <strong>FIX-1（Rb 奇数电子伪能隙）不在本次讨论范围</strong>：odd-nelec bug 其实<u>没被修</u>，但官方打分用的 bench（<code>/srv/...</code>，fermi-slice）从无此 bug、run 失败也已被 solver <code>FIX-2</code> 绕过 → Rb 现已不再失败。<strong>机理详见 §6</strong>（此处叙述已于 0525 更正——先前"代码被重构掉"的说法有误）。</li>
   <li>原报告 §8 的"部署 gap"叙事已被
       <a href="standard-bench-failures-5fail-2026-05-22.html#post">0525 的 5-fail 报告 §11.4</a> 推翻（solver 是 per-task subprocess，不存在部署 gap）。本清单<strong>不沿用该叙事</strong>。</li>
 </ul>
@@ -113,8 +113,11 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
 <tr><td><strong>4</strong></td><td><code>dos_curve</code> 用 F1 面积重叠</td>
     <td><span class="tag tag-decide">请决策</span></td>
     <td>面积重叠对"协议偷懒"容忍度太高（协议错的 case 还能拿 0.63）。要不要换更严格的形状指标？</td></tr>
+<tr><td><strong>5</strong></td><td><code>dos_e_fermi</code> 绝对容差 0.1 eV</td>
+    <td><span class="tag tag-decide">请决策</span></td>
+    <td>对 layered vdW 偏紧：BN<sub>hex</sub> 的 VBM 参考 agent 2.8123 vs GT 2.4533 eV，差 <strong>0.36 eV</strong> → 直接 0 分（连 2×tol 部分分都没）。绝对 E_F/VBM 跨独立 run 本就难复现，单放宽阈值不够，可能要改成<u>referenced</u>比较。</td></tr>
 </table>
-不在范围（§6）：scheduler reap（web 后端 / GPU 池，weilin 侧）、部署 gap（已推翻）、所有 solver 侧 fix（我侧；含已部署的 prompt 修复）。
+不在范围（§7）：scheduler reap（web 后端 / GPU 池，weilin 侧）、部署 gap（已推翻）、所有 solver 侧 fix（我侧；含已部署的 prompt 修复）。
 </div>
 
 <div class="toc">
@@ -124,6 +127,7 @@ footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
   <li><a href="#m2">议题 2 — DOS per-fu / per-cell 归一化</a></li>
   <li><a href="#m3">议题 3 — GT 协议元数据失同步</a></li>
   <li><a href="#m4">议题 4 — dos_curve 评分指标</a></li>
+  <li><a href="#m5">议题 5 — dos_e_fermi 容差对 layered vdW 偏紧（BN<sub>hex</sub>）</a></li>
   <li><a href="#resolved">已解决（无需动作）— Rb 奇数电子伪能隙</a></li>
   <li><a href="#oos">明确不在本次范围</a></li>
   <li><a href="#verify">复核命令（可自行覆核）</a></li>
@@ -182,7 +186,7 @@ fermi-splitter 里的简并容差 <strong><code>eps = 5e-3</code>（5 meV，<cod
 <div class="callout note">
 <span class="tag" style="background:#f1c40f; color:#5a4500;">注意</span>
 <strong>Rb 是复核时的新发现</strong>：原报告把 Rb 归到 FIX-1（奇数电子伪能隙，10.989 eV）。
-那个 bug 在权威仓里已经没了（见 <a href="#resolved">§5</a>）；Rb 现在的<strong>残留</strong>失分恰恰
+那个 bug 其实没修、只是不影响官方分（见 <a href="#resolved">§6</a>）；Rb 现在的<strong>残留</strong>失分恰恰
 落在<u>同一个阈值问题</u>上——只不过它的实算 gap 是 20~43 meV，<strong>比原报告 FIX-3a 提的
 10 meV 还高</strong>。所以单纯把阈值从 1 meV 抬到 10 meV，能救 Ge，<strong>救不了 Rb</strong>。
 </div>
@@ -275,37 +279,100 @@ BN / NaCl 这种还能拿 ~0.63），<strong>因此一直藏着没暴露</strong
 </div>
 <p class="src">原报告依据：<a href="standard-bench-failures-rb-ge-wo3-cosb3-2026-05-20.html#bn-dos-fix">§9.6 讨论点 3</a>。</p>
 
+<!-- ============ 议题 5 ============ -->
+<h2 id="m5">议题 5 · <code>dos_e_fermi</code> 绝对容差 0.1 eV 对 layered vdW 偏紧 <span class="tag tag-bench" style="font-size:11px">BENCH</span> <span class="tag tag-decide" style="font-size:11px">请决策</span></h2>
+
+<h3>现状：评分规则</h3>
+<p><code>dos_e_fermi</code> 走 <code>absolute</code> rule，容差 <strong>0.1 eV</strong>（题目 JSON 的 <code>ground_truth.dos_e_fermi</code>）。
+打分实现 <code>/srv/shared/science/bench/harness/lib/scoring.py:187-216</code>（<code>_score_with_tolerance</code>）：</p>
+<pre><code>err = |agent − GT|
+err ≤ 0.1            → 1.0
+0.1 &lt; err ≤ 0.2      → 线性衰减 1.0 → 0.0   （partial credit 开时）
+err &gt; 0.2            → 0.0</code></pre>
+<p>注意对<strong>绝缘体 / 半导体</strong>，按 杨博 2026-05-18 的约定 <code>dos_e_fermi</code> 取的是
+<strong>VBM（带顶）</strong>而非真费米能（<code>evaluator.py</code> 在 <code>is_metal_per_gt=False</code> 时设 <code>dos_e_fermi=vbm_e</code>）。
+所以这个字段实际在比"<strong>绝对 VBM 能量</strong>"。</p>
+
+<h3>典型材料：BN<sub>hex</sub>（唯一进 T2 的 layered vdW）</h3>
+<p>样本：<code>M1_T2_BN_hex_bands_dos</code>，runs <code>2026-05-22T00-13-26Z</code> / <code>14-44-15Z</code>。</p>
+<table class="runs">
+<tr><th>量</th><th>GT</th><th>agent（两次跑）</th><th>err</th><th>得分</th></tr>
+<tr><td><code>dos_e_fermi</code>（= VBM）</td><td><code>2.4533 eV</code></td>
+    <td><code>2.8123 / 2.8131 eV</code></td>
+    <td class="fail"><strong>0.359 eV</strong></td>
+    <td class="fail">0.0（&gt; 2×tol，部分分也没）</td></tr>
+</table>
+<p>两次跑的 agent 值（2.8123 / 2.8131）<strong>彼此只差 0.8 meV</strong>——高度可复现，说明这不是 agent 抖动，
+而是 agent 与 GT 之间一个<strong>稳定的 0.36 eV 系统性偏移</strong>。BN<sub>hex</sub> 综合分 0.80 里，<code>dos_e_fermi</code> 这 0 分是失分项之一
+（另一项 <code>dos_curve</code> 见议题 2 / 3）。</p>
+
+<div class="callout note">
+<span class="tag" style="background:#f1c40f; color:#5a4500;">把机理说准</span>
+agent 和 GT <strong>都是 PBE</strong>，所以这<u>不是</u>"PBE 对实验的 0.1–0.2 eV 误差"那回事——那个误差在两边会抵消。
+0.36 eV 这种量级、且跨 run 高度可复现的偏移，更像是<strong>绝对能量零点 / VBM 参考系不一致</strong>
+（周期 DFT 里 VBM 的绝对值挂在内部平均势上，layered vdW 带真空层时尤其敏感），叠加面外 k-mesh 对 E<sub>F</sub>/VBM 收敛的松动。
+<strong>关键推论：单把容差从 0.1 放宽到 0.2 救不了 BN（0.36 &gt; 0.2）</strong>——跟议题 1 的阈值是一类问题。</p>
+</div>
+
+<div class="ask">
+<b>需要你们决策：</b> 对 layered vdW（及一般绝缘体）这类材料，<code>dos_e_fermi</code> 该怎么比？
+<ul style="margin:6px 0 0 0">
+  <li>简单方案：把绝对容差从 <code>0.1</code> 放宽（如 <code>0.2~0.3 eV</code>）。<strong>但 BN 的 0.36 eV 仍漏</strong>，且对真费米能（金属）放太松会失去区分度。</li>
+  <li>更稳方案：<strong>改成 referenced 比较</strong>——既然 DOS 曲线本来就以 VBM 对齐（<code>relative_to_VBM</code>），<code>dos_e_fermi</code> 字段对绝缘体也应比"相对量"或干脆<u>不单独记绝对 VBM</u>；金属才比真 E<sub>F</sub>。这样消掉绝对零点漂移。</li>
+  <li>需要你们物理判断：layered vdW 的 E<sub>F</sub>/VBM 在你们的 GT pipeline 里参考的是什么零点？agent 要对齐到什么才公平？</li>
+</ul>
+</div>
+<p class="src">数据：BN<sub>hex</sub> run report.json（<code>per_field_scores.dos_e_fermi=0.0</code>）+ <code>scoring.py:187</code> / <code>evaluator.py</code> VBM 参考切换（杨博 2026-05-18）。本议题为 0525 新增。</p>
+
 <!-- ============ 已解决 ============ -->
-<h2 id="resolved">5. 已解决（无需动作）· Rb 奇数电子伪能隙 <span class="tag tag-done" style="font-size:11px">RESOLVED</span></h2>
+<h2 id="resolved">6. Rb 奇数电子伪能隙 · run 已不再失败（solver 绕过），但 bench bug 未修 <span class="tag tag-done" style="font-size:11px">不阻塞 · 无需 DFT 动作</span></h2>
 
 <p>原报告 §2 的 <strong>FIX-1</strong>：Rb（GBRV USPP，Z<sub>val</sub>=9，半芯 4s²4p⁶5s¹）在
 <code>'mv'</code> smearing 下 QE 不打印 homo/lumo，评估器走 <code>_find_vbm_cbm_via_electron_count</code>
 按电子数切带，<code>round(9/2)=4</code> → 把 4p 半芯顶当 VBM、5s 金属带底当 CBM →
-报出 <strong>10.989 eV 伪能隙</strong> → 3/3 失败。</p>
+报出 <strong>≈ 11 eV 伪能隙</strong> → 原先 3/3 失败。</p>
 
-<div class="callout fix">
-<span class="tag tag-done">复核结论：权威仓里这个 bug 已经不存在</span>
-<p style="margin:8px 0 0 0">权威仓 <code>/srv/shared/science/bench</code> 的 VBM/CBM 定位<strong>只剩两条路径</strong>——
-<code>_find_vbm_cbm_via_homo_lumo</code>（<code>:485</code>）和 <code>_find_vbm_cbm_via_fermi</code>（<code>:521</code>）。
-原报告 FIX-1 要打的 <code>_find_vbm_cbm_via_electron_count</code> 函数<strong>整个被重构掉了</strong>，
-Rb 这种情况现在直接走 fermi-slice。</p>
+<div class="callout bench">
+<span class="tag" style="background:#f1c40f; color:#5a4500;">关键：有两个 evaluator 同时在跑，行为不同</span>
+<p style="margin:8px 0 0 0">odd-nelec bug <strong>并没有被修</strong>，它仍活在 <code>~/projects/bench/harness/lib/evaluator.py:517</code>
+（<code>n_val = int(round(nelec/2))</code>，由 commit <code>898cdf4</code> "electron-count fallback" 加入）。
+但<strong>官方打分用的是另一份 bench</strong>，两条路径各取一个 evaluator：</p>
+<pre style="margin:8px 0 0 0"><code>solver physics_sanity 自检  →  import <span class="diff-del">~/projects/bench</span> 的 evaluator  →  electron-count  →  <span class="diff-del">10.988 eV</span>（bug 仍触发）
+官方打分 (web backend)      →  config.toml bench_dir=<span class="diff-add">/srv/shared/science/bench</span>  →  fermi-slice  →  <span class="diff-add">0.020 eV</span></code></pre>
+<p style="margin:8px 0 0 0">权威仓 <code>/srv/shared/science/bench</code> <strong>从来没有</strong> <code>_find_vbm_cbm_via_electron_count</code>
+（<code>git log -S</code> 该函数名在该仓历史中为空），它的 VBM/CBM 定位只有
+<code>_find_vbm_cbm_via_homo_lumo</code>（<code>:485</code>）+ <code>_find_vbm_cbm_via_fermi</code>（<code>:521</code>）。
+所以官方分数<strong>从来不受这个 bug 影响</strong>。</p>
 </div>
 
-<p>实跑数据印证（<code>state.db</code>，权威 bench 打分）：</p>
-<pre><code>Rb bands_dos:
-  2026-05-19 / 05-21    failed         ← 原报告的伪能隙时期
-  2026-05-22 07:08      done   0.642   ← 已恢复
-  2026-05-22 12:54      done   0.641
-  2026-05-22 14:35      done   0.642
+<p><strong>让 run 不再失败的是 solver 侧 <code>FIX-2</code></strong>（commit <code>e7c66d2</code>，2026-05-20 09:40 UTC，
+<em>不是任何 bench 改动</em>）。它给 <code>physics_sanity</code> 加了一条：当 "advisor=metal × 提取 gap &gt; 5 eV"
+（真实金属物理上不可能）时，识别为 odd-nelec bug 的签名，判 <code>blocked_by_bench</code> 并放行提交，不再 replan：</p>
 
-提取的 band_gap_ev：  0.020 / 0.043 eV   （← 不再是 10.989 eV）</code></pre>
+<table class="runs">
+<tr><th>对比同一 Rb 题</th><th>0519 失败 run</th><th>0522 done run</th></tr>
+<tr><td>physics_sanity 自检提取（<code>~/projects/bench</code>）</td>
+    <td><code>10.988 eV</code></td><td class="fail"><code>10.988 eV</code>（bug 照样触发）</td></tr>
+<tr><td>verdict</td>
+    <td><code>fail</code> → 触发 replan → 配额耗尽 → <strong>run 失败 (exit 2)</strong></td>
+    <td class="pass"><code>blocked_by_bench</code> + <code>fix_actions=[]</code> → <strong>直接 submit</strong></td></tr>
+<tr><td>官方打分提取（<code>/srv/shared/science/bench</code> fermi-slice）</td>
+    <td>—</td><td><code>0.020 / 0.043 eV</code> → done <strong>0.64</strong></td></tr>
+</table>
 
-<p>Rb 在 2026-05-22 从 <code>failed</code> 翻成 <code>done ~0.64</code>，提取 gap 是 0.02~0.04 eV（不是 10.989）——
-说明 fermi-slice 路径已正确处理半芯金属。<strong>FIX-1 因此作废，不进本次讨论。</strong>
-它残留的那点失分（小隙被标 direct/indirect）归到<a href="#m1">议题 1</a>。</p>
+<p>实跑印证（<code>state.db</code>）：Rb 自 <strong>2026-05-22</strong> 从 <code>failed</code> 翻成 <code>done ~0.64</code>
+（0521 那两次死于<u>无关</u>的 "scheduler reap" 基础设施问题，非本 bug）。</p>
+
+<div class="callout note">
+<span class="tag tag-done">为什么"无需 DFT 合作者动作"</span>
+不是因为 bug 修好了，而是因为：<strong>(a)</strong> 官方打分用的 fermi-slice bench 从无此 bug；
+<strong>(b)</strong> run 失败被 solver FIX-2 绕过。残留的 odd-nelec bug 只活在 <code>~/projects/bench</code>
+（solver 自检指向的旧 bench 路径）——这是 <strong>solver 侧的路径/配置问题，归我侧</strong>，不在 bench/DFT 讨论桌上。
+Rb 现在的残留失分（小隙 0.02~0.04 eV 被标 direct/indirect）归到 <a href="#m1">议题 1</a> 的阈值问题。</p>
+</div>
 
 <!-- ============ 不在范围 ============ -->
-<h2 id="oos">6. 明确不在本次范围 <span class="tag tag-out" style="font-size:11px">OUT OF SCOPE</span></h2>
+<h2 id="oos">7. 明确不在本次范围 <span class="tag tag-out" style="font-size:11px">OUT OF SCOPE</span></h2>
 <div class="callout" style="border-left-color:var(--muted); background:#f4f6f6;">
 为了不让会议跑偏，这三类<strong>不在</strong> bench / DFT 讨论桌上：
 <table class="runs" style="margin-top:8px">
@@ -323,7 +390,7 @@ Rb 这种情况现在直接走 fermi-slice。</p>
 </div>
 
 <!-- ============ 复核命令 ============ -->
-<h2 id="verify">7. 复核命令（可自行覆核）</h2>
+<h2 id="verify">8. 复核命令（可自行覆核）</h2>
 <pre><code># 权威 bench 仓 HEAD（即 web/config.toml 的 bench_dir）
 git -C /srv/shared/science/bench log --oneline -1            # 5850ea4
 
@@ -337,10 +404,17 @@ sed -n '683p'      /srv/shared/science/bench/harness/lib/evaluator.py
 grep -nE 'sigma_ev|gt_switched_at' \
   /srv/shared/science/bench/questions/M1_T2/M1_T2_BN_hex_bands_dos.json
 
-# §5 FIX-1 已作废：electron-count 函数已不存在，只剩两条
-grep -n 'def _find_vbm_cbm' /srv/shared/science/bench/harness/lib/evaluator.py
+# 议题 5 dos_e_fermi 容差 + 打分实现
+python3 -c "import json;print(json.load(open('/srv/shared/science/bench/tools/gt_selfrun/canonical_gt_t2/M1_T2_BN_hex_bands_dos.json'))['ground_truth']['dos_e_fermi'])"
+sed -n '187,216p' /srv/shared/science/bench/harness/lib/scoring.py   # _score_with_tolerance
+#   BN run report.json: extracted dos_e_fermi=2.8123 vs GT 2.4533 → per_field_scores.dos_e_fermi=0.0
 
-# §5 Rb 已恢复
+# §6 odd-nelec bug 只活在 ~/projects/bench；权威仓从无该函数
+grep -n 'def _find_vbm_cbm' /srv/shared/science/bench/harness/lib/evaluator.py   # 只有 homo_lumo + fermi
+git -C /srv/shared/science/bench log -S '_find_vbm_cbm_via_electron_count' --oneline   # 空 = 从没进过
+grep -n 'n_val = int(round(nelec / 2))' /home/shijie/projects/bench/harness/lib/evaluator.py  # bug 仍在这边
+
+# §6 Rb：solver FIX-2 让 run 不再失败（0522 起 done ~0.64）
 sqlite3 /srv/shared/science/web/runs_local/state.db \
   "SELECT substr(created_at,1,16),status,total_score FROM runs \
    WHERE task_id LIKE '%Rb%' ORDER BY created_at DESC LIMIT 6;"</code></pre>
