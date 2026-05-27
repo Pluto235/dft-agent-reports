@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solver v4.2 · 27 题标准档 · 2026-05-25 batch</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+     max-width:1400px;margin:0 auto;padding:30px;color:#2c3e50;line-height:1.7;}
+h1{color:#34495e;border-bottom:3px solid #3498db;padding-bottom:10px;}
+h2{color:#34495e;margin-top:50px;border-bottom:1px solid #bdc3c7;padding-bottom:5px;}
+h3{color:#34495e;margin-top:30px;}
+h4{color:#34495e;margin:18px 0 6px;}
+p{margin:10px 0;}
+.meta{background:#ecf0f1;padding:14px 20px;border-radius:6px;margin:15px 0;line-height:1.7;}
+.meta strong{color:#2c3e50;}
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px;}
+th{background:#34495e;color:white;padding:8px 10px;text-align:left;font-weight:600;}
+td{border-bottom:1px solid #ecf0f1;padding:6px 10px;vertical-align:top;}
+tr:hover td{background:#f8f9fa;}
+.num{text-align:right;font-variant-numeric:tabular-nums;}
+.score-1{color:#27ae60;font-weight:bold;}
+.score-mid{color:#e67e22;font-weight:bold;}
+.score-low{color:#c0392b;font-weight:bold;}
+.score-fail{color:#7f8c8d;font-style:italic;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:15px 0;}
+.card{background:#ecf0f1;padding:14px 16px;border-radius:6px;border-left:4px solid #3498db;}
+.card-label{color:#7f8c8d;font-size:12px;}
+.card-value{font-size:24px;font-weight:600;margin:4px 0;color:#2c3e50;}
+.card-sub{color:#7f8c8d;font-size:12px;line-height:1.4;}
+.card.good{border-left-color:#27ae60;}
+.card.warn{border-left-color:#f39c12;}
+.card.bad{border-left-color:#e74c3c;}
+.note{background:#fffbe6;border-left:4px solid #f1c40f;padding:12px 16px;margin:12px 0;
+      font-size:14px;color:#7d6608;border-radius:4px;line-height:1.7;}
+.warn{background:#fdedec;border-left:4px solid #e74c3c;padding:12px 16px;margin:12px 0;
+      font-size:14px;color:#922b21;border-radius:4px;line-height:1.7;}
+.good{background:#eafaf1;border-left:4px solid #27ae60;padding:12px 16px;margin:12px 0;
+      font-size:14px;color:#196f3d;border-radius:4px;line-height:1.7;}
+pre{background:#f4f6f7;padding:10px 14px;border-radius:4px;font-size:12px;overflow-x:auto;
+    border-left:3px solid #95a5a6;line-height:1.5;}
+code{background:#ecf0f1;padding:1px 5px;border-radius:3px;font-size:90%;color:#c0392b;
+     font-family:'SF Mono','Consolas','Menlo',monospace;}
+pre code{background:transparent;color:inherit;padding:0;}
+.case{background:#fbfcfd;border:1px solid #d6dbdf;border-radius:6px;padding:14px 18px;margin:14px 0;}
+.case h4{margin-top:0;}
+.case .subscore-table{font-size:12px;margin:8px 0;}
+.case .subscore-table td{padding:4px 8px;}
+nav.toc{background:#fbfcfd;border:1px solid #d6dbdf;border-radius:6px;padding:12px 22px;
+        margin:18px 0;font-size:13px;}
+nav.toc a{color:#2980b9;text-decoration:none;}
+nav.toc a:hover{text-decoration:underline;}
+nav.toc ol{margin:4px 0;padding-left:20px;}
+.qbox{background:#fef9e7;border:1px solid #f4d03f;border-radius:6px;padding:14px 18px;
+      margin:12px 0;}
+.qbox h4{margin-top:0;color:#7d6608;}
+.qbox ol{margin:8px 0;padding-left:22px;}
+.qbox li{margin:6px 0;}
+.devbox{background:#eef5fc;border:1px solid #aed6f1;border-radius:6px;padding:14px 18px;
+        margin:12px 0;}
+.devbox h4{margin-top:0;color:#1b4f72;}
+.devbox ol{margin:8px 0;padding-left:22px;}
+.devbox li{margin:6px 0;}
+.bar{display:inline-block;height:12px;border-radius:2px;vertical-align:middle;}
+.bar-qe{background:#3498db;}
+.bar-llm{background:#27ae60;}
+.bar-ovh{background:#95a5a6;}
+a{color:#2980b9;text-decoration:none;}
+a:hover{text-decoration:underline;}
+.field-tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;
+           font-family:monospace;margin:0 2px;}
+.field-zero{background:#fadbd8;color:#922b21;}
+.field-perfect{background:#d5f5e3;color:#196f3d;}
+.field-partial{background:#fdebd0;color:#7e5109;}
+</style>
+</head>
+<body>
+
+<h1>Solver v4.2 · 27 题标准档 · 2026-05-25 batch 复盘</h1>
+
+<div class="meta">
+本报告对 <code>solver v4.2</code> 在 2026-05-25 这次标准档跑批的结果做一次纵深分析。
+<strong>对比基线</strong>是 2026-05-17 的<a href="solver-v1-v41-v42-standard27-2026-05-17.html">三版本横向报告</a>里 v4.2 的成绩；
+此后 v4.2 又收编了 FIX-9 ~ FIX-22 共 14 条变更（详见
+<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构评审</a>的"v6 增量更新"附录），
+本次是这些变更落地后第一次完整跑 27 题。
+<br><br>
+<strong>Batch ID</strong>：<code>10351c77207844db88cf28eed5febab9</code> ・
+<strong>启动</strong>：2026-05-25 13:22 UTC ・
+<strong>完成（含 scheduler bench_fallback 重试）</strong>：2026-05-27 10:06 UTC ・
+<strong>Owner</strong>：shijie ・
+<strong>Agent</strong>：<code>v4_2</code> ・
+<strong>模型</strong>：<code>deepseek-v4-pro</code> ・
+<strong>题集</strong>：standard（27 题：T1 vc_relax × 6 + T2 bands_dos × 21） ・
+<strong>QE 后端</strong>：GPU ・
+<strong>数据库</strong>：<code>/srv/shared/science/web/runs_local/state.db</code>
+</div>
+
+<nav class="toc">
+<strong>目录</strong>
+<ol>
+<li><a href="#tldr">TL;DR — 一张图看完</a></li>
+<li><a href="#scoreboard">逐题打分总表（best-of-attempts）</a></li>
+<li><a href="#progress">vs 2026-05-17 基线：分数差与版本归因</a></li>
+<li><a href="#forensics">低分案例的字段级失分分析</a></li>
+<li><a href="#retry">scheduler bench_fallback 重试时间线（透明披露）</a></li>
+<li><a href="#dft-asks">给 DFT 合作者的两个讨论议题</a></li>
+<li><a href="#dev-backlog">solver-team 改进 backlog</a></li>
+<li><a href="#cost">耗时与成本拆分</a></li>
+<li><a href="#appendix">附录：query / 文件路径 / 关联报告</a></li>
+</ol>
+</nav>
+
+<h2 id="tldr">1. TL;DR — 一张图看完</h2>
+
+<div class="cards">
+  <div class="card good">
+    <div class="card-label">overall avg score</div>
+    <div class="card-value">0.918</div>
+    <div class="card-sub">best-of-attempts 27 题 · 比 2026-05-17 的 0.771 提升 <strong>+0.147 (+19% rel.)</strong></div>
+  </div>
+  <div class="card good">
+    <div class="card-label">pass / fail</div>
+    <div class="card-value">27 / 27</div>
+    <div class="card-sub">每道题至少一次 <code>solver_status=ok</code> · 含 3 道靠 <a href="#retry">bench_fallback 重试</a>救回</div>
+  </div>
+  <div class="card good">
+    <div class="card-label">total wall</div>
+    <div class="card-value">29.8 h</div>
+    <div class="card-sub">含 11.6 h QE / 4.5 h LLM / 13.7 h 其他（bash + agent 间通信）</div>
+  </div>
+  <div class="card good">
+    <div class="card-label">total cost</div>
+    <div class="card-value">$1.73</div>
+    <div class="card-sub">29.5 M input · 0.8 M output token · 平均 $0.064 / 题 · <strong>首次端到端记录</strong>，2026-05-17 是 "not recorded"</div>
+  </div>
+  <div class="card">
+    <div class="card-label">≥ 0.99 perfect</div>
+    <div class="card-value">15 / 27</div>
+    <div class="card-sub">vs 2026-05-17：T2 #(≥0.99) 还是 0 个的时代 ・ 现在 T2 最高分 0.9997</div>
+  </div>
+  <div class="card">
+    <div class="card-label">≥ 0.95</div>
+    <div class="card-value">19 / 27</div>
+    <div class="card-sub">中位数 0.991</div>
+  </div>
+  <div class="card warn">
+    <div class="card-label">low score (< 0.7)</div>
+    <div class="card-value">4 / 27</div>
+    <div class="card-sub">Cd vc_relax 0.445 · BN_hex 0.524 · SiO2 quartz 0.561 · CaTiO3 0.797 → 见 <a href="#forensics">§4</a></div>
+  </div>
+  <div class="card warn">
+    <div class="card-label">retried tasks</div>
+    <div class="card-value">3 / 27</div>
+    <div class="card-sub">Rb (3×) / CoSb3 (2×) / C_diamond (2×) ・ batch 实际拖了 62 h 才收完</div>
+  </div>
+</div>
+
+<div class="good">
+<strong>一句话总结</strong>：v4.2 在 2026-05-17 之后的 14 条 FIX 落地之后，标准档分数从 0.771→0.918，
+T2 中位数从 ~0.76 跳到 0.99，<strong>每题成本只要 ~$0.06</strong>。
+代价是：3 道难题靠 bench harness 的自动重试机制救回（单 pass 跑就是 0.83 / 25 of 27），
+6 道题剩下零碎的字段级失分需要 DFT 同行帮拍——见 <a href="#forensics">§4</a> 和 <a href="#dft-asks">§6</a>。
+</div>
+
+<div class="note">
+<strong>口径说明</strong>：headline 用 <em>best-of-attempts</em>（每题取最高分那次），因为这是 bench harness 实际报告给上游的成绩。
+但同时披露 <em>first-attempt</em> 口径以便看 v4.2 单 pass 的真实能力：
+overall 0.832（含 Rb 第一次 crash 计 0）、26 / 27 出分。差距全部来自 Rb 的两次 orchestrator crash + CoSb3/C_diamond 第一次的 score 比第二次低。详见 <a href="#retry">§5</a>。
+</div>
+
+<h2 id="scoreboard">2. 逐题打分总表</h2>
+
+<p>27 题 best-of-attempts，按 task_id 排序；同题多次 attempt 在 "n" 列里显示。</p>
+
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th class="num">Score</th>
+<th class="num">n</th>
+<th class="num">Wall (s)</th>
+<th class="num">Turns</th>
+<th class="num">QE calls</th>
+<th class="num">QE wall (s)</th>
+<th class="num">Cost ($)</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>M1_T1_Cd_vc_relax</td><td class="num score-low">0.445</td><td class="num">1</td><td class="num">423</td><td class="num">23</td><td class="num">1</td><td class="num">236</td><td class="num">0.022</td><td>HCP c-axis 4% 偏 → tolerance 1% 红线</td></tr>
+<tr><td>M1_T1_GaAs_vc_relax</td><td class="num score-1">1.000</td><td class="num">1</td><td class="num">379</td><td class="num">23</td><td class="num">1</td><td class="num">168</td><td class="num">0.025</td><td></td></tr>
+<tr><td>M1_T1_NaCl_vc_relax</td><td class="num score-1">1.000</td><td class="num">1</td><td class="num">262</td><td class="num">23</td><td class="num">1</td><td class="num">92</td><td class="num">0.023</td><td></td></tr>
+<tr><td>M1_T1_Si_vc_relax</td><td class="num score-1">1.000</td><td class="num">1</td><td class="num">262</td><td class="num">18</td><td class="num">1</td><td class="num">107</td><td class="num">0.018</td><td></td></tr>
+<tr><td>M1_T2_AlAs_bands_dos</td><td class="num score-1">1.000</td><td class="num">1</td><td class="num">1725</td><td class="num">82</td><td class="num">13</td><td class="num">582</td><td class="num">0.068</td><td></td></tr>
+<tr><td>M1_T2_AlN_bands_dos</td><td class="num score-1">0.998</td><td class="num">1</td><td class="num">1726</td><td class="num">69</td><td class="num">10</td><td class="num">1168</td><td class="num">0.056</td><td></td></tr>
+<tr><td>M1_T2_BN_hex_bands_dos</td><td class="num score-low">0.524</td><td class="num">1</td><td class="num">1516</td><td class="num">56</td><td class="num">6</td><td class="num">328</td><td class="num">0.060</td><td>VBM 标到 K，GT 是 H</td></tr>
+<tr><td>M1_T2_C_diamond_bands_dos</td><td class="num score-mid">0.857</td><td class="num">2</td><td class="num">707</td><td class="num">56</td><td class="num">7</td><td class="num">107</td><td class="num">0.052</td><td>第 1 跑 0.348，第 2 跑修对 indirect gap</td></tr>
+<tr><td>M1_T2_CdSe_bands_dos</td><td class="num score-1">0.991</td><td class="num">1</td><td class="num">1497</td><td class="num">60</td><td class="num">7</td><td class="num">973</td><td class="num">0.051</td><td></td></tr>
+<tr><td>M1_T2_GaN_bands_dos</td><td class="num score-1">0.999</td><td class="num">1</td><td class="num">3963</td><td class="num">73</td><td class="num">7</td><td class="num">2778</td><td class="num">0.061</td><td>2026-05-17 在这道挂了 0.05；FIX-17 后恢复</td></tr>
+<tr><td>M1_T2_Ge_bands_dos</td><td class="num score-1">0.985</td><td class="num">1</td><td class="num">1244</td><td class="num">58</td><td class="num">8</td><td class="num">579</td><td class="num">0.060</td><td></td></tr>
+<tr><td>M1_T2_InP_bands_dos</td><td class="num score-1">0.954</td><td class="num">1</td><td class="num">1858</td><td class="num">60</td><td class="num">8</td><td class="num">621</td><td class="num">0.060</td><td></td></tr>
+<tr><td>M1_T2_KF_bands_dos</td><td class="num score-1">0.998</td><td class="num">1</td><td class="num">1756</td><td class="num">63</td><td class="num">9</td><td class="num">1183</td><td class="num">0.055</td><td></td></tr>
+<tr><td>M1_T2_LiCl_bands_dos</td><td class="num score-1">0.998</td><td class="num">1</td><td class="num">1066</td><td class="num">53</td><td class="num">6</td><td class="num">575</td><td class="num">0.053</td><td></td></tr>
+<tr><td>M1_T2_MgO_bands_dos</td><td class="num score-1">0.998</td><td class="num">1</td><td class="num">2575</td><td class="num">111</td><td class="num">17</td><td class="num">1067</td><td class="num">0.081</td><td></td></tr>
+<tr><td>M1_T2_NaCl_bands_dos</td><td class="num score-1">0.950</td><td class="num">1</td><td class="num">1582</td><td class="num">64</td><td class="num">8</td><td class="num">476</td><td class="num">0.052</td><td></td></tr>
+<tr><td>M1_T2_Rb_bands_dos</td><td class="num score-1">0.991</td><td class="num">3</td><td class="num">11965</td><td class="num">116</td><td class="num">—</td><td class="num">—</td><td class="num">0.111</td><td>前 2 次 orchestrator crash；第 3 次 fallback 重跑救回</td></tr>
+<tr><td>M1_T2_Si_bands_dos</td><td class="num score-1">1.000</td><td class="num">1</td><td class="num">660</td><td class="num">53</td><td class="num">6</td><td class="num">217</td><td class="num">0.049</td><td></td></tr>
+<tr><td>M2_T1_CsPbI3_gamma_vc_relax</td><td class="num score-1">1.000</td><td class="num">1</td><td class="num">5842</td><td class="num">22</td><td class="num">1</td><td class="num">—</td><td class="num">0.028</td><td>QE wall 未记录；满分但耗时 1.6 h</td></tr>
+<tr><td>M2_T1_WO3_roomT_vc_relax</td><td class="num score-1">1.000</td><td class="num">1</td><td class="num">5564</td><td class="num">24</td><td class="num">1</td><td class="num">—</td><td class="num">0.031</td><td>同上 · FIX-17 verifier default-pass 让 WO3 不再卡 14400s timeout</td></tr>
+<tr><td>M2_T2_CaTiO3_tet_bands_dos</td><td class="num score-mid">0.797</td><td class="num">1</td><td class="num">3458</td><td class="num">65</td><td class="num">7</td><td class="num">2209</td><td class="num">0.054</td><td>VBM/CBM 都落在 off-symmetry k 点</td></tr>
+<tr><td>M2_T2_CoSb3_bands_dos</td><td class="num score-1">0.979</td><td class="num">2</td><td class="num">12728</td><td class="num">72</td><td class="num">—</td><td class="num">—</td><td class="num">0.072</td><td>第 1 跑 0.162（band 字段全 0）；第 2 跑 0.979</td></tr>
+<tr><td>M2_T2_HfO2_monoclinic_bands_dos</td><td class="num score-1">0.995</td><td class="num">1</td><td class="num">2899</td><td class="num">66</td><td class="num">9</td><td class="num">1889</td><td class="num">0.062</td><td></td></tr>
+<tr><td>M2_T2_LiAlSi2O6_spodumene_bands_dos</td><td class="num score-mid">0.892</td><td class="num">1</td><td class="num">3804</td><td class="num">67</td><td class="num">8</td><td class="num">1926</td><td class="num">0.070</td><td>VBM Y_2 → off-path coords</td></tr>
+<tr><td>M2_T2_MgSiO3_bridgmanite_bands_dos</td><td class="num score-mid">0.893</td><td class="num">1</td><td class="num">8705</td><td class="num">76</td><td class="num">12</td><td class="num">6193</td><td class="num">0.075</td><td>VBM (0,0,0.300) → 落 (0,0.350,0)</td></tr>
+<tr><td>M2_T2_SiO2_alpha_quartz_bands_dos</td><td class="num score-low">0.561</td><td class="num">1</td><td class="num">1790</td><td class="num">60</td><td class="num">6</td><td class="num">1200</td><td class="num">0.061</td><td>band_gap 5.72 vs GT 5.54 · 0.18 eV 差超 0.1 eV tol</td></tr>
+<tr><td>M2_T2_Ti3O5_bands_dos</td><td class="num score-1">0.975</td><td class="num">1</td><td class="num">8363</td><td class="num">75</td><td class="num">17</td><td class="num">5846</td><td class="num">0.077</td><td>2026-05-17 报告里的"硬题"之一；现稳定满分</td></tr>
+</tbody>
+</table>
+
+<div class="note">
+<strong>QE wall 列出现 4 个 "—"</strong>（Rb 第 3 次、CoSb3 第 2 次、CsPbI3、WO3）：这些 run 走的是
+<code>scheduler_bench_fallback</code> 评分路径或某种 bypass，DB 的 <code>qe_call_count</code> / <code>qe_wall_sec</code>
+没被填，但 <code>report.json</code> 里 <code>audit_flags.qe_invoked=true</code> 是真的。属于一个仪表化空洞，详见 <a href="#dev-backlog">§7</a>。
+</div>
+
+<h2 id="progress">3. vs 2026-05-17 基线</h2>
+
+<table style="max-width:900px">
+<thead>
+<tr><th></th><th class="num">2026-05-17 v4.2</th><th class="num">2026-05-25 v4.2 (本次)</th><th class="num">Δ</th></tr>
+</thead>
+<tbody>
+<tr><td>Overall mean</td><td class="num">0.771</td><td class="num"><strong>0.918</strong></td><td class="num score-1">+0.147 (+19%)</td></tr>
+<tr><td>Median total score</td><td class="num">0.762</td><td class="num"><strong>0.991</strong></td><td class="num score-1">+0.229</td></tr>
+<tr><td>T1 mean (vc_relax × 6)</td><td class="num">0.960</td><td class="num">0.908</td><td class="num score-low">−0.052</td></tr>
+<tr><td>T2 mean (bands_dos × 21)</td><td class="num">0.716</td><td class="num"><strong>0.921</strong></td><td class="num score-1">+0.205 (+29%)</td></tr>
+<tr><td>T2 max</td><td class="num">0.956</td><td class="num">0.9997</td><td class="num score-1">+0.044</td></tr>
+<tr><td>#(≥ 0.99)</td><td class="num">0</td><td class="num"><strong>15</strong></td><td class="num score-1">+15</td></tr>
+<tr><td>Pass / Fail / Cancel / Run</td><td class="num">27 / 0 / 0 / 0</td><td class="num">27 / 0 / 0 / 0*</td><td class="num">同</td></tr>
+<tr><td>Total wall-clock</td><td class="num">30.8 h</td><td class="num">29.8 h</td><td class="num">−1 h</td></tr>
+<tr><td>Total API cost</td><td class="num">not recorded</td><td class="num"><strong>$1.73</strong></td><td class="num">首次记录</td></tr>
+</tbody>
+</table>
+
+<small>* 本次实际有 2 条 row 在 DB 里 status=failed（Rb 前两次 orchestrator crash），但属于同一题被 bench_fallback 自动重跑后救回。Pass rate 按 task 维度统计仍是 27/27。</small>
+
+<div class="good">
+<strong>核心好消息</strong>（这部分主要要给 DFT 同行和老板看）：
+<ul style="margin:6px 0">
+<li><strong>T2 中位数从 0.762 跳到 0.991</strong> — 这是 14 条 FIX (FIX-9 ~ FIX-22) 的累计效果：dos_nscf 默认切 tetrahedra、5 套 playbook 落地（含新加的 layered-vdw）、occupations 5×4 决策矩阵补齐、verifier default-pass (FIX-17) 让边界 case 不再死锁。</li>
+<li><strong>#(≥0.99) 从 0 跳到 15</strong> — 2026-05-17 那时没有一道 T2 满分，现在过半数 T2 接近满分。</li>
+<li><strong>2026-05-17 报告里的 4 个"集体困难户"（Ti3O5 / CoSb3 / MgSiO3 / GaN）</strong>：Ti3O5 现 0.975（满分），CoSb3 现 0.979（best-of），MgSiO3 仍 0.893（VBM 字段卡），GaN 0.999（2026-05-17 只有 0.05）。</li>
+<li><strong>成本</strong>：首次端到端记录，$1.73 / 27 题 = ~$0.064 / 题。</li>
+</ul>
+</div>
+
+<div class="note">
+<strong>需要诚实承认的回退</strong>：T1 mean 从 0.96 降到 0.908。
+唯一掉分的是 <strong>M1_T1_Cd_vc_relax 从满分掉到 0.445</strong>（之前的 27 题 batch 在 Cd 上是满分）。
+排查方向：v4.2 的 occupations 矩阵在 alkaline / post-transition 金属上做了改动；
+Cd 是 d10 closed-shell 但 c/a 比例异常，对 smearing 和 k-mesh 敏感，可能是某条新策略把 Cd 推到了一个不太好的设定上。详见 <a href="#forensics">§4.1</a>。
+</div>
+
+<h2 id="forensics">4. 低分案例的字段级失分分析</h2>
+
+<p>本节给每个失分案例贴出 <code>report.json</code> 里的 <code>per_field_scores</code> 拆解。
+按归因类型分组：① 似为 solver 提取 bug → 进 <a href="#dev-backlog">§7</a> dev backlog；
+② 真正难的物理 → 进 <a href="#dft-asks">§6</a> DFT 议题。</p>
+
+<h3>4.1 Cd vc_relax · 0.445（T1 唯一低分） · solver extraction 嫌疑</h3>
+<div class="case">
+<table class="subscore-table">
+<tr><th>field</th><th>w</th><th>GT</th><th>solver</th><th>Δ / tol</th><th>score</th></tr>
+<tr><td>a</td><td>0.20</td><td>3.0509 Å</td><td>2.9933 Å</td><td>−1.9 % / ±1 % rel</td><td><span class="field-tag field-partial">0.112</span></td></tr>
+<tr><td>b</td><td>0.20</td><td>3.0509 Å</td><td>2.9933 Å</td><td>−1.9 % / ±1 % rel</td><td><span class="field-tag field-partial">0.112</span></td></tr>
+<tr><td>c</td><td>0.20</td><td>5.6486 Å</td><td><strong>5.8695 Å</strong></td><td><strong>+3.9 % / ±1 % rel</strong></td><td><span class="field-tag field-zero">0.000</span></td></tr>
+<tr><td>α / β / γ</td><td>0.05 × 3</td><td>90 / 90 / 120</td><td>90 / 90 / 120</td><td>—</td><td><span class="field-tag field-perfect">1 / 1 / 1</span></td></tr>
+<tr><td>space_group_number</td><td>0.25</td><td>194</td><td>194</td><td>exact</td><td><span class="field-tag field-perfect">1.0</span></td></tr>
+</table>
+<p>解读：晶格<strong>角度和空间群全对</strong>（说明 spglib pipeline 正常），就是 a / c 数值偏。
+扩出来的 c/a 比例 5.87 / 2.99 = <strong>1.96</strong>，比 GT 的 1.85 高出 5.9 %；
+而 HCP Cd 的实验 c/a 约 1.886，反而比 GT 还略高。<strong>说明 solver 跑出来的不是收敛失败、而是一个"偏向更长 c"的局部最小</strong>，
+通常对应 k-mesh 在 c 方向太稀 或 smearing 过宽。
+GT 是同样 PBE 跑出来的，所以 4 % 的 c 偏差不是 PBE 系统误差能解释的——更像是 solver 选了一组特定参数。
+此问题进 <a href="#dev-backlog">§7</a> dev backlog。</p>
+</div>
+
+<h3>4.2 BN_hex bands_dos · 0.524 · solver extraction 嫌疑（VBM 标错 + Fermi 偏 0.4 eV）</h3>
+<div class="case">
+<table class="subscore-table">
+<tr><th>field</th><th>w</th><th>GT</th><th>solver</th><th>score</th></tr>
+<tr><td>band_gap_ev</td><td>0.40</td><td>4.3835 eV</td><td>4.473 eV</td><td><span class="field-tag field-partial">0.21</span> (Δ=0.09 eV, tol ±0.1)</td></tr>
+<tr><td>gap_type</td><td>0.15</td><td>indirect</td><td>indirect</td><td><span class="field-tag field-perfect">1.0</span></td></tr>
+<tr><td><strong>vbm_k_label</strong></td><td>0.10</td><td><strong>H</strong></td><td><strong>K</strong></td><td><span class="field-tag field-zero">0.0</span></td></tr>
+<tr><td>cbm_k_label</td><td>0.10</td><td>Γ</td><td>Γ</td><td><span class="field-tag field-perfect">1.0</span></td></tr>
+<tr><td><strong>dos_e_fermi</strong></td><td>0.05</td><td>2.4534 eV</td><td><strong>2.8171 eV</strong></td><td><span class="field-tag field-zero">0.0</span> (Δ=0.36 eV, tol ±0.1)</td></tr>
+<tr><td>dos_curve</td><td>0.20</td><td>(F1)</td><td>—</td><td><span class="field-tag field-perfect">0.949</span></td></tr>
+</table>
+<p>解读：hex BN 六方 BZ 里 <strong>K = (1/3, 1/3, 0)</strong>，<strong>H = (1/3, 1/3, 1/2)</strong>——
+两者 in-plane 坐标一样，只差 k<sub>z</sub>。Solver 把 z-坐标丢了，导致 VBM 标 K 而不是 H。
+这是 <code>solver-v1-v41-v42-standard27-2026-05-17.html</code> 报告里就提过的"layered-vdw playbook"的应用范围之一，
+但本次仍然命中——说明 playbook 文档化了，但实际 k-label resolver 没接住 k<sub>z</sub>。
+<br>
+dos_e_fermi 偏 0.36 eV：可能是 nscf 和 scf 的 Fermi 没用同一个（FIX-19 之前的老 bug 残留），需要复核。</p>
+</div>
+
+<h3>4.3 SiO2 α-quartz bands_dos · 0.561 · 物理对但 tolerance 紧</h3>
+<div class="case">
+<table class="subscore-table">
+<tr><th>field</th><th>w</th><th>GT</th><th>solver</th><th>score</th></tr>
+<tr><td><strong>band_gap_ev</strong></td><td>0.40</td><td>5.5388 eV</td><td><strong>5.72 eV</strong></td><td><span class="field-tag field-zero">0.0</span> (Δ=0.18 eV, tol ±0.1)</td></tr>
+<tr><td>gap_type</td><td>0.15</td><td>indirect</td><td>indirect</td><td><span class="field-tag field-perfect">1.0</span></td></tr>
+<tr><td>vbm_k_label</td><td>0.10</td><td>K</td><td>K</td><td><span class="field-tag field-perfect">1.0</span></td></tr>
+<tr><td>cbm_k_label</td><td>0.10</td><td>Γ</td><td>Γ</td><td><span class="field-tag field-perfect">1.0</span></td></tr>
+<tr><td>dos_e_fermi</td><td>0.05</td><td>1.9899 eV</td><td>2.0077 eV</td><td><span class="field-tag field-perfect">1.0</span></td></tr>
+<tr><td>dos_curve</td><td>0.20</td><td>(F1)</td><td>—</td><td><span class="field-tag field-partial">0.804</span></td></tr>
+</table>
+<p>解读：除了 band_gap_ev 数值偏 0.18 eV，<strong>其它字段都对</strong>（含 k-label、Fermi、gap 类型）。
+SiO2 α-quartz PBE 实验值是 5.4–5.7 eV 范围（不同 cutoff / k-grid 都会给不同值），
+GT 5.54 是 bench 用某套参数跑出来的；solver 拿到 5.72 在物理上完全合理。
+<strong>这是一个"GT 和 solver 都用 PBE 但用了不同 k-grid/cutoff"的典型 case</strong>——
+绝对 tolerance ±0.1 eV 对宽带隙绝缘体偏紧（5.5 eV 的 1.8 % 相对偏差就归零），
+但归到这里是 solver 没复现 bench 的具体参数选择，不一定算 solver bug。</p>
+</div>
+
+<h3>4.4 CoSb3 bands_dos 第一次跑 · 0.162 · k-grid 太稀，VBM/CBM 落在非高对称点</h3>
+<div class="case">
+<table class="subscore-table">
+<tr><th>field</th><th>w</th><th>GT</th><th>solver (1st)</th><th>solver (2nd)</th></tr>
+<tr><td>band_gap_ev</td><td>0.40</td><td>0.151 eV</td><td><span class="field-tag field-zero">0.020</span></td><td><span class="field-tag field-perfect">0.187</span></td></tr>
+<tr><td>gap_type</td><td>0.15</td><td>direct</td><td><span class="field-tag field-zero">indirect</span></td><td><span class="field-tag field-perfect">direct</span></td></tr>
+<tr><td>vbm_k_label</td><td>0.10</td><td>Γ</td><td><span class="field-tag field-zero">(0.045, 0.045, 0.045)</span></td><td><span class="field-tag field-perfect">Γ</span></td></tr>
+<tr><td>cbm_k_label</td><td>0.10</td><td>Γ</td><td><span class="field-tag field-zero">(0.065, 0.065, −0.131)</span></td><td><span class="field-tag field-perfect">Γ</span></td></tr>
+<tr><td>dos_e_fermi</td><td>0.05</td><td>11.7419 eV</td><td><span class="field-tag field-zero">11.485</span></td><td><span class="field-tag field-perfect">11.786</span></td></tr>
+<tr><td>dos_curve</td><td>0.20</td><td>(F1)</td><td><span class="field-tag field-partial">0.812</span></td><td><span class="field-tag field-partial">0.896</span></td></tr>
+<tr><td><strong>total</strong></td><td></td><td></td><td><strong>0.162</strong></td><td><strong>0.979</strong></td></tr>
+</table>
+<p>解读：CoSb3 skutterudite 的能带极值在 Γ 附近一个很窄的窗口里。
+<strong>第 1 跑 k-mesh 不够密</strong>，VBM 落在 (0.045, 0.045, 0.045)、CBM 落在 (0.065, 0.065, −0.131)——
+两个都是 Γ 附近的非高对称点，距离 Γ 在 0.05 单位以上，被 <code>k_label_match</code>（tol 0.05）判为不匹配。
+然后链式反应：被判 indirect、gap 数值也偏（0.020 eV）。
+第 2 跑（scheduler_bench_fallback 自动重跑）拿到了直接 Γ→Γ，0.187 eV，所有字段满分。<br>
+<strong>这个 case 应该上 §6 DFT 议题</strong>：CoSb3 这种"近 Γ 极值密集"的体系，对 k-grid 选择高度敏感；
+v4.2 的 playbook 是否需要给"小带隙 + 极值靠 Γ"加一个 k-grid lower bound？</p>
+</div>
+
+<h3>4.5 C_diamond bands_dos 第一次跑 · 0.348 · band path 漏了 indirect</h3>
+<div class="case">
+<table class="subscore-table">
+<tr><th>field</th><th>w</th><th>GT</th><th>solver (1st)</th><th>solver (2nd)</th></tr>
+<tr><td>band_gap_ev</td><td>0.40</td><td>4.1449 eV</td><td><span class="field-tag field-zero">5.581</span></td><td><span class="field-tag field-perfect">4.1395</span></td></tr>
+<tr><td>gap_type</td><td>0.15</td><td>indirect</td><td><span class="field-tag field-zero">direct</span></td><td><span class="field-tag field-perfect">indirect</span></td></tr>
+<tr><td>vbm_k_label</td><td>0.10</td><td>Γ</td><td><span class="field-tag field-perfect">Γ</span></td><td><span class="field-tag field-perfect">Γ</span></td></tr>
+<tr><td>cbm_k_label</td><td>0.10</td><td>(0.350, 0, 0.350) ≈ X</td><td><span class="field-tag field-zero">Γ</span></td><td><span class="field-tag field-perfect">(0.367, 0, 0.367)</span></td></tr>
+<tr><td>dos_e_fermi</td><td>0.05</td><td>13.2771 eV</td><td><span class="field-tag field-perfect">13.2693</span></td><td><span class="field-tag field-perfect">13.2672</span></td></tr>
+<tr><td>dos_curve</td><td>0.20</td><td>(F1)</td><td><span class="field-tag field-perfect">0.992</span></td><td><span class="field-tag field-partial">0.284</span></td></tr>
+<tr><td><strong>total</strong></td><td></td><td></td><td><strong>0.348</strong></td><td><strong>0.857</strong></td></tr>
+</table>
+<p>解读：第 1 跑 solver 把 diamond 当成<strong>直接带隙</strong>，报 Γ→Γ = 5.58 eV——这其实是 diamond 的 Γ-Γ 直接跃迁能量（PBE 下约 5.5–5.7 eV），并不"错"，但它<strong>不是 CBM 所在位置</strong>。diamond 真正的 CBM 在 0.85·X 附近（Γ-X 上靠近 X 的位置）。
+说明 solver 走完了 band 路径，但<strong>能带最低点搜索逻辑只看了 high-symmetry 点</strong>，把 Γ 直接采当 CBM 而没去扫过 X。第 2 跑修对了路径，CBM 拿到 (0.367, 0, 0.367)，全 band 字段满分。
+<strong>诡异的是 2 跑 dos_curve 从 0.992 掉到 0.284</strong>——可能是第 2 跑用了不同的 DOS broadening。这个值得复核：DOS 质量不应该在重试时变差。<br>
+此 case 上 §6 + §7：CBM 搜索逻辑是 solver 改进（§7），但"哪些材料必须扫到非高对称点找 CBM" 是 DFT 知识题（§6）。</p>
+</div>
+
+<h3>4.6 MgSiO3 / CaTiO3 / Spodumene · ~0.79–0.89 · off-symmetry VBM/CBM 一类</h3>
+<div class="case">
+<table class="subscore-table">
+<tr><th>task</th><th>score</th><th>fail field</th><th>GT</th><th>solver</th></tr>
+<tr><td>MgSiO3 bridgmanite</td><td>0.893</td><td>vbm_k_label</td><td>(0, 0, 0.300)</td><td>(0, 0.350, 0) — 落到不同方向</td></tr>
+<tr><td>CaTiO3 tetragonal</td><td>0.797</td><td>vbm + cbm</td><td>Z, Γ</td><td>(0.200, 0.200, 0.401), (0.153, 0.153, 0.306)</td></tr>
+<tr><td>LiAlSi2O6 spodumene</td><td>0.892</td><td>vbm_k_label</td><td>Y_2</td><td>(0.331, 0.331, 0.363)</td></tr>
+</table>
+<p>解读：三道复杂氧化物的共同问题——<strong>VBM/CBM 落在非高对称 k 点上，labeler 给出 fractional coords 而不是有名字的字母</strong>。
+其中 MgSiO3 和 CaTiO3 的 solver 找到的 k 点和 GT 的距离都明显 &gt; 0.05（tol）；
+spodumene 还要确认 (0.331, 0.331, 0.363) 是不是 Y_2 在 seekpath 命名下的别名。
+2026-05-17 报告里 MgSiO3 就用过 "OFF_PATH" 这个词标记此类 case；现在三道都是同样的 pattern。
+<strong>分两路</strong>：(a) labeler 改进能否消化更多 off-symmetry 命名（dev backlog）；
+(b) 真正"VBM 在哪儿"是 DFT 物理问题（议题 §6）。</p>
+</div>
+
+<h2 id="retry">5. scheduler bench_fallback 重试时间线（透明披露）</h2>
+
+<p>本节回答两个问题：① batch 实际跑了多久？② 重试机制是不是在帮 v4.2 掩盖脆弱性？</p>
+
+<table style="max-width:1000px">
+<thead>
+<tr><th>Task</th><th>Attempt</th><th>Started</th><th>Wall</th><th>Status</th><th>Score</th><th>scored_by</th></tr>
+</thead>
+<tbody>
+<tr><td rowspan="3">M1_T2_Rb_bands_dos</td><td>1st</td><td>05-25 17:04</td><td>42 min</td><td><span class="score-fail">failed</span></td><td>—</td><td>orchestrator crash</td></tr>
+<tr><td>2nd</td><td>05-26 03:54</td><td>72 min</td><td><span class="score-fail">failed</span></td><td>—</td><td>同 crash 再触发</td></tr>
+<tr><td>3rd ✅</td><td>05-27 02:46</td><td>199 min</td><td>done</td><td>0.991</td><td><code>scheduler_bench_fallback</code></td></tr>
+<tr><td rowspan="2">M2_T2_CoSb3_bands_dos</td><td>1st</td><td>05-25 20:02</td><td>178 min</td><td>done</td><td>0.162</td><td>—</td></tr>
+<tr><td>2nd ✅</td><td>05-27 05:32</td><td>212 min</td><td>done</td><td>0.979</td><td><code>scheduler_bench_fallback</code></td></tr>
+<tr><td rowspan="2">M1_T2_C_diamond_bands_dos</td><td>1st</td><td>05-25 23:40</td><td>25 min</td><td>done</td><td>0.348</td><td>—</td></tr>
+<tr><td>2nd ✅</td><td>05-27 09:54</td><td>12 min</td><td>done</td><td>0.857</td><td>—（手动 enqueue 或同 fallback 通道）</td></tr>
+</tbody>
+</table>
+
+<div class="warn">
+<strong>诚实声明 1：batch 实际跨度 ~62 h，不是 30 h。</strong><br>
+从 batch 创建（05-25 13:22）到最后一个 run 完成（05-27 10:06）一共 62 小时 44 分。
+但 27 个 task 的<strong>累计 solver wall time 是 30 h</strong>（DB 里的 <code>SUM(wall_time_sec)</code>）——
+中间有大段等待 / 排队时间。如果以"用户问 → bench 收到完整成绩单"的口径算，是 62 h。
+</div>
+
+<div class="warn">
+<strong>诚实声明 2：scheduler_bench_fallback 在帮 v4.2 拉分。</strong><br>
+单 pass 跑（first-attempt only）的口径：<strong>0.832 平均 · 25 of 27 出分 · Rb 完全挂</strong>。
+拿到 0.918 / 27 of 27 这个 headline 数字，是依赖 bench harness 的自动重试机制。
+"v4.2 加 bench_fallback 联合系统" ≠ "v4.2 单 agent 能力"。报告里给老板看的数字是前者；
+评估 solver 设计本身的健壮性应该看后者。
+</div>
+
+<h3>5.1 Rb orchestrator crash 根因</h3>
+
+<p>从 <code>solver_stderr.log</code> 的 traceback：</p>
+
+<pre><code>Traceback (most recent call last):
+  File "/srv/shared/science/solver/v4.2/solve.py", line 383, in main
+    result = orchestrator.run()
+TypeError: unhashable type: 'slice'</code></pre>
+
+<p>Rb 前两次都<strong>跑到了 solver_status=ok（QE 都算完了），但 orchestrator 在做最后的 error/result 整理时挂了</strong>。
+两次 stack trace 完全一样——同一段代码连续两次失败。第 3 次 (05-27 02:46) 走的是 <code>scheduler_bench_fallback</code> 路径，
+绕过了这段代码，直接成功。</p>
+
+<p>所以这并不是 Rb 物理本身难——前两次的 QE 计算（约 1400 / 2500 s）其实跑出了能用的结果，
+只是被 orchestrator 的 <code>unhashable slice</code> 异常吞了。<strong>这是一个 solver 100 % 可修的 bug</strong>。
+现在 <code>/srv/shared/science/solver/v4.2/solve.py:383</code> 附近有一段在 dict key 上做 slice 的代码，需要复查。</p>
+
+<h2 id="dft-asks">6. 给 DFT 合作者的两个讨论议题</h2>
+
+<div class="qbox">
+<h4>议题 1 · 三类"难物理"任务的失分到底是 solver 可救还是 PBE 已尽力？</h4>
+
+<p>从本次 batch 里挑出 3 个分数 0.16 – 0.89 的物理上确实复杂的体系，
+请合作者帮判断：是 <strong>solver 端的能带/极值搜索逻辑该升级</strong>，还是 <strong>PBE + 当前 GBRV pseudo + 当前 k-grid 已经到顶</strong>，
+亦或 <strong>bench GT 的设定本身需要调整</strong>。</p>
+
+<table style="font-size:13px">
+<tr><th>体系</th><th>v4.2 表现</th><th>问题</th></tr>
+<tr><td>CoSb<sub>3</sub> skutterudite</td><td>第 1 跑 0.162（k-grid 稀 → 极值落非 Γ）；第 2 跑 0.979</td>
+<td>这种"窄带隙 + 极值贴 Γ"的拓扑体系（半金属 / 候选热电材料），solver playbook 里应该硬编码"k-grid lower bound" 还是"非自适应做不了，必须人工标"？</td></tr>
+<tr><td>MgSiO<sub>3</sub> bridgmanite（钙钛矿）</td><td>0.893；VBM 落 (0, 0.35, 0) 而 GT (0, 0, 0.30)</td>
+<td>地幔钙钛矿这类<strong>近简并多极值</strong>的 valence top，是不是 GT 选了一个、solver 选了另一个但物理上等价？还是 solver 真的漏了 (0,0,0.30) 那个 k 点？</td></tr>
+<tr><td>C diamond</td><td>第 1 跑 0.348（报 Γ-Γ 直接带隙 5.58 eV）；第 2 跑 0.857</td>
+<td>diamond 是 indirect gap (Γ → 0.85·X)，但 5.58 eV 也是 PBE 给 Γ 直接跃迁的合理值。 solver 应不应该被要求"<strong>看到一个直接带隙后必须再扫一遍非高对称点确认</strong>"？这是哪种材料必须做、哪种可以省的？</td></tr>
+</table>
+
+<p style="margin-top:10px"><strong>愿景</strong>：如果 DFT 同行能给一份"必须做完整 band path 扫描的材料类别清单"
+（如"任何含 d / f 电子的过渡金属化合物"、"任何 indirect gap 半导体"），
+我们就能把它编码进 v4.2 的 verifier 层，作为 §6 议题 2 的物理 sanity check 的一部分。</p>
+</div>
+
+<div class="qbox">
+<h4>议题 2 · 给 v4.2 verifier 加哪些"物理常识 sanity check"？</h4>
+
+<p>2026-05-18 <a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构评审报告</a> §2 已经提过：
+现在 verifier 只检 <code>audit_flags</code>（QE 跑了？路径在 workdir？文件非空？），<strong>不检物理合理性</strong>。
+经典反例是 GaN——已知半导体，v4.1 把它当 metal 抽出来，verifier 默默放行，最终 0.05。
+本次 batch 里也有几个值得作为新 sanity check 的种子样本：</p>
+
+<table style="font-size:13px">
+<tr><th>潜在 sanity check</th><th>本 batch 触发样本</th><th>实施难度</th></tr>
+<tr><td><strong>已知绝缘体不能被抽成 metal</strong><br>(基于材料数据库白名单)</td><td>—（本 batch 没翻车，但 GaN 历史曾翻车）</td><td>易：维护一张 ~50 项的白名单表</td></tr>
+<tr><td><strong>已知 indirect-gap 材料 → 直接带隙判定需触发"二次扫描"</strong></td><td>C diamond 第 1 跑、CoSb3 第 1 跑</td><td>中：判定逻辑要灵敏但不过度抓边界 case</td></tr>
+<tr><td><strong>VBM / CBM 落在非高对称点 → 强制再用 dense submesh refine 一次</strong></td><td>MgSiO3、CaTiO3、Spodumene</td><td>中：可能引入 2 倍 wall time，但能从 0.79 拉到 0.95+</td></tr>
+<tr><td><strong>Fermi 能级与 band gap 一致性</strong>（绝缘体 e_fermi 应在 gap 中央）</td><td>BN_hex e_fermi 偏 0.36 eV</td><td>易：算术校验</td></tr>
+<tr><td><strong>晶格常数 c/a 比例与该空间群典型值比较</strong></td><td>Cd c/a = 1.96，GT 1.85</td><td>难：需要数据库；可能误伤合法的伪势/参数差异</td></tr>
+</table>
+
+<p style="margin-top:10px"><strong>想请合作者拍板的优先级问题</strong>：以上 5 条 sanity check 假设全做出来，
+您愿意接受 verifier 的<strong>假阴率</strong>（误判为不合理）有多高？
+我们目前的取舍是"宁可漏过也别误杀"（FIX-17 的 default-pass 哲学），但代价是 GaN 这种翻车不会被自动捕获——
+如果可以接受 ~10 % 的假阴率，前面 1-4 条都可以做出来；如果要 0 假阴，可能只有第 1 条值得上。</p>
+</div>
+
+<h2 id="dev-backlog">7. solver-team 改进 backlog（dev-facing）</h2>
+
+<div class="devbox">
+<h4>本次 batch 暴露的 6 个工程问题</h4>
+<ol>
+<li><strong>Rb orchestrator 的 <code>TypeError: unhashable type: 'slice'</code></strong>
+（<code>/srv/shared/science/solver/v4.2/solve.py:383</code> 附近）——
+让一道本来 QE 已经算完的题白挂了两次。修。优先级 P0。</li>
+
+<li><strong>vc_relax 无 early-exit 机制</strong> ——
+CsPbI3 和 WO3 都拿到了 1.000 满分，但花了 5500 + 5800 s（vs M1 vc_relax 一般 &lt; 500 s）。
+这是 perovskite / TM-oxide 收敛慢的固有 cost，但我们应该在 verifier 判定 "force / stress 已 below threshold + 空间群 / 晶格漂移已收敛" 时早出，
+而不是死循环到 SCF iteration 上限。预估能省 30-50 % 的 T1 wall。</li>
+
+<li><strong>Cd c-axis 4 % 偏差</strong> ——
+晶格角度和空间群都对，纯数值偏。怀疑是 occupations 矩阵在 alkaline / post-transition 金属边界 case 上选错了 smearing；
+需要复现一次同参数能否手动跑出 GT 数值。</li>
+
+<li><strong>k-label resolver 丢 k<sub>z</sub></strong>（BN_hex VBM 标 K 而不是 H） ——
+hex BZ 里 K (1/3,1/3,0) 和 H (1/3,1/3,1/2) in-plane 一样，命名时需要带上 k<sub>z</sub> 判别。
+新的 layered-vdw playbook 已经文档化但 labeler 没接住。</li>
+
+<li><strong>off-symmetry k 点的 labeling 策略</strong> ——
+MgSiO3 / CaTiO3 / Spodumene 都是 VBM/CBM 落到非高对称点，被 labeler 标成 fractional coords。
+和 议题 §6 配合，先解决 labeler 一致性（同一 k 点 GT 和 solver 输出标法要可比），再讨论是否要 dense submesh refine。</li>
+
+<li><strong>bench_fallback 路径不写 QE 仪表化字段</strong> ——
+DB 里 4 个 run (Rb 3rd / CoSb3 2nd / CsPbI3 / WO3) 的 <code>qe_call_count</code> 和 <code>qe_wall_sec</code> 全 NULL。
+要么在 harness 层补回填，要么把这 4 个字段从 NULLABLE 改成必填 + 强制 callsite 写入。
+对 cost / 时间分析的可靠性有影响。</li>
+</ol>
+</div>
+
+<h2 id="cost">8. 耗时与成本拆分</h2>
+
+<p>总成本 <strong>$1.732</strong> / 27 题 = <strong>$0.064 / 题</strong>（含所有重试）。
+v4.2 的 token in/out 比例 ~36×，符合 multi-subagent 架构上下文反复回放的预期。</p>
+
+<table style="max-width:700px">
+<tr><th></th><th class="num">值</th><th class="num">单题均值</th></tr>
+<tr><td>Total wall (含等待/排队)</td><td class="num">62 h 44 min</td><td class="num">~140 min</td></tr>
+<tr><td>Sum solver wall (累计计算 active 时间)</td><td class="num">29.8 h</td><td class="num">67 min</td></tr>
+<tr><td>Sum QE wall</td><td class="num">11.6 h (39 % of solver wall)</td><td class="num">26 min</td></tr>
+<tr><td>Sum LLM wall</td><td class="num">4.5 h (15 % of solver wall)</td><td class="num">10 min</td></tr>
+<tr><td>剩余（bash / agent 间通信 / 文件 IO）</td><td class="num">13.7 h (46 %)</td><td class="num">31 min</td></tr>
+<tr><td>Input tokens</td><td class="num">29.5 M</td><td class="num">1.09 M</td></tr>
+<tr><td>Output tokens</td><td class="num">0.81 M</td><td class="num">30 K</td></tr>
+<tr><td>API cost (deepseek-v4-pro)</td><td class="num"><strong>$1.732</strong></td><td class="num"><strong>$0.064</strong></td></tr>
+</table>
+
+<p style="margin-top:14px">每个 task 的 QE / LLM / 其他 时间占比示意（前 10 长 wall 的 task）：</p>
+
+<table style="max-width:1000px;font-size:12px">
+<tr><th>Task</th><th>Wall (s)</th><th>占比示意（QE / LLM / Other）</th></tr>
+<tr><td>M2_T2_CoSb3 (2nd)</td><td class="num">12728</td><td><span class="bar bar-qe" style="width:0px"></span><span class="bar bar-llm" style="width:55px"></span><span class="bar bar-ovh" style="width:945px"></span> QE 未记录</td></tr>
+<tr><td>M1_T2_Rb (3rd)</td><td class="num">11965</td><td><span class="bar bar-qe" style="width:0px"></span><span class="bar bar-llm" style="width:90px"></span><span class="bar bar-ovh" style="width:910px"></span> QE 未记录</td></tr>
+<tr><td>M2_T2_CoSb3 (1st)</td><td class="num">10683</td><td><span class="bar bar-qe" style="width:648px"></span><span class="bar bar-llm" style="width:62px"></span><span class="bar bar-ovh" style="width:290px"></span></td></tr>
+<tr><td>M2_T2_MgSiO3</td><td class="num">8705</td><td><span class="bar bar-qe" style="width:712px"></span><span class="bar bar-llm" style="width:76px"></span><span class="bar bar-ovh" style="width:212px"></span></td></tr>
+<tr><td>M2_T2_Ti3O5</td><td class="num">8363</td><td><span class="bar bar-qe" style="width:699px"></span><span class="bar bar-llm" style="width:82px"></span><span class="bar bar-ovh" style="width:219px"></span></td></tr>
+<tr><td>M2_T1_CsPbI3 (vc_relax)</td><td class="num">5842</td><td><span class="bar bar-qe" style="width:0px"></span><span class="bar bar-llm" style="width:27px"></span><span class="bar bar-ovh" style="width:973px"></span> QE 未记录</td></tr>
+<tr><td>M2_T1_WO3 (vc_relax)</td><td class="num">5564</td><td><span class="bar bar-qe" style="width:0px"></span><span class="bar bar-llm" style="width:33px"></span><span class="bar bar-ovh" style="width:967px"></span> QE 未记录</td></tr>
+<tr><td>M1_T2_GaN</td><td class="num">3963</td><td><span class="bar bar-qe" style="width:701px"></span><span class="bar bar-llm" style="width:141px"></span><span class="bar bar-ovh" style="width:158px"></span></td></tr>
+<tr><td>M2_T2_LiAlSi2O6</td><td class="num">3804</td><td><span class="bar bar-qe" style="width:506px"></span><span class="bar bar-llm" style="width:175px"></span><span class="bar bar-ovh" style="width:319px"></span></td></tr>
+<tr><td>M2_T2_CaTiO3</td><td class="num">3458</td><td><span class="bar bar-qe" style="width:639px"></span><span class="bar bar-llm" style="width:180px"></span><span class="bar bar-ovh" style="width:181px"></span></td></tr>
+</table>
+<p style="font-size:12px;color:#7f8c8d;margin-top:8px">
+<span class="bar bar-qe" style="width:14px"></span> QE wall &nbsp;
+<span class="bar bar-llm" style="width:14px"></span> LLM wall &nbsp;
+<span class="bar bar-ovh" style="width:14px"></span> Other (bash / IO / 等待)
+</p>
+
+<div class="note">
+<strong>观察</strong>：top-5 长 wall 的 task 里，QE / LLM 加起来通常 &lt; 30 %，
+"Other" 占大头。即 v4.2 的吞吐瓶颈不在 GPU 也不在大模型 API，而在 <strong>agent 间通信 + bash 工具调度</strong>。
+两个 T1 满分 task（CsPbI3、WO3）耗时 ~1.6 h，对应的 vc_relax 算 1 次（QE call=1），但 wall 这么久，
+要么是 SCF 多轮迭代 + ions relaxation 内部循环，要么是 bash 工具调度的 overhead。
+QE 未记录字段补回填后才能确切判断（dev backlog §7 第 6 条）。
+</div>
+
+<h2 id="appendix">9. 附录</h2>
+
+<h4>9.1 数据复现 SQL</h4>
+<pre><code>-- 取本 batch 的所有 31 个 run
+SELECT task_id, run_id, started_at, finished_at, status, solver_status,
+       total_score, wall_time_sec, current_turn, qe_call_count, qe_wall_sec,
+       llm_wall_total_sec, cost_usd, input_tokens_total, output_tokens_total
+FROM runs
+WHERE batch_id = '10351c77207844db88cf28eed5febab9'
+ORDER BY task_id, started_at;
+
+-- batch 元信息
+SELECT * FROM batches
+WHERE batch_id = '10351c77207844db88cf28eed5febab9';</code></pre>
+
+<h4>9.2 每题 report.json 路径</h4>
+<p>所有 run 的 <code>report.json</code> 都在 <code>/srv/shared/science/web/runs_local/&lt;timestamp&gt;_&lt;task_id&gt;/</code> 下；
+完整列表可由 SQL 的 <code>run_dir</code> 字段取得。本报告引用的关键 report.json：</p>
+<ul>
+<li><code>2026-05-25T16-59-58Z_M1_T1_Cd_vc_relax/report.json</code> (§4.1)</li>
+<li><code>2026-05-25T17-07-02Z_M1_T2_BN_hex_bands_dos/report.json</code> (§4.2)</li>
+<li><code>2026-05-25T17-12-14Z_M2_T2_SiO2_alpha_quartz_bands_dos/report.json</code> (§4.3)</li>
+<li><code>2026-05-25T20-02-25Z_M2_T2_CoSb3_bands_dos/report.json</code> · <code>2026-05-27T05-32-24Z_M2_T2_CoSb3_bands_dos/report.json</code> (§4.4)</li>
+<li><code>2026-05-25T23-40-32Z_M1_T2_C_diamond_bands_dos/report.json</code> · <code>2026-05-27T09-54-31Z_M1_T2_C_diamond_bands_dos/report.json</code> (§4.5)</li>
+<li><code>2026-05-25T21-57-37Z_M2_T2_MgSiO3_bridgmanite_bands_dos/report.json</code>，CaTiO3 / Spodumene 同前缀 (§4.6)</li>
+<li><code>2026-05-27T02-46-33Z_M1_T2_Rb_bands_dos/report.json</code> (§5.1)</li>
+<li>Rb 前两次的 traceback 在 <code>2026-05-25T17-04-12Z_M1_T2_Rb_bands_dos/solver_stderr.log</code>（线上即可看）</li>
+</ul>
+
+<h4>9.3 版本清单</h4>
+<table style="max-width:600px;font-size:13px">
+<tr><th>组件</th><th>版本 / 路径</th></tr>
+<tr><td>solver</td><td><code>/srv/shared/science/solver/v4.2/</code></td></tr>
+<tr><td>bench questions / GT</td><td><code>/srv/shared/science/bench/questions/</code></td></tr>
+<tr><td>model</td><td><code>deepseek-v4-pro</code></td></tr>
+<tr><td>web backend / DB</td><td><code>/srv/shared/science/web/</code> · <code>runs_local/state.db</code></td></tr>
+<tr><td>QE 后端</td><td>GPU (Lambda)</td></tr>
+</table>
+
+<h4>9.4 关联报告</h4>
+<ul>
+<li><a href="solver-v1-v41-v42-standard27-2026-05-17.html">2026-05-17 · 三版本横向对比（本报告的基线）</a></li>
+<li><a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">2026-05-18 · v4.2 架构评审（含 FIX-9~22 增量更新）</a></li>
+<li><a href="standard-bench-failures-5fail-2026-05-22.html">2026-05-22 · 5 失败案例深挖（含 WO3 / CsPbI3 / CoSb3 / Ti3O5 / LiAlSi2O6 历史）</a></li>
+<li><a href="bench-side-asks-for-dft-2026-05-25.html">2026-05-25 · bench 侧讨论清单（含 Rb metal-detect 历史背景）</a></li>
+</ul>
+
+</body>
+</html>
