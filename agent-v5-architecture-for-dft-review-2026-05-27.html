@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v5 Solver 架构 · 邀请 DFT 专家评审 · 2026-05-27（as-wired）</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+         'Microsoft YaHei', sans-serif;
+         max-width: 920px; margin: 40px auto; padding: 0 28px; color: #2c3e50; line-height: 1.75; }
+  h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 12px; margin-top: 30px; }
+  h2 { color: #34495e; border-left: 5px solid #3498db; padding-left: 12px; margin-top: 50px; }
+  h3 { color: #2c3e50; margin-top: 30px; }
+  h4 { color: #34495e; margin-top: 22px; }
+  p { margin: 12px 0; }
+  a { color: #2980b9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+         background: #ecf0f1; padding: 2px 5px; border-radius: 3px; font-size: 90%; color: #c0392b; }
+  pre { background: #2c3e50; color: #ecf0f1; padding: 16px 20px; border-radius: 6px;
+        overflow-x: auto; font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 13px; line-height: 1.55; }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+
+  .meta { background: #ecf0f1; border-left: 4px solid #3498db; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .note { background: #fdf2e9; border-left: 4px solid #e67e22; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .qbox { background: #eafaf1; border: 1px solid #58d68d; border-left: 5px solid #27ae60;
+          padding: 14px 18px; margin: 22px 0; border-radius: 6px; }
+  .qbox h4 { margin: 0 0 8px 0; color: #1d8348; }
+  .qbox ul { margin: 6px 0; padding-left: 22px; }
+  .qbox li { margin: 4px 0; }
+
+  .concept { background: #fef9e7; border: 1px solid #f4d03f; border-radius: 8px;
+             padding: 16px 20px; margin: 24px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .concept .lbl { display: inline-block; background: #f1c40f; color: #fff;
+                  font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+                  margin-right: 8px; }
+  .concept h4 { margin: 0 0 8px 0; display: inline; color: #7d6608; }
+  .concept p { margin: 8px 0 0 0; }
+
+  .analogy { background: #eaf2f8; border-left: 4px solid #5dade2;
+             padding: 12px 18px; margin: 18px 0; border-radius: 4px;
+             font-size: 15px; }
+  .analogy::before { content: "🌰 类比 · "; font-weight: 700; color: #21618c; }
+
+  .diagram-caption { text-align: center; color: #7f8c8d; font-style: italic;
+                     font-size: 14px; margin: 6px 0 30px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #d5dbdb; text-align: left;
+           vertical-align: top; }
+  th { background: #34495e; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  td code { font-size: 12px; }
+
+  nav.toc { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 16px 24px; margin: 24px 0; }
+  nav.toc h3 { margin-top: 0; color: #34495e; }
+  nav.toc ol { padding-left: 24px; }
+  nav.toc li { padding: 3px 0; }
+
+  .svg-wrap { text-align: center; margin: 24px 0 6px; padding: 16px;
+              background: #fafbfc; border-radius: 8px; border: 1px solid #ecf0f1; }
+  .svg-wrap svg { max-width: 100%; height: auto; }
+
+  details { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 8px 14px; margin: 14px 0; }
+  details summary { cursor: pointer; color: #34495e; font-weight: 600; }
+  details[open] summary { margin-bottom: 8px; }
+
+  /* wiring-status badges — new for the v5 doc */
+  .badge { display: inline-block; font-weight: 700; padding: 1px 9px; border-radius: 11px;
+           font-size: 11px; vertical-align: middle; margin-left: 4px; white-space: nowrap; }
+  .b-wired   { background: #d5f5e3; color: #1d8348; border: 1px solid #58d68d; }
+  .b-unwired { background: #fdebd0; color: #9c640c; border: 1px solid #e59866; }
+  .b-weaker  { background: #fadbd8; color: #a93226; border: 1px solid #e6786e; }
+  .legend span { margin-right: 14px; }
+
+  h2[id], h3[id], .concept[id] { scroll-margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>v5 Solver 架构 · 邀请 DFT 专家评审</h1>
+
+<p style="margin: -8px 0 14px; color: #7f8c8d; font-size: 13px;">
+<strong style="background: #d6eaf8; color: #1b4f72; padding: 2px 10px; border-radius: 12px;
+border: 1px solid #2980b9;">as-wired · 2026-05-27</strong>
+&nbsp;这是 <a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构评审文档</a>
+的姊妹篇。同样请你审"代 agent 做主的 DFT 决策物理上合不合理"，但<strong>本文只描述代码里
+<em>真正接线（wired）跑得起来</em>的机制</strong>——v5 有几个招牌功能"写了但没接上线"，下文逐一标注。
+</p>
+
+<div class="note" style="background: #fadbd8; border-left-color: #c0392b;">
+<strong>⚠ 接线状态声明（as-wired，2026-05-27 亲自核对代码）</strong>：v5 是 <code>claude-agent-sdk</code>
+原生重写，架构图上很漂亮，但<strong>多个招牌组件 built-but-unwired</strong>。本文给每个机制贴一个状态徽章：
+<div class="legend" style="margin-top: 8px;">
+<span class="badge b-wired">已接线 wired</span>真跑得到 ·
+<span class="badge b-unwired">建好没接 built-unwired</span>代码+单测齐全但 live path 不调用 ·
+<span class="badge b-weaker">弱于 v4.2 weaker</span>同名机制比 v4.2 弱
+</div>
+<strong>结论先行</strong>：就 <em>DFT 物理决策层面</em>而言，<strong>v4.2 仍是更成熟的 agent</strong>
+（详见 <a href="#s4">§4 对照表</a>）。v5 的创新主要在 agent 工程（结构化工具 / 卡死检测 / 子 agent /
+经验库），而真正写进代码、约束 QE 物理的规则比 v4.2 薄。评审时请聚焦机制的物理合理性，
+以及<strong>哪些该补、哪些该接线</strong>。
+</div>
+
+<div class="meta">
+<strong>给谁看</strong>：DFT / Quantum ESPRESSO 实战熟练、不一定了解 LLM agent 的合作者。<br>
+<strong>看完后请做的事</strong>：跳到 <a href="#s6">§6 想请你审的 4 类问题</a> 给反馈。<br>
+<strong>这是什么</strong>：bench 评测用的 solver 又出了一版 v5。和 v4.2"三个 LLM 角色接力"不同，
+v5 走 Anthropic 的 <code>claude-agent-sdk</code>，给模型一套<strong>结构化工具</strong>（不再让它裸跑 bash），
+出问题时甩给一个<strong>SCF 收敛子 agent</strong>，还加了<strong>卡死检测</strong>和<strong>跨题经验库</strong>。
+本文讲它在哪些 DFT 决策上"代你做了主"，以及这些机制有多少真的接线了。<br>
+<strong>对应代码</strong>：<code>/srv/shared/science/solver/v5/</code>　·
+<strong>相关报告</strong>：
+<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构评审（姊妹篇）</a>、
+<a href="agent-design-survey-2026-05-13.html">跨域 agent 架构调研</a>、
+<a href="solver-versions-explained-2026-05-17.html">四版本入门教程</a><br>
+<strong>预计阅读</strong>：15–20 分钟。
+</div>
+
+<nav class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">起因：v5 想改 v4.2 的什么</a></li>
+  <li><a href="#s2">v5 怎么跑一题：单 executor + 7 个结构化工具</a></li>
+  <li><a href="#s3"><strong>v5 里真正"代 agent 做 DFT 决策"的地方</strong>
+    <ol>
+      <li><a href="#s31">已接线的硬纪律：阈值收紧 + hex/trig k-mesh</a></li>
+      <li><a href="#s32">SCF 症状 → 处方表（6 条）</a></li>
+      <li><a href="#s33">verify_run 物理验收门（T1 / T2）</a></li>
+    </ol>
+  </li>
+  <li><a href="#s4">v4.2 vs v5：DFT 物理决策面对照（核心）</a></li>
+  <li><a href="#s5">真实跑一题：Si vc-relax 的工具轨迹 + 卡死旁路</a></li>
+  <li><a href="#s6">想请你审的 4 类问题</a></li>
+  <li><a href="#s7">附录：代码路径 + 相关链接</a></li>
+</ol>
+</nav>
+
+
+<!-- ─────────────────────────────── §1 ─────────────────────────────── -->
+<h2 id="s1">1 · 起因：v5 想改 v4.2 的什么</h2>
+
+<p>v4.2 是"<strong>三个 LLM 角色接力</strong>（planner → executor → verifier）+ 一堆写死的 DFT 规则"，
+executor 拿到的工具是裸的 <code>bash</code>：它自己 <code>cat</code> 几兆的 <code>.out</code>、自己 grep 路径、
+自己判断收敛。这套能跑，但有几个长期痛点：</p>
+
+<ul>
+  <li><strong>上下文被原始输出撑爆</strong>——<code>cat scf.out</code> 一次几千行进 context，模型容易看花眼、产生幻觉。</li>
+  <li><strong>SCF 不收敛时原地打转</strong>——executor 在同一段上下文里反复重试，越试越乱，没有"换个脑子重新诊断"。</li>
+  <li><strong>每道题从零开始</strong>——上一道 Si 用了什么 ecut / k-mesh，这道题完全不知道。</li>
+  <li><strong>卡死没人管</strong>——模型陷入"再试一次→还是不行→再试一次"时，没有断路器把它拽出来。</li>
+</ul>
+
+<p>v5 的设计回应（灵感来自 SWE-agent 的 ACI、Voyager 的技能库、Magentic-One 的 progress ledger）：</p>
+
+<ol>
+  <li><strong>结构化工具层</strong>：7 个带类型的 MCP 工具替代裸 bash；<code>read_qe_output</code> 只给"开窗"视图，永不整段 dump。</li>
+  <li><strong>SCF 收敛子 agent</strong>（<code>convergence_fixer</code>）：SCF 挂了就甩给一个干净上下文的子 agent，按处方表诊断、最多试 3 次。</li>
+  <li><strong>卡死检测 + ledger</strong>：每次工具调用后跑 7 个信号（S1–S7），命中就往上下文里塞一条 <code>[ledger]</code> 提醒。</li>
+  <li><strong>经验库</strong>（Voyager 式）：把过往成功 run 的参数检索出来，拼到 prompt 前面。</li>
+  <li><strong>程序级 verifier</strong>：<code>verify_run</code> 在提交前做物理 sanity，<code>solve.py</code> 还会复核一道硬门。</li>
+</ol>
+
+<div class="note">
+<strong>诚实的副标题</strong>：上面 5 条里，<strong>真正完整接线、跑得到的只有 1、2（部分）、3、5；
+经验库（4）有个 <code>params={}</code> 的 bug 让它退化成"只记成败、不记参数"；而那张漂亮的
+SCF <em>程序化</em>处方表其实没接上线</strong>（详见 §3.2）。本文不替这些遮丑——恰恰相反，
+"哪些没接线、该不该接"正是想请你帮判断的事。
+</div>
+
+<div class="analogy">
+v4.2 像一个<strong>有总工程师（planner）盯着、按 SOP 手册（5 份材料 playbook + 验收清单）干活的施工队</strong>；
+v5 像<strong>给了一个老师傅一套更趁手的工具箱、出事能叫专家会诊，但暂时撤掉了总工程师、SOP 手册也只剩薄薄一页</strong>。
+工具更好用了，但写死的工艺规范变少了。
+</div>
+
+
+<!-- ─────────────────────────────── §2 ─────────────────────────────── -->
+<h2 id="s2">2 · v5 怎么跑一题：单 executor + 7 个结构化工具</h2>
+
+<p>这一节是<strong>背景</strong>，给你建立"模型在怎么干活"的画面，DFT 物理点在 §3。</p>
+
+<h3>双模式路由</h3>
+<p><code>solve.py</code> 看模型名分流：<code>--model claude-*</code> 走 v5 新栈（SDK 驱动 + 结构化工具）；
+其它模型（如 <code>deepseek-v4-pro</code>）原样复用 v4 的手写 tool-use loop，保证可复现。本文只讲 Claude 路径。</p>
+
+<div class="note" style="background:#fdebd0; border-left-color:#d35400;">
+<strong>这里有个 v5 的退步 <span class="badge b-weaker">weaker</span></strong>：v5 的 Claude 路径是
+<strong>单个 executor</strong>——<strong>没有活的 planner</strong>。代码里有 <code>prompts/strategist.md</code>
+（本想做 planner），但除了它自己和一个路径常量，没有任何地方调用它，driver 不接。
+而 v4.2 有完整的 planner + 类型化 step-DAG + replan。也就是说 <em>"先规划再执行、卡住能重规划"</em>
+这件事，v5 反而丢了。</p>
+</div>
+
+<h3>7 个结构化工具</h3>
+<table>
+<tr><th>工具</th><th>干什么</th><th>对 DFT 的意义</th></tr>
+<tr><td><code>write_qe_input</code></td><td>生成 pw.x 输入（scf/nscf/bands/relax/vc-relax），登记一个 <code>calc_id</code></td><td>写入时自动收紧 vc-relax 阈值（见 §3.1）</td></tr>
+<tr><td><code>run_pw</code></td><td>按 <code>calc_id</code> 跑 pw.x；命令落进 <code>bash.log</code> 供审计；只回简短摘要</td><td>保留 v4 的 bash.log 审计链；禁止后台运行</td></tr>
+<tr><td><code>read_qe_output</code></td><td><strong>开窗</strong>读输出：<code>tail/errors/forces/stress/final_cell/scf_steps/bands_table/summary/grep:PATTERN</code>，默认 200 行、硬上限 1000 行</td><td>永不整段 dump，逼模型按需取证，减少幻觉 <span class="badge b-wired">wired</span></td></tr>
+<tr><td><code>parse_structure</code></td><td>pymatgen <code>SpacegroupAnalyzer</code> 取弛豫后晶格 + 空间群</td><td>T1 提交前必跑——bench 给空间群 0.25 分</td></tr>
+<tr><td><code>verify_run</code></td><td>物理 sanity，回 pass / soft_fail / hard_fail（见 §3.3）</td><td>提交前的物理门；<strong>但硬门有漏洞</strong>，见 §3.3</td></tr>
+<tr><td><code>bash</code></td><td>逃生舱：只在没有结构化工具时用（如 <code>bands.x</code> / <code>dos.x</code> 后处理）</td><td>仍落 bash.log；仍禁后台</td></tr>
+<tr><td><code>submit</code></td><td>设 <code>submit_payload</code> 哨兵，driver 退出循环</td><td>提交 workdir 相对路径</td></tr>
+</table>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 880 430" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+  <!-- task in -->
+  <rect x="20" y="20" width="150" height="48" rx="6" fill="#f5eef8" stroke="#8e44ad"/>
+  <text x="95" y="40" text-anchor="middle" fill="#6c3483">task_prompt.txt</text>
+  <text x="95" y="58" text-anchor="middle" fill="#6c3483" font-size="11">+ 经验检索块</text>
+  <!-- executor -->
+  <rect x="360" y="14" width="170" height="62" rx="8" fill="#d6eaf8" stroke="#2980b9" stroke-width="2"/>
+  <text x="445" y="40" text-anchor="middle" fill="#1b4f72" font-weight="bold">Executor (单个)</text>
+  <text x="445" y="60" text-anchor="middle" fill="#1b4f72" font-size="11">claude-agent-sdk loop</text>
+  <line x1="170" y1="44" x2="358" y2="44" stroke="#7f8c8d" marker-end="url(#ah)"/>
+  <!-- tools box -->
+  <rect x="300" y="120" width="290" height="150" rx="8" fill="#fafbfc" stroke="#d5dbdb"/>
+  <text x="445" y="140" text-anchor="middle" fill="#34495e" font-weight="bold">7 个结构化 MCP 工具</text>
+  <text x="445" y="164" text-anchor="middle" font-size="11" fill="#2c3e50">write_qe_input · run_pw</text>
+  <text x="445" y="184" text-anchor="middle" font-size="11" fill="#2c3e50">read_qe_output（开窗）</text>
+  <text x="445" y="204" text-anchor="middle" font-size="11" fill="#2c3e50">parse_structure · verify_run</text>
+  <text x="445" y="224" text-anchor="middle" font-size="11" fill="#2c3e50">bash（逃生舱）· submit</text>
+  <text x="445" y="252" text-anchor="middle" font-size="10" fill="#7f8c8d">每个 calc 登记 calc_id → calcs.json</text>
+  <line x1="445" y1="76" x2="445" y2="118" stroke="#2980b9" marker-end="url(#ah)"/>
+  <line x1="430" y1="118" x2="430" y2="78" stroke="#2980b9" marker-end="url(#ah)"/>
+  <!-- subagent -->
+  <rect x="640" y="120" width="210" height="62" rx="8" fill="#d5f5e3" stroke="#229954"/>
+  <text x="745" y="144" text-anchor="middle" fill="#196f3d" font-weight="bold">convergence_fixer</text>
+  <text x="745" y="164" text-anchor="middle" font-size="11" fill="#196f3d">SCF 子 agent · 最多 3 次</text>
+  <path d="M590 175 Q620 160 638 152" fill="none" stroke="#229954" marker-end="url(#ahg)"/>
+  <text x="612" y="150" font-size="10" fill="#196f3d">SCF 挂→甩</text>
+  <!-- ledger -->
+  <rect x="640" y="210" width="210" height="60" rx="8" fill="#fdebd0" stroke="#ca6f1e"/>
+  <text x="745" y="234" text-anchor="middle" fill="#9c640c" font-weight="bold">Progress Ledger</text>
+  <text x="745" y="254" text-anchor="middle" font-size="11" fill="#9c640c">S1–S7 卡死信号 → 提醒</text>
+  <path d="M745 210 Q700 195 590 200" fill="none" stroke="#ca6f1e" stroke-dasharray="4 3" marker-end="url(#aho)"/>
+  <text x="640" y="196" font-size="10" fill="#9c640c">[ledger] 注入</text>
+  <!-- experience -->
+  <rect x="20" y="120" width="200" height="60" rx="8" fill="#f5eef8" stroke="#8e44ad"/>
+  <text x="120" y="144" text-anchor="middle" fill="#6c3483" font-weight="bold">经验库</text>
+  <text x="120" y="164" text-anchor="middle" font-size="10" fill="#6c3483">data/experience.jsonl（top-K）</text>
+  <line x1="120" y1="118" x2="120" y2="68" stroke="#8e44ad" marker-end="url(#ahp)"/>
+  <!-- gate + out -->
+  <rect x="320" y="330" width="240" height="56" rx="8" fill="#fadbd8" stroke="#c0392b"/>
+  <text x="440" y="354" text-anchor="middle" fill="#922b21" font-weight="bold">solve.py 复核硬门</text>
+  <text x="440" y="372" text-anchor="middle" font-size="11" fill="#922b21">verify_vc_relax(initial=None) → result.json</text>
+  <line x1="445" y1="270" x2="440" y2="328" stroke="#c0392b" marker-end="url(#ahr)"/>
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#7f8c8d"/></marker>
+    <marker id="ahg" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#229954"/></marker>
+    <marker id="aho" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#ca6f1e"/></marker>
+    <marker id="ahp" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#8e44ad"/></marker>
+    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#c0392b"/></marker>
+  </defs>
+</svg>
+</div>
+<p class="diagram-caption">图 1 · v5 Claude 路径的执行回路。注意：没有 planner 框；strategist 未接线。</p>
+
+<div class="concept">
+<span class="lbl">概念</span><h4>Progress Ledger（卡死检测）</h4>
+<p>每次工具调用后，ledger 按 S1→S7 顺序检查 7 个"卡住"信号（先便宜后贵），命中第一个就往
+模型上下文塞一条 <code>[ledger] You appear stuck (signal=Sx ...)</code> 提醒，并给出 (a)(b)(c) 选项
+（换参数 / 甩给子 agent / 交不完整）。同一信号一个 session 只触发一次。这是纯 Python、无 LLM，
+确定性的断路器。<span class="badge b-wired">wired</span></p>
+<table style="margin-top:10px;">
+<tr><th>信号</th><th>触发条件（核对自 <code>progress_ledger.py</code>）</th></tr>
+<tr><td>S1</td><td>近 6 轮内同一 <code>(工具, 参数哈希)</code> 调用 ≥ 3 次</td></tr>
+<tr><td>S2</td><td>近 8 轮内工具报错 ≥ 6 次</td></tr>
+<tr><td>S3</td><td>≥ 600 s 没有一次 <code>verify_run</code> verdict=pass</td></tr>
+<tr><td>S4</td><td>近 10 轮内同一条 bash 命令（去掉 cd）≥ 3 次</td></tr>
+<tr><td>S5</td><td>近 4 轮内"挫败语"正则命中 ≥ 3 次（"let me try again / keeps failing / still not …"）</td></tr>
+<tr><td>S6</td><td>近 15 轮内没有一次 run_pw 成功、也没有 verify pass</td></tr>
+<tr><td>S7</td><td>输入 token 用了 ≥ 70%，却还没有一次成功 verify</td></tr>
+</table>
+</div>
+
+
+<!-- ─────────────────────────────── §3 ─────────────────────────────── -->
+<h2 id="s3">3 · v5 里真正"代 agent 做 DFT 决策"的地方</h2>
+
+<p>这是本文的物理核心。v5 写进代码、约束 QE 物理的就这三块：<strong>(§3.1) 输入阈值 + k-mesh 纪律、
+(§3.2) SCF 处方表、(§3.3) verify_run 验收门</strong>。我把每块的接线状态都标出来。</p>
+
+<h3 id="s31">3.1 · 已接线的硬纪律：阈值收紧 + hex/trig k-mesh</h3>
+
+<h4>vc-relax 阈值自动收紧 <span class="badge b-wired">wired</span></h4>
+<p><code>write_qe_input</code> 生成输入后立刻过 <code>qe_input_lint</code>，对 vc-relax 把三个收敛阈值
+按 <code>min(模型给的值, 默认严值)</code> 收紧，模型只能更严不能更松：</p>
+<table>
+<tr><th>关键字</th><th>强制严值</th><th>所在 namelist</th><th>物理后果（放松的话）</th></tr>
+<tr><td><code>press_conv_thr</code></td><td>0.05 kbar</td><td><code>&CELL</code></td><td rowspan="3">阈值一松，弛豫后晶格漂移，pymatgen <code>SpacegroupAnalyzer</code> 会把 cubic 误降成 trigonal，bench 空间群分确定性掉 0.25</td></tr>
+<tr><td><code>forc_conv_thr</code></td><td>1.0×10⁻⁴ Ry/Bohr</td><td><code>&CONTROL</code></td></tr>
+<tr><td><code>etot_conv_thr</code></td><td>1.0×10⁻⁵ Ry</td><td><code>&CONTROL</code></td></tr>
+</table>
+<p>这条和 v4.2 一致，是从 v3 起就吃过亏总结出来的硬纪律。</p>
+
+<h4>六方 / 三方晶系 k-mesh ÷3 纪律 <span class="badge b-wired">wired</span></h4>
+<p>写在 executor 主 prompt 里、并由 <code>qe_input_lint</code> 出 warning：六方/三方晶系（ibrav=4/5 或晶格角≈120°/60°）的
+SCF k-mesh 的 <code>N_x</code>、<code>N_y</code> <strong>必须能被 3 整除</strong>，才能采到
+K=(⅓,⅓,0) 和 H=(⅓,⅓,½) 角点——而 VBM/CBM 常落在那里（BN_hex、石墨烯衍生物、α-石英、hex GaN/AlN…）。</p>
+<ul>
+  <li>推荐 hex SCF：<code>[12,12,N_z]</code> 或 <code>[18,18,N_z]</code>；<strong>不要</strong> <code>[8,8,_]</code> / <code>[10,10,_]</code>。</li>
+  <li>三方：<code>[12,12,12]</code> 起步，各分量 ÷3。</li>
+  <li>选了非 ÷3 → SCF Fermi 偏低、评测器把 VBM/CBM 误判 ~0.1 eV → <code>vbm_k_label=OFF_PATH</code>、扣 0.2/1.0。</li>
+</ul>
+<div class="note">这是 v5 比较亮眼的一条<strong>真·已接线</strong>的 DFT 纪律，来自 2026-05 对 hex 题的复盘（见 git 提交
+<code>T1 k-mesh formula + T2 seekpath primitive cell</code>）。请你重点看 §6 里它对不对。</div>
+
+<h3 id="s32">3.2 · SCF 症状 → 处方表（6 条）<span class="badge b-unwired">程序表 built-unwired</span></h3>
+
+<div class="note" style="background:#fdebd0; border-left-color:#d35400;">
+<strong>接线真相（务必先读）</strong>：v5 写了一张<strong>程序化</strong>的处方表
+<code>agent/subagents/playbook_scf.py</code>（<code>match_symptom()</code> 正则匹配错误签名、
+<code>merge_remedy()</code> 自动合并参数补丁），<strong>还配了单元测试</strong>——但<strong>除了测试，
+没有任何 live 代码 import 它</strong>。真正跑的时候，<code>convergence_fixer</code> 子 agent
+是<strong>让 LLM 读一份 markdown 表</strong>（<code>prompts/convergence_subagent.md</code>）自己挑处方，
+而不是调那张确定性的 Python 表。
+<br><br>
+更糟的是<strong>两张表内容已经漂移</strong>：markdown 把 <code>electron_maxstep</code> 放进了
+<code>extra_control</code>（<strong>错的 namelist</strong>——它属于 <code>&ELECTRONS</code>），
+而 Python 表正确地放进 <code>extra_electrons</code>。也就是说<strong>真正跑的那张表，反而是错得更多的那张</strong>。
+</div>
+
+<p>下面这张是<strong>程序化表</strong>（<code>playbook_scf.py</code>，物理上更可信的那份）的完整内容。
+子 agent 拿到一个失败的 <code>calc_id</code>，先 <code>read_qe_output(window="errors")</code> +
+<code>scf_steps</code> 看症状，按下表选处方，<code>write_qe_input</code> 重写输入 → <code>run_pw</code> →
+<code>verify_run</code>，最多 3 次：</p>
+
+<table>
+<tr><th>#</th><th>症状（pw.x 输出正则）</th><th>首选处方</th><th>失败则升级</th><th>物理依据</th></tr>
+<tr><td>1</td><td><code>convergence NOT achieved …</code></td><td><code>electron_maxstep=200</code></td><td>→ <code>mixing_beta=0.3, mixing_ndim=12</code> → <code>mixing_mode=local-TF</code></td><td>默认 100 步不够；再不行是混合太猛振荡，降阻尼+扩 Pulay 子空间</td></tr>
+<tr><td>2</td><td><code>charge density is (too) negative</code></td><td><code>mixing_mode=local-TF, mixing_beta=0.4</code></td><td>→ k-mesh ×2</td><td>负电荷密度 → 换预条件器；BZ 欠采样产生分数占据 → 加密</td></tr>
+<tr><td>3</td><td><code>S matrix not positive definite</code></td><td><code>occupations=smearing, smearing=mv, degauss=0.02</code></td><td>→ <code>ecutrho ×1.5</code></td><td>金属没开 smearing → 上 MV+0.02 Ry 标配；overlap 矩阵在低 ecutrho 病态</td></tr>
+<tr><td>4</td><td><code>eigenvalues not converged</code> / <code>Error in routine c_bands</code></td><td><code>diago_thr_init=1e-2, startingwfc=atomic+random</code></td><td>→ <code>diagonalization=cg</code></td><td>初猜差 → 放松对角化阈值+扰动波函；Davidson 卡住换更稳的 CG</td></tr>
+<tr><td>5</td><td>SCF accuracy 连续 5+ 步振荡（charge sloshing）</td><td><code>mixing_beta=0.2, mixing_ndim=12, electron_maxstep=300</code></td><td>（无）</td><td>振荡 → 强阻尼 + 更大 Pulay 子空间</td></tr>
+<tr><td>6</td><td><code>symmetry error / inconsistent / not preserved</code></td><td><code>force_symmorphic=.true.</code></td><td>（无）</td><td>非点式（non-symmorphic）对称惹麻烦 → 强制 symmorphic</td></tr>
+</table>
+
+<div class="concept">
+<span class="lbl">概念</span><h4>为什么用"干净上下文"的子 agent</h4>
+<p>v4.2 是 executor 在<strong>同一段上下文</strong>里原地重试 SCF——同样的推理、同样的盲点，越试越糊。
+v5 的 <code>convergence_fixer</code> 是个 <strong>fresh-context</strong> 的子 agent：看不到父 agent
+那些失败尝试，被逼着重新诊断；只给它 4 个工具（读/写/跑/验，没有 bash、没有 submit）；硬性最多 3 次。
+这套<strong>调度结构是已接线的</strong> <span class="badge b-wired">wired</span>——只是它脑子里那张表
+是 markdown 而非程序化表（见上方真相框）。</p>
+</div>
+
+<h3 id="s33">3.3 · verify_run 物理验收门（T1 / T2）<span class="badge b-weaker">硬门 weaker</span></h3>
+
+<p><code>verify_run</code> 跑两遍：执行中作为模型的<strong>顾问</strong>调用一次；<code>solve.py</code> 在最终提交前作为
+<strong>强制硬门</strong>再跑一次。返回 <code>pass</code> / <code>soft_fail</code>（仅 advisory 项没过）/ <code>hard_fail</code>（任一非 advisory 项没过）。</p>
+
+<h4>T1 vc_relax 检查项（核对自 <code>verify_run.py</code>）</h4>
+<table>
+<tr><th>检查</th><th>类型</th><th>阈值</th><th>说明</th></tr>
+<tr><td>file_present_and_sized</td><td>hard</td><td>≥ 1024 B</td><td>镜像 bench 审计</td></tr>
+<tr><td>job_done_marker</td><td>hard</td><td>末 64 KB 含 <code>JOB DONE.</code></td><td>bench 审计要求</td></tr>
+<tr><td>scf_converged</td><td>hard</td><td><code>convergence=true</code></td><td>电子循环达到 etot_conv_thr</td></tr>
+<tr><td>forces_below_thr</td><td>hard</td><td>max\|F\| ≤ 1.0×10⁻⁴ Ry/Bohr（≈2.57×10⁻³ eV/Å，换算常数 25.71104）</td><td>力太松 = 没到真正极小</td></tr>
+<tr><td>stress_below_thr</td><td>hard</td><td>max\|σ_对角\| ≤ 0.05 kbar</td><td>应力太松 = 晶胞没收敛</td></tr>
+<tr><td>space_group_preserved</td><td>hard*</td><td>sg_后 == sg_前</td><td><strong>仅当传了 initial 才跑</strong>——见下方漏洞框</td></tr>
+<tr><td>advisory:lattice_drift_under_5pct</td><td>advisory</td><td>max(Δa/a,…) ≤ 0.05</td><td>抓"跑错材料"；仅当传 initial</td></tr>
+<tr><td>angles_preserved</td><td>hard*/advisory</td><td>cubic ≤ 0.5°，其它 ≤ 1.0°</td><td>仅当传 initial</td></tr>
+</table>
+
+<div class="note" style="background:#fadbd8; border-left-color:#c0392b;">
+<strong>⚠ 硬门漏洞（v5 弱于 v4.2 的关键一处）</strong>：<code>solve.py:213</code> 的强制硬门是
+<code>verify_vc_relax(out_path, initial=None)</code>——<strong><code>initial=None</code></strong>。
+于是 <code>space_group_preserved</code> / <code>lattice_drift</code> / <code>angles_preserved</code>
+这三项在硬门里<strong>全部被跳过</strong>。换句话说，<strong>那个本该守护"空间群 0.25 分"的硬门，
+其实根本没查空间群</strong>——只有当 executor 在执行中的顾问调用里<em>记得</em>手动传 <code>initial=</code>
+时才会查。而 v4.2 的 <code>physics_sanity</code> 直接 import bench 自己的 <code>extract_t2_fields</code>、
+做 8 条规则、且金属/绝缘体判据带 <code>pbe_near_metal</code> 软警告分支——明显更厚。
+</div>
+
+<h4>T2 bands_dos 检查项</h4>
+<p>要 4 个文件（scf.out / bands.out / bands.dat / dos.dat，均 ≥1024 B）。检查：scf 收敛；
+<code>|E_F| &lt; 50 eV</code> 且有限；bands.dat 可解析、k 路径单调、nbnd ≥ 4；dos.dat 行数 &gt; 10、
+能量窗覆盖 <code>E_F ± 2 eV</code>；带隙落在启发式 <code>[0, 12] eV</code>。这些是粗粒度的"没崩"门，
+不是精度门——请你看 §6 评判够不够。</p>
+
+
+<!-- ─────────────────────────────── §4 ─────────────────────────────── -->
+<h2 id="s4">4 · v4.2 vs v5：DFT 物理决策面对照（核心）</h2>
+
+<p>把两版"代 agent 做主的 DFT 物理决策"摆一起，这是本文最该让你看清的一张表。
+<strong>左列 v4.2、右列 v5。</strong></p>
+
+<table>
+<tr><th>物理决策维度</th><th>v4.2（更厚）</th><th>v5（更薄）</th></tr>
+<tr>
+  <td>occupations / smearing 决策</td>
+  <td>5 材料类型 × 4 工作流阶段的 <strong>occupations 决策矩阵</strong>（金属/绝缘体/pbe_near_metal/磁性 TM 氧化物/金属性 TM 氧化物）<span class="badge b-wired">wired</span></td>
+  <td>无矩阵。只在 SCF 处方表第 3 条出现"金属没 smearing→上 MV"这一条被动补救</td>
+</tr>
+<tr>
+  <td>材料家族 playbook</td>
+  <td><strong>5 份</strong>：alkali-metal / complex-silicate / low-symmetry-oxide / polar-III-V / layered-vdw（含"层状 vdW 跳过 vc-relax 用输入晶胞"等专门处置）<span class="badge b-wired">wired</span></td>
+  <td><strong>0 份</strong>。无材料家族分流</td>
+</tr>
+<tr>
+  <td>物理验收 / sanity</td>
+  <td><code>physics_sanity</code> 直接 import bench 的 <code>extract_t2_fields</code>，<strong>8 条规则</strong>，含金属×带隙矛盾的 fail/replan、pbe_near_metal 软警告、识别 bench 的奇数电子 bug<span class="badge b-wired">wired</span></td>
+  <td><code>verify_run</code>：T1 力/应力/JOB DONE/（条件性）空间群；硬门 <code>initial=None</code> 跳过空间群<span class="badge b-weaker">weaker</span></td>
+</tr>
+<tr>
+  <td>SCF 不收敛补救</td>
+  <td>有 planner+replan 预算与重试 hook，但无确定性症状→处方表（prose 提示）</td>
+  <td>有 <strong>6 条程序化处方表</strong>（设计更好）<span class="badge b-unwired">但未接线</span>；live 跑的是 markdown 表，且有 namelist 错</td>
+</tr>
+<tr>
+  <td>规划 / 重规划</td>
+  <td>planner + 类型化 step-DAG + replan<span class="badge b-wired">wired</span></td>
+  <td>单 executor，<strong>无 planner</strong>（strategist 未接线）<span class="badge b-weaker">weaker</span></td>
+</tr>
+<tr>
+  <td>k-mesh 纪律</td>
+  <td>hex/trig 处置（在 low-symmetry / playbook 内）</td>
+  <td><strong>hex/trig ÷3 纪律</strong>写进 prompt + lint warning<span class="badge b-wired">wired</span></td>
+</tr>
+<tr>
+  <td>输出读取卫生</td>
+  <td>executor 仍可 <code>cat</code> 大文件（qe_facts 只是 ≤200 字顾问）</td>
+  <td><strong>强制开窗</strong> <code>read_qe_output</code>，禁整段 dump<span class="badge b-wired">wired</span>（v5 在这一项更好）</td>
+</tr>
+<tr>
+  <td>卡死断路器</td>
+  <td>无 step 内断路器（只有 retry/replan 预算）</td>
+  <td><strong>7 信号 ledger</strong><span class="badge b-wired">wired</span>（v5 在这一项更好）</td>
+</tr>
+<tr>
+  <td>跨题经验</td>
+  <td>方法论"踩坑笔记"，精确→模糊特征匹配，仅 recover 时写，严格防答案泄漏</td>
+  <td>Voyager 式 top-K 参数检索，但 <code>recorder</code> 写 <code>params={}</code> 的 bug 让它只记成败<span class="badge b-weaker">weaker</span></td>
+</tr>
+</table>
+
+<div class="note">
+<strong>一句话</strong>：v5 在 <em>agent 工程卫生</em>（开窗读取、卡死断路、子 agent 隔离）上确实领先；
+但在 <em>DFT 物理决策的厚度</em>上明显薄于 v4.2，且最该体现物理智慧的两处（程序化处方表、空间群硬门）
+要么没接线、要么被 <code>initial=None</code> 架空。<strong>§6 的核心就是请你判断：v5 该不该把 v4.2 的物理层搬过来。</strong>
+</div>
+
+
+<!-- ─────────────────────────────── §5 ─────────────────────────────── -->
+<h2 id="s5">5 · 真实跑一题：Si vc-relax 的工具轨迹 + 卡死旁路</h2>
+
+<p>顺一遍正常路径（Claude 路径，T1 Si vc-relax），让你看清工具怎么串：</p>
+
+<pre><code>solve.py amain()
+├─ parse_required_keys(prompt)        → ["vc_relax_out"]
+├─ retrieve_for_task()                → 把过往成功 Si run 拼到 prompt 前（注：参数因 params={} bug 缺失）
+├─ Driver.run(executor)
+│  ├─ turn1  write_qe_input(calc="vc-relax", ecutwfc=60, ecutrho=480, kpts=[8,8,8])
+│  │         → lint 收紧 press/forc/etot 阈值 → 登记 calc_001_vc_relax_si
+│  ├─ turn2  run_pw(calc_id=calc_001…)            → JOB DONE.；摘要回一行
+│  ├─ turn3  parse_structure(calc_id=calc_001…)   → a=b=c=5.47Å, sg=227 (Fd-3m) ✓
+│  ├─ turn4  verify_run(calc_id=calc_001…, expected_type="vc_relax", initial={…sg=227…})
+│  │         → 顾问调用：力/应力/空间群全过 → verdict=pass
+│  └─ turn5  submit({"vc_relax_out": "calc_001_vc_relax_si/output.out"})  → 哨兵置位
+├─ _gate_check → verify_vc_relax(out, initial=None)   ← 注意：硬门没查空间群
+└─ write_result(result.json) → exit 0</code></pre>
+
+<p>再看一条<strong>卡死旁路</strong>（SCF 不收敛 + S3 触发）：</p>
+
+<pre><code>turn8  run_pw(calc_002_scf…)  → "convergence NOT achieved after 100 iterations"
+turn9  read_qe_output(calc_002…, window="errors")  → 确认症状
+…executor 在同上下文里又试了两次（turn10/11），墙钟超 600s…
+turn12 [ledger] You appear stuck (signal=S3: no verify_run pass in 610s).
+        choices: (a) verify 最接近完成的 calc (b) SCF 没收敛→甩 convergence_fixer (c) 交不完整
+turn13 Agent(convergence_fixer, calc_002)         ← 甩给干净上下文子 agent
+        ├─ read_qe_output(window="errors"/"scf_steps")
+        ├─ 选处方：electron_maxstep=200（按 markdown 表；程序表本会更稳）
+        ├─ write_qe_input(…+remedy) → run_pw → verify_run → pass
+        └─ 返回新的成功 calc_id
+turn14 executor 用新 calc 继续 → submit</code></pre>
+
+<p>这条轨迹同时暴露了本文反复强调的两点：<strong>子 agent 调度确实接线、能把模型从死循环里拽出来</strong>（好），
+但<strong>它选处方靠的是那张有 namelist 错的 markdown 表，而非旁边那张更对的程序化表</strong>（待修）。</p>
+
+
+<!-- ─────────────────────────────── §6 ─────────────────────────────── -->
+<h2 id="s6">6 · 想请你审的 4 类问题</h2>
+
+<div class="qbox">
+<h4>§6.1 · 这 6 条 SCF 症状→处方规则，物理上对不对、全不全？该不该接线？</h4>
+<ul>
+  <li>逐条看 §3.2 的表：症状判据（正则匹配的那串 pw.x 报错）和处方是否合理？比如
+      "<code>S matrix not positive definite</code> → 强制 MV smearing + degauss 0.02"——这个因果对吗？
+      有没有该是"先查是不是真金属、别盲目 smearing 把绝缘体也抹了"？</li>
+  <li>升级链对吗？如 <code>mixing_beta 0.7→0.3→local-TF</code>、<code>Davidson→CG</code> 的顺序与取值。</li>
+  <li>漏了哪些常见 SCF 失败模式（如 starting magnetization 不当、ESM/带电体系、强关联需 +U）？</li>
+  <li><strong>关键决策</strong>：既然程序化表（确定性、可在花一个 LLM 轮次前就自动重跑）物理上更可信，
+      <strong>值不值得把它接线、取代当前让 LLM 读 markdown 的做法</strong>？还是说"让 LLM 灵活挑"更稳妥？</li>
+</ul>
+</div>
+
+<div class="qbox">
+<h4>§6.2 · verify_run 的 T1/T2 物理门，阈值定得对吗？</h4>
+<ul>
+  <li>T1：force 1×10⁻⁴ Ry/Bohr、stress 0.05 kbar、cubic 角度漂移 0.5°、晶格漂移 5%——
+      这些当"通过/打回"的判据是否合适？对低对称（单斜/三斜）体系 0.5°/1.0° 的角度容差够不够？</li>
+  <li>T2：<code>|E_F|&lt;50 eV</code>、带隙 <code>[0,12] eV</code>、DOS 覆盖 <code>E_F±2 eV</code>、nbnd≥4——
+      这些"plausibility"门是否太宽/太窄？比如宽带隙绝缘体（&gt;12 eV，如某些氟化物）会不会被误杀？</li>
+  <li><strong>关键</strong>：硬门 <code>initial=None</code> 跳过空间群检查（§3.3 漏洞框），
+      你认为应当让硬门强制带上 initial、把空间群守住吗？（这正是 0.25 分所在）</li>
+</ul>
+</div>
+
+<div class="qbox">
+<h4>§6.3 · v5 该不该把 v4.2 的物理层整体搬过来？</h4>
+<ul>
+  <li>对照 §4：v4.2 有 occupations 5×4 矩阵、5 份材料 playbook、8 条 <code>physics_sanity</code>（含识别 bench odd-nelec bug）。
+      v5 几乎都没有。<strong>你觉得 v5 现在"薄"得能用吗，还是必须补齐这些才算合格的 DFT agent？</strong></li>
+  <li>如果只能先补一样，你会优先补哪个：occupations 矩阵 / 材料 playbook / physics_sanity？为什么？</li>
+  <li>有没有哪条 v4.2 的规则你其实觉得是<strong>过度拟合</strong>、v5 不抄反而更干净？</li>
+</ul>
+</div>
+
+<div class="qbox">
+<h4>§6.4 · 经验库"按过往相似 run 直接套参数"，物理上站得住吗？</h4>
+<ul>
+  <li>v5 设想：检索过往成功 run 的 <code>ecut / kpts / smearing / degauss</code> 拼进 prompt 当起点。
+      <strong>跨材料家族套参数有没有风险？</strong>比如把 Si 的 <code>degauss</code> 套到过渡金属氧化物上、
+      或把某 ecut 套到含更硬赝势的元素上。</li>
+  <li>"相似"该按什么定义才物理安全：化学式？空间群？赝势家族？还是必须按"元素的赝势硬度 + 是否磁性 + 金属/绝缘体"这种物理特征？</li>
+  <li>（提醒：当前 <code>recorder</code> 有 <code>params={}</code> bug，参数其实没存下来——所以这条目前是
+      "设计意图"评审，不是"现状"评审。修好之后上面的担忧才成立。）</li>
+</ul>
+</div>
+
+
+<!-- ─────────────────────────────── §7 ─────────────────────────────── -->
+<h2 id="s7">7 · 附录：代码路径 + 相关链接</h2>
+
+<table>
+<tr><th>组件</th><th>文件（<code>/srv/shared/science/solver/v5/</code> 下）</th></tr>
+<tr><td>入口 / 双模式路由 / 复核硬门</td><td><code>solve.py</code>（硬门在 <code>:213</code>，<code>initial=None</code>）</td></tr>
+<tr><td>SDK 驱动</td><td><code>agent/runtime/driver.py</code></td></tr>
+<tr><td>卡死检测 ledger（S1–S7）</td><td><code>agent/runtime/progress_ledger.py</code>（常数在 <code>:31-44</code>）</td></tr>
+<tr><td>7 个结构化工具</td><td><code>agent/tools/structured/</code>（<code>server.py</code> + 各 tool）</td></tr>
+<tr><td>开窗读取</td><td><code>agent/tools/structured/read_qe_output.py</code></td></tr>
+<tr><td>物理验收门</td><td><code>agent/tools/structured/verify_run.py</code>（阈值 <code>:40-42</code>）</td></tr>
+<tr><td>SCF 处方表（程序化，未接线）</td><td><code>agent/subagents/playbook_scf.py</code>（只被 tests + <code>__init__</code> import）</td></tr>
+<tr><td>SCF 子 agent（已接线，读 markdown）</td><td><code>agent/subagents/convergence.py</code> + <code>agent/prompts/convergence_subagent.md</code></td></tr>
+<tr><td>阈值收紧 + k-mesh 纪律</td><td><code>agent/tools/qe_input_lint.py</code> + <code>agent/prompts/executor.md</code>（<code>:63-75</code>）</td></tr>
+<tr><td>经验库（params={} bug）</td><td><code>agent/experience/</code>（recorder / retriever / store / embed）</td></tr>
+<tr><td>未接线的 planner</td><td><code>agent/prompts/strategist.md</code>（无 driver 调用）</td></tr>
+</table>
+
+<p><strong>相关报告</strong>：
+<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构评审（姊妹篇，物理层更厚）</a> ·
+<a href="agent-design-survey-2026-05-13.html">跨域 agent 架构调研（驱动 v5 的设计来源）</a> ·
+<a href="solver-versions-explained-2026-05-17.html">四版本 solver 入门教程</a> ·
+<a href="index.html">← 返回报告索引</a></p>
+
+<p style="color:#7f8c8d; font-size:13px; margin-top:30px;">
+本文所有阈值 / 规则 / 行号均于 2026-05-27 亲自核对自 <code>/srv/shared/science/solver/v5/</code> 源码。
+接线状态徽章反映核对当时的 live path 实际调用关系，非设计意图。
+</p>
+
+</body>
+</html>
