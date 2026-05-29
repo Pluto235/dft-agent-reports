@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>v5.1 Solver 架构 · v5 chassis + v4.2 知识层 · 2026-05-29（explainer）</title>
+<title>v5.1 Solver 架构 · 结构设计讲解 · 2026-05-29（v2）</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
          'Microsoft YaHei', sans-serif;
@@ -70,12 +70,13 @@
   details summary { cursor: pointer; color: #34495e; font-weight: 600; }
   details[open] summary { margin-bottom: 8px; }
 
-  /* wiring-status badges (same vocabulary as the v5 doc) */
+  /* wiring-status badges */
   .badge { display: inline-block; font-weight: 700; padding: 1px 9px; border-radius: 11px;
            font-size: 11px; vertical-align: middle; margin-left: 4px; white-space: nowrap; }
   .b-wired   { background: #d5f5e3; color: #1d8348; border: 1px solid #58d68d; }
   .b-unwired { background: #fdebd0; color: #9c640c; border: 1px solid #e59866; }
   .b-phase2  { background: #ebdef0; color: #6c3483; border: 1px solid #bb8fce; }
+  .b-fixed   { background: #d6eaf8; color: #1b4f72; border: 1px solid #5dade2; }
   .legend span { margin-right: 14px; }
   .score-good { color: #1d8348; font-weight: 700; }
   .score-mid  { color: #9c640c; font-weight: 700; }
@@ -86,526 +87,509 @@
 </head>
 <body>
 
-<h1>v5.1 Solver 架构 · v5 chassis + v4.2 知识层</h1>
+<h1>v5.1 Solver 架构 · 结构设计讲解</h1>
 
 <p style="margin: -8px 0 14px; color: #7f8c8d; font-size: 13px;">
 <strong style="background: #d6eaf8; color: #1b4f72; padding: 2px 10px; border-radius: 12px;
-border: 1px solid #2980b9;">explainer · as-wired · 2026-05-29</strong>
-&nbsp;这是 <a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构文档</a> 的续篇。
-v5 文档讲的是 <em>chassis</em>（结构化工具 / 卡死检测 / 子 agent / 经验库）；<strong>本文讲 v5.1
-在那个底盘上加了什么</strong>，目标是让合作者和我自己都能看懂 v5.1 的设计与取舍。建议先读 v5 文档的 §2/§3 建立画面。
+border: 1px solid #2980b9;">explainer · v2 · 2026-05-29</strong>
+&nbsp;<strong>本文自带上下文，不要求先读别的报告</strong>。目标是让合作者和我自己看懂 v5.1 这个 solver 的
+<strong>结构设计</strong>——一道题怎么从 prompt 流到结果。§2 是结构主干，其余是 v5.1 相对 v5 的具体改动。
+（想更深可参 <a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构评审</a> /
+<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构</a>，但非必读。）
 </p>
 
 <div class="note" style="background: #d5f5e3; border-left-color: #1d8348;">
-<strong>一句话：v5.1 = v5 底盘 + 把 v4.2 的"知识层"以一个共享 <code>preflight</code> 搬进来 + 三条写死的系统提示词
-lesson。</strong> 它解决的是一个具体的失败：v5 在 <code>deepseek-v4-pro</code>（legacy 路径）上跑 M2 vc-relax 时
-自己挑了 <code>ecutwfc=80 / ecutrho=800 / 8×8×8（=512 k）</code>，单道 vc-relax 撞穿 ~4 h 的 harness 墙钟被回收 → 0 分。
-v5.1 让它<strong>"够用就行，别过度收敛"</strong>。<br><br>
-<strong>结果（实测，<code>deepseek-v4-pro</code>，2026-05-28）</strong>：两道目标题都到
-<span class="score-good">1.0</span> —
-<code>M2_T1_CsPbI3_gamma_vc_relax</code>（1.0，墙钟 ~79 min）和 <code>M2_T1_WO3_roomT_vc_relax</code>（1.0）。目标达成（§6）。
+<strong>一句话总览</strong>：v5.1 是 bench 评测用的 solver——<strong>一个用大模型驱动 Quantum ESPRESSO（pw.x）
+跑 DFT 任务的 agent</strong>。它给模型一套<strong>带类型的工具</strong>（写输入 / 跑 pw.x / 开窗读输出 / 验收 / 提交），
+让模型一步步把一道题做完，中途配了卡死检测、SCF 收敛子 agent、提交前的物理验收门。
+<strong>v5.1 = v5 的这套底盘 + 把 v4.2 的"材料知识层"搬进来当 preflight + 三条写死的提示词 lesson。</strong><br><br>
+<strong>本次 v2 更新（2026-05-29，提交 <code>944602f</code>）的两件大事</strong>：
+① <strong>路由变了</strong>——<code>deepseek-*</code> 模型现在也走 SDK 路径（§3）；
+② <strong>四个 review 修复 C1–C4</strong>（§6），其中两个正好补上了 v5 评审里点出的洞（空间群硬门、namelist 串味）。
 </div>
 
 <div class="note">
-<strong>接线状态徽章（同 v5 文档的词汇，2026-05-29 亲自核对代码 / git log / runs DB）</strong>：
-v5.1 只把知识层的<strong>确定性部分</strong>接上了线；几个组件是"建好没接"或"留给 Phase 2"。每个机制贴一个状态徽章：
+<strong>接线状态徽章</strong>（2026-05-29 亲自核对代码 / git log / runs DB）：
 <div class="legend" style="margin-top: 8px;">
 <span class="badge b-wired">已接线 wired</span>live path 真调用 ·
-<span class="badge b-unwired">建好没接 built-unwired</span>代码+单测齐全但 live path 不调用 ·
-<span class="badge b-phase2">Phase 2</span>路线图里、尚未实现
+<span class="badge b-fixed">本次修复 C1–C4</span>944602f 修掉 ·
+<span class="badge b-unwired">建好没接 built-unwired</span>有代码+单测但 live 不调用 ·
+<span class="badge b-phase2">Phase 2</span>路线图、尚未实现
 </div>
 </div>
 
 <div class="meta">
-<strong>给谁看</strong>：DFT / Quantum ESPRESSO 实战熟练、想搞懂 v5.1 在做什么的合作者（以及未来的我）。<br>
-<strong>读完你会知道</strong>：v5.1 相对 v5 改了哪三件事、preflight 怎么把材料知识喂进去、为什么移植 v4.2
-顺手补了两个"背题"漏洞、它在 bench 上到底跑成什么样、以及哪些故意留给了 Phase 2。<br>
-<strong>对应代码</strong>：<code>/srv/shared/science/solver/v5.1/</code>（git 分支 <code>v5.1</code>）<br>
-<strong>相关报告</strong>：
-<a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构（底盘，前篇）</a> ·
-<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构（知识层来源）</a> ·
-<a href="solver-versions-explained-2026-05-17.html">四版本入门教程</a><br>
-<strong>预计阅读</strong>：12–18 分钟。
+<strong>给谁看</strong>：DFT / Quantum ESPRESSO 熟练、想搞懂这个 agent 怎么搭的合作者（以及未来的我）。<br>
+<strong>读完你会有</strong>：一张"任务怎么流过系统"的清晰心智图（§2），知道现在哪些模型走哪条路（§3），
+v5.1 加了什么知识（§4–5），这次修了什么（§6），还差什么（§9）。<br>
+<strong>对应代码</strong>：<code>/srv/shared/science/solver/v5.1/</code>（git 分支 <code>v5.1</code>，HEAD <code>944602f</code>）<br>
+<strong>预计阅读</strong>：15–20 分钟。
 </div>
 
 <nav class="toc">
 <h3>目录</h3>
 <ol>
-  <li><a href="#s1">起因：v5 在 deepseek 上为什么会超时</a></li>
-  <li><a href="#s2">v5 底盘速览（双路径）</a></li>
-  <li><a href="#s3"><strong>v5.1 改了什么（核心）</strong>
+  <li><a href="#s1">v5.1 是什么 + 为什么有这一版</a></li>
+  <li><a href="#s2"><strong>结构设计：一道题怎么流过系统</strong>
     <ol>
-      <li><a href="#s31">preflight 知识层（确定性，喂两条路径）</a></li>
-      <li><a href="#s32">三条写死的 lesson（50 Ry / 各向异性 k / 墙钟预算）</a></li>
-      <li><a href="#s33">移植 v4.2 顺手抓出的两个基准泄漏</a></li>
+      <li><a href="#s21">入口与 prompt 装配</a></li>
+      <li><a href="#s22">executor 主循环（SDK 路径）</a></li>
+      <li><a href="#s23">7 个结构化工具</a></li>
+      <li><a href="#s24">卡死检测 ledger（S1–S7）</a></li>
+      <li><a href="#s25">SCF 收敛子 agent</a></li>
+      <li><a href="#s26">verifier 验收门 + 重放</a></li>
     </ol>
   </li>
-  <li><a href="#s4">preflight 怎么工作：CsPbI₃ 走一遍</a></li>
-  <li><a href="#s5">v5 vs v5.1 对照表</a></li>
-  <li><a href="#s6">跑一题：CsPbI₃ 从超时到 1.0 + 成绩单</a></li>
-  <li><a href="#s7">还没做的（Phase 2）</a></li>
-  <li><a href="#s8">附录：代码路径</a></li>
+  <li><a href="#s3">路由：claude 和 deepseek 现在都走 SDK 路径（新）</a></li>
+  <li><a href="#s4">v5.1 在底盘上加的知识层</a></li>
+  <li><a href="#s5">preflight 走一遍：CsPbI₃</a></li>
+  <li><a href="#s6">944602f 的四个 review 修复（C1–C4）（新）</a></li>
+  <li><a href="#s7">v5 → v5.1 对照表</a></li>
+  <li><a href="#s8">跑一题 + 成绩单</a></li>
+  <li><a href="#s9">还没做的（Phase 2）</a></li>
+  <li><a href="#s10">附录：代码路径</a></li>
 </ol>
 </nav>
 
 
 <!-- ─────────────────────────────── §1 ─────────────────────────────── -->
-<h2 id="s1">1 · 起因：v5 在 deepseek 上为什么会超时</h2>
+<h2 id="s1">1 · v5.1 是什么 + 为什么有这一版</h2>
 
-<p>v5 的底盘很漂亮，但在一类题上反复 0 分：<strong>M2 的 20–32 原子 vc-relax</strong>（CsPbI₃、WO₃ 这种）。
-根因不是物理错，而是<strong>参数过度收敛 + 墙钟用尽</strong>：</p>
+<p><strong>它是什么</strong>：bench 给每道 DFT 题准备一个 <code>task_prompt.txt</code>（材料、初始晶胞、要交哪些输出），
+启动 <code>solve.py</code> 作为子进程。<code>solve.py</code> 驱动一个大模型，<strong>一轮一轮地调用工具</strong>把这道题做完，
+最后写 <code>result.json</code>，由 bench 打分。模型不是裸跑 shell——它拿到的是<strong>带类型的结构化工具</strong>：
+"写 QE 输入"、"跑 pw.x"、"开窗读输出某个片段"、"解析弛豫后结构"、"物理验收"、"提交"。§2 把这套结构讲透。</p>
 
-<ul>
-  <li>模型（这里是 <code>deepseek-v4-pro</code>，走 legacy 路径）自己挑了 <code>ecutwfc=80, ecutrho=800</code>，
-      又配了各向同性的 <code>K_POINTS 8×8×8 = 512</code> 个 k 点；</li>
-  <li>20–32 原子的盒子在这个参数下，单道 vc-relax 的墙钟超过 harness 的 ~4 h 上限 → 进程被回收 → 该题直接计 0。</li>
-  <li>而这些题是按 <strong>1% 相对晶格容差</strong>打分的，不是按绝对总能 —— 这个容差在 <code>ecut=50</code> 就已经满足
-      （任务 JSON 自带的 ecut 扫描可证），<code>ecut=50</code> + 合理 k 网格 ~1.5–3 h 就能跑完。</li>
-</ul>
+<p><strong>为什么有 v5.1</strong>：上一版 v5 的底盘很好，但在一类题上反复 0 分——<strong>M2 的 20–32 原子 vc-relax</strong>
+（CsPbI₃、WO₃ 这种）。根因不是物理错，而是<strong>参数过度收敛 + 墙钟用尽</strong>：模型自己挑了
+<code>ecutwfc=80, ecutrho=800</code> 加各向同性 <code>8×8×8 = 512</code> k 点，单道 vc-relax 撞穿 harness 的 ~4 h
+上限被回收 → 计 0。而这些题按 <strong>1% 相对晶格容差</strong>打分（不是绝对总能），这个容差在 <code>ecut=50</code> 就满足。</p>
 
 <div class="concept">
 <span class="lbl">核心概念</span><h4>converge ENOUGH, not maximally</h4>
-<p>对这些 vc-relax 题，"更高的 ecut / 更密的 k" 不会换来更高的分，只会换来更长的墙钟——而墙钟一旦用尽，分数从可能的
-1.0 直接掉到 0。<strong>过度收敛在这里是纯粹的负收益。</strong>v5.1 的全部改动都围绕这一句话。</p>
-</div>
-
-<div class="analogy">
-v5 像个<strong>追求极致精度、却没带表的工程师</strong>——他能把活干得很漂亮，但常常在交付截止前还在"再多收敛一位小数"，
-结果什么都没交上去。v5.1 没换人，只是<strong>塞给他一张便条（preflight + 三条 lesson）</strong>："这活 50 Ry 就够，
-长轴别过采样，留好时间，跑完一次就交"。便条不强制，但他照着做了。</p>
+<p>对这些 vc-relax 题，"更高 ecut / 更密 k" 不换分，只换更长墙钟——墙钟一旦用尽，分数从可能的 1.0 直接掉到 0。
+<strong>过度收敛在这里是纯负收益。</strong>v5.1 的全部新增都围绕这一句：把"够用就行"的物理纪律喂给模型。</p>
 </div>
 
 
 <!-- ─────────────────────────────── §2 ─────────────────────────────── -->
-<h2 id="s2">2 · v5 底盘速览（双路径）</h2>
+<h2 id="s2">2 · 结构设计：一道题怎么流过系统</h2>
 
-<p>这一节是<strong>背景</strong>，只为后面定位 preflight 插在哪。底盘细节（7 个结构化工具、卡死 ledger、收敛子 agent）见
-<a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 文档</a>，这里不重复。</p>
-
-<p><code>solve.py:amain</code> 按模型名分流成<strong>两条路径</strong>，但 v5.1 的知识层（preflight）+ 经验库是
-<strong>两条都喂</strong>的——这是 v5.1 设计上一个关键点：</p>
-
-<table>
-<tr><th>路径</th><th>触发</th><th>怎么跑</th><th>v5.1 在这条路径上的状态</th></tr>
-<tr>
-  <td><strong>Claude 路径</strong></td>
-  <td><code>--model claude-*</code></td>
-  <td><code>Driver</code>（<code>claude-agent-sdk</code>）+ 7 个结构化 MCP 工具 + 卡死 ledger（S1–S7）+ 收敛子 agent + verifier 硬门</td>
-  <td>收到 preflight + 三条 lesson，但<strong>只通过 prompt</strong>；结构化工具<em>本身</em>还没强制 50 Ry / 各向异性 k（留给 Phase 2，见 §7）</td>
-</tr>
-<tr>
-  <td><strong>legacy 路径</strong></td>
-  <td>其它模型（<code>deepseek-v4-pro</code> 等）</td>
-  <td>原样复用 v4 的手写 tool-use loop（<code>agent/loop.py:run_loop</code>）+ 裸 <code>BashTool</code></td>
-  <td>同样收到 preflight + 三条 lesson；<strong>v5.1 至今的全部实测跑分都在这条路径上</strong></td>
-</tr>
-</table>
-
-<div class="note">
-<strong>读者注意</strong>：v5.1 这一版的实测结果（§6）<strong>全部来自 legacy / deepseek 路径</strong>——这也是被修的那条。
-Claude 路径继承了同样的 preflight 与 lesson，但本批次没有用 Claude 模型实跑，所以 Claude 路径"修没修好"目前没有数据，
-而且它缺少工具级的硬约束（§7 P2-1）。下文凡谈"成绩"均指 legacy/deepseek。
-</div>
+<p>这是本文主干。下图是一道题从 <code>task_prompt.txt</code> 到 <code>result.json</code> 的完整流转，后面逐块讲。</p>
 
 <div class="svg-wrap">
-<svg viewBox="0 0 880 430" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
-  <!-- task in -->
-  <rect x="20" y="24" width="160" height="46" rx="6" fill="#f5eef8" stroke="#8e44ad"/>
-  <text x="100" y="44" text-anchor="middle" fill="#6c3483">task_prompt.txt</text>
-  <text x="100" y="61" text-anchor="middle" fill="#6c3483" font-size="11">required keys / 材料</text>
-  <!-- PREFLIGHT (the new v5.1 block) -->
-  <rect x="20" y="120" width="250" height="150" rx="8" fill="#fef9e7" stroke="#d4ac0d" stroke-width="2.5"/>
-  <text x="145" y="142" text-anchor="middle" fill="#7d6608" font-weight="bold">preflight 知识层（v5.1 新增）</text>
-  <text x="145" y="166" text-anchor="middle" font-size="11" fill="#5b4d09">structure_features.extract</text>
-  <text x="145" y="184" text-anchor="middle" font-size="11" fill="#5b4d09">↓ 晶系 / 家族 / 元素</text>
-  <text x="145" y="204" text-anchor="middle" font-size="11" fill="#5b4d09">skills.select_and_render（5 份）</text>
-  <text x="145" y="224" text-anchor="middle" font-size="11" fill="#5b4d09">config_advisor（确定性分类）</text>
-  <text x="145" y="248" text-anchor="middle" font-size="10" fill="#7f8c8d">→ 一段 advice 块 + .config_advice.json</text>
-  <line x1="100" y1="70" x2="120" y2="118" stroke="#8e44ad" marker-end="url(#ahp)"/>
+<svg viewBox="0 0 880 470" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+  <!-- inputs -->
+  <rect x="18" y="20" width="150" height="44" rx="6" fill="#f5eef8" stroke="#8e44ad"/>
+  <text x="93" y="38" text-anchor="middle" fill="#6c3483">task_prompt.txt</text>
+  <text x="93" y="55" text-anchor="middle" fill="#6c3483" font-size="11">材料 / 初始晶胞 / 要交什么</text>
+  <rect x="18" y="86" width="150" height="58" rx="6" fill="#fef9e7" stroke="#d4ac0d"/>
+  <text x="93" y="106" text-anchor="middle" fill="#7d6608" font-size="11">preflight 知识层</text>
+  <text x="93" y="122" text-anchor="middle" fill="#7d6608" font-size="10">skills + config_advisor</text>
+  <text x="93" y="136" text-anchor="middle" fill="#7d6608" font-size="10">+ 经验库检索（§4）</text>
   <!-- assemble -->
-  <rect x="330" y="150" width="200" height="90" rx="8" fill="#d6eaf8" stroke="#2980b9" stroke-width="2"/>
-  <text x="430" y="178" text-anchor="middle" fill="#1b4f72" font-weight="bold">assemble_user_prompt</text>
-  <text x="430" y="200" text-anchor="middle" font-size="11" fill="#1b4f72">preflight ▸ experience ▸</text>
-  <text x="430" y="218" text-anchor="middle" font-size="11" fill="#1b4f72">base prompt（最后）</text>
-  <line x1="270" y1="195" x2="328" y2="195" stroke="#2980b9" marker-end="url(#ah)"/>
-  <!-- system prompt lessons -->
-  <rect x="330" y="30" width="200" height="86" rx="8" fill="#eafaf1" stroke="#27ae60"/>
-  <text x="430" y="54" text-anchor="middle" fill="#196f3d" font-weight="bold">system_prompt.py</text>
-  <text x="430" y="76" text-anchor="middle" font-size="11" fill="#196f3d">V5.1-LESSON：50 Ry /</text>
-  <text x="430" y="94" text-anchor="middle" font-size="11" fill="#196f3d">各向异性 k / 墙钟预算</text>
-  <!-- router -->
-  <rect x="600" y="150" width="250" height="92" rx="8" fill="#fafbfc" stroke="#d5dbdb"/>
-  <text x="725" y="172" text-anchor="middle" fill="#34495e" font-weight="bold">solve.py 按模型分流</text>
-  <text x="725" y="196" text-anchor="middle" font-size="11" fill="#2c3e50">claude-* → Driver（SDK，7 工具）</text>
-  <text x="725" y="216" text-anchor="middle" font-size="11" fill="#2c3e50">其它 → legacy run_loop（deepseek）</text>
-  <text x="725" y="234" text-anchor="middle" font-size="10" fill="#7f8c8d">两条都收到上面的 user_prompt</text>
-  <line x1="530" y1="195" x2="598" y2="195" stroke="#2980b9" marker-end="url(#ah)"/>
-  <line x1="530" y1="73" x2="565" y2="73" stroke="#27ae60"/>
-  <path d="M565 73 Q585 73 585 150" fill="none" stroke="#27ae60" marker-end="url(#ahg)"/>
+  <rect x="210" y="48" width="150" height="66" rx="8" fill="#d6eaf8" stroke="#2980b9" stroke-width="2"/>
+  <text x="285" y="74" text-anchor="middle" fill="#1b4f72" font-weight="bold" font-size="12">assemble_user_prompt</text>
+  <text x="285" y="94" text-anchor="middle" fill="#1b4f72" font-size="10">preflight ▸ 经验 ▸ 原题</text>
+  <line x1="168" y1="42" x2="208" y2="64" stroke="#8e44ad" marker-end="url(#ah)"/>
+  <line x1="168" y1="112" x2="208" y2="92" stroke="#d4ac0d" marker-end="url(#ah)"/>
+  <!-- executor loop -->
+  <rect x="405" y="20" width="455" height="250" rx="10" fill="#fafbfc" stroke="#2980b9" stroke-dasharray="5 3"/>
+  <text x="632" y="40" text-anchor="middle" fill="#1b4f72" font-weight="bold">Driver · claude_agent_sdk.query() 主循环（§2.2）</text>
+  <text x="632" y="56" text-anchor="middle" fill="#7f8c8d" font-size="10">system prompt = executor.md；每轮模型调一个工具，直到 submit / max_turns</text>
+  <line x1="360" y1="81" x2="403" y2="100" stroke="#2980b9" marker-end="url(#ah)"/>
+  <text x="383" y="80" font-size="9" fill="#2980b9">user_prompt</text>
+  <!-- 7 tools -->
+  <rect x="420" y="74" width="250" height="120" rx="8" fill="#eef6fc" stroke="#5dade2"/>
+  <text x="545" y="94" text-anchor="middle" fill="#1b4f72" font-weight="bold" font-size="12">7 个结构化工具（§2.3）</text>
+  <text x="545" y="114" text-anchor="middle" font-size="11" fill="#2c3e50">write_qe_input · run_pw</text>
+  <text x="545" y="132" text-anchor="middle" font-size="11" fill="#2c3e50">read_qe_output（开窗）</text>
+  <text x="545" y="150" text-anchor="middle" font-size="11" fill="#2c3e50">parse_structure · verify_run</text>
+  <text x="545" y="168" text-anchor="middle" font-size="11" fill="#2c3e50">bash（逃生舱）· submit</text>
+  <text x="545" y="186" text-anchor="middle" font-size="10" fill="#7f8c8d">每个 calc 登记 calc_id</text>
+  <!-- ledger -->
+  <rect x="690" y="74" width="155" height="55" rx="8" fill="#fdebd0" stroke="#ca6f1e"/>
+  <text x="767" y="96" text-anchor="middle" fill="#9c640c" font-weight="bold" font-size="12">卡死 ledger</text>
+  <text x="767" y="114" text-anchor="middle" font-size="10" fill="#9c640c">S1–S7 → 注入提醒</text>
+  <path d="M690 101 L672 110" fill="none" stroke="#ca6f1e" stroke-dasharray="3 2" marker-end="url(#aho)"/>
+  <!-- subagent -->
+  <rect x="690" y="139" width="155" height="55" rx="8" fill="#d5f5e3" stroke="#229954"/>
+  <text x="767" y="161" text-anchor="middle" fill="#196f3d" font-weight="bold" font-size="12">收敛子 agent</text>
+  <text x="767" y="179" text-anchor="middle" font-size="10" fill="#196f3d">SCF 挂 → 甩 · ≤3 次</text>
+  <path d="M670 150 L688 158" fill="none" stroke="#229954" marker-end="url(#ahg)"/>
+  <!-- loop arrow -->
+  <path d="M545 194 Q545 230 600 230 Q660 230 660 200" fill="none" stroke="#2980b9" marker-end="url(#ah)"/>
+  <text x="600" y="248" text-anchor="middle" font-size="10" fill="#7f8c8d">工具结果回灌 → 下一轮（PostToolUse hook 记 ledger）</text>
+  <!-- gate -->
+  <rect x="300" y="330" width="280" height="58" rx="8" fill="#fadbd8" stroke="#c0392b"/>
+  <text x="440" y="354" text-anchor="middle" fill="#922b21" font-weight="bold">verifier 验收门 + 重放（§2.6）</text>
+  <text x="440" y="373" text-anchor="middle" font-size="11" fill="#922b21">_gate_check：力/应力/空间群… hard_fail → 重放 ≤2 次</text>
+  <line x1="632" y1="270" x2="510" y2="328" stroke="#2980b9" marker-end="url(#ah)"/>
+  <text x="592" y="305" font-size="9" fill="#2980b9">submit 后</text>
+  <path d="M300 360 Q210 360 210 210 Q210 130 360 95" fill="none" stroke="#c0392b" stroke-dasharray="4 3" marker-end="url(#ahr)"/>
+  <text x="150" y="250" font-size="10" fill="#c0392b">不过 → 带反馈重放</text>
   <!-- result -->
-  <rect x="600" y="320" width="250" height="56" rx="8" fill="#d5f5e3" stroke="#229954"/>
-  <text x="725" y="344" text-anchor="middle" fill="#196f3d" font-weight="bold">result.json + 记录经验</text>
-  <text x="725" y="364" text-anchor="middle" font-size="11" fill="#196f3d">（经验已 scrub 产出量，§3.3）</text>
-  <line x1="725" y1="242" x2="725" y2="318" stroke="#229954" marker-end="url(#ahr)"/>
+  <rect x="300" y="410" width="280" height="44" rx="8" fill="#d5f5e3" stroke="#229954"/>
+  <text x="440" y="437" text-anchor="middle" fill="#196f3d" font-weight="bold">result.json + 记录经验（已脱敏）</text>
+  <line x1="440" y1="388" x2="440" y2="408" stroke="#229954" marker-end="url(#ahg)"/>
   <defs>
     <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#2980b9"/></marker>
-    <marker id="ahg" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#27ae60"/></marker>
-    <marker id="ahp" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#8e44ad"/></marker>
-    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#229954"/></marker>
+    <marker id="ahg" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#229954"/></marker>
+    <marker id="aho" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#ca6f1e"/></marker>
+    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#c0392b"/></marker>
   </defs>
 </svg>
 </div>
-<p class="diagram-caption">图 1 · v5.1 的数据流。黄框 preflight 与绿框 lesson 是 v5.1 相对 v5 的全部新增；两者汇入
-<code>assemble_user_prompt</code>，再分流给两条路径。底盘（工具/ledger/子 agent）原封不动。</p>
+<p class="diagram-caption">图 1 · 一道题的完整流转。紫=输入，黄=知识层，蓝=执行循环，橙=卡死断路，绿=子 agent / 结果，红=验收门。</p>
+
+<h3 id="s21">2.1 · 入口与 prompt 装配</h3>
+<p><code>solve.py:amain</code> 先解析任务：从 prompt 抽出 <strong>required keys</strong>（要交哪些输出）、推断
+<strong>task_type</strong>（<code>vc_relax</code> 还是 <code>bands_dos</code>）。然后把三块文本<strong>拼成一个 user_prompt</strong>
+（<code>assemble_user_prompt</code>），顺序固定：</p>
+<pre><code>preflight 块（材料知识：skills + config 建议，§4）
+   ▸ experience 块（过往相似成功 run 的方法论参数，已脱敏）
+      ▸ 原始 task prompt（殿后，保证它的"提交说明"是最新鲜的上下文）</code></pre>
+<p>这个 user_prompt 两条路径都用（§3）。下面 §2.2–2.6 讲<strong>SDK 路径</strong>（现在 claude 和 deepseek 都走它）。</p>
+
+<h3 id="s22">2.2 · executor 主循环（SDK 路径）</h3>
+<p>核心在 <code>agent/runtime/driver.py</code> 的 <code>Driver</code>。它调 <code>claude_agent_sdk.query(prompt=user_prompt, options=...)</code>，
+拿到一个<strong>异步消息流</strong>，一条条处理。关键配置（<code>_build_options</code>）：</p>
+<ul>
+  <li><strong>system prompt</strong> = <code>agent/prompts/executor.md</code> 渲染后的文本（<code>build_executor_prompt</code> 只替换
+      <code>{workdir}/{pw_x_path}/{qe_backend}/{required_keys}</code> 四个占位符）；</li>
+  <li><strong>工具</strong> = 7 个结构化 MCP 工具（<code>mcp_servers={"dft_qe": ...}</code>）+ <code>Agent</code>（用来叫子 agent）；</li>
+  <li><strong>子 agent</strong> = <code>{"convergence_fixer": ...}</code>（§2.5）；</li>
+  <li><strong>hooks</strong> = 每次工具调用前后各跑一个钩子（<code>PreToolUse</code> 写 transcript；<code>PostToolUse</code> 记 ledger + 查卡死，§2.4）；</li>
+  <li><code>max_turns</code>（默认 60）、<code>permission_mode="bypassPermissions"</code>、<code>cwd=workdir</code>、
+      <code>env=extra_env</code>（给 deepseek 转发 base URL + key，§3）。</li>
+</ul>
+<p>循环<strong>什么时候停</strong>：模型调 <code>submit</code> 工具时会置一个 <code>ctx.submit_payload</code> 哨兵，driver 立刻 break；
+或者收到 <code>ResultMessage</code>；或者 <code>max_turns</code> 用完（交不完整）。早退时 driver 会 <code>aclose()</code> 那个异步生成器
+（<code>944602f</code> 顺手修的一个 GC 报错）。</p>
+
+<div class="analogy">
+你可以把它想成<strong>给一个 DFT 老师傅配了一套规范化的仪器面板</strong>：他不能乱接线乱敲命令，只能按面板上的几个按钮
+（写输入、跑、读、验、交）操作；每按一次，旁边的记录员（ledger）就记一笔，发现他原地打转就递张纸条提醒；
+活干完按"提交"，质检员（verifier）再过一道关。</p>
+</div>
+
+<h3 id="s23">2.3 · 7 个结构化工具</h3>
+<p>定义在 <code>agent/tools/structured/server.py</code>。给模型"带类型的动作"，而不是裸 bash——这样能在写入时强制收紧阈值、
+读输出时只开窗（防上下文爆炸 + 幻觉）。</p>
+<table>
+<tr><th>工具</th><th>干什么</th></tr>
+<tr><td><code>write_qe_input</code></td><td>按 <code>calc=scf/nscf/bands/relax/vc-relax</code> 生成 pw.x 输入，登记 <code>calc_id</code>；vc-relax 阈值自动收紧</td></tr>
+<tr><td><code>run_pw</code></td><td>按 <code>calc_id</code> 跑 pw.x；只回简短摘要（尾部 ~80 行）；命令落 <code>bash.log</code> 供审计；<strong>非收敛/无 JOB DONE. 标 failed</strong>（C4，§6）</td></tr>
+<tr><td><code>read_qe_output</code></td><td><strong>开窗</strong>读输出：<code>tail/errors/forces/stress/final_cell/scf_steps/bands_table/summary/grep:PATTERN</code>，永不整段 dump</td></tr>
+<tr><td><code>parse_structure</code></td><td>pymatgen 取弛豫后晶格 + 空间群（T1 提交前必跑——空间群占 0.25 分）</td></tr>
+<tr><td><code>verify_run</code></td><td>物理 sanity，回 <code>pass / soft_fail / hard_fail</code>（详见 §2.6）</td></tr>
+<tr><td><code>bash</code></td><td>逃生舱：只在没有结构化工具时用（如 <code>bands.x</code>/<code>dos.x</code> 后处理）；仍落日志、禁后台</td></tr>
+<tr><td><code>submit</code></td><td>置 <code>submit_payload</code> 哨兵，driver 退出循环</td></tr>
+</table>
+
+<h3 id="s24">2.4 · 卡死检测 ledger（S1–S7）<span class="badge b-wired">wired</span></h3>
+<p>纯 Python、无 LLM 的<strong>断路器</strong>（<code>agent/runtime/progress_ledger.py</code>）。每次工具调用后，
+<code>PostToolUse</code> 钩子记一笔，并按 S1→S7 顺序查"卡住"信号，命中第一个就往模型上下文塞一条
+<code>[ledger] You appear stuck (signal=Sx...)</code> 提醒，给 (a) 换参数 / (b) 甩收敛子 agent / (c) 交不完整 三个选项。
+同一信号一个 session 只触发一次。</p>
+<table>
+<tr><th>信号</th><th>触发条件</th></tr>
+<tr><td>S1</td><td>近 6 轮内同一 <code>(工具, 参数哈希)</code> 调用 ≥ 3 次</td></tr>
+<tr><td>S2</td><td>近 8 轮内工具报错 ≥ 6 次</td></tr>
+<tr><td>S3</td><td>≥ 600 s 没有一次 <code>verify_run</code> pass</td></tr>
+<tr><td>S4</td><td>近 10 轮内同一条 bash 命令（去掉 cd）≥ 3 次</td></tr>
+<tr><td>S5</td><td>近 4 轮内"挫败语"正则命中 ≥ 3 次（"let me try again / keeps failing …"）</td></tr>
+<tr><td>S6</td><td>近 15 轮内没有一次 pw.x 成功、也没有 verify pass</td></tr>
+<tr><td>S7</td><td>输入 token 用了 ≥ 70%，却还没有一次成功 verify</td></tr>
+</table>
+<div class="note">注：S2/S3/S6/S7 依赖"识别出 verify pass / 工具报错"。在 SDK 路径上这两个判定<strong>曾经失效</strong>
+（SDK 会剥掉自定义返回字段、用驼峰 <code>isError</code>），<code>944602f</code> 的 <strong>C1</strong> 修好了它们（§6）。</div>
+
+<h3 id="s25">2.5 · SCF 收敛子 agent<span class="badge b-wired">wired</span></h3>
+<p><code>agent/subagents/convergence.py</code> 注册了一个叫 <code>convergence_fixer</code> 的子 agent。SCF 挂了，主 executor
+可以叫它（<code>Agent(name="convergence_fixer", ...)</code>）。它是<strong>干净上下文</strong>——看不到父 agent 那些失败尝试，
+被逼着重新诊断；只给 4 个工具（<code>read_qe_output / write_qe_input / run_pw / verify_run</code>，没有 bash、没有 submit）；
+按一张"症状→处方"playbook（<code>agent/prompts/convergence_subagent.md</code>）选补丁，最多试 ~3 次。</p>
+
+<h3 id="s26">2.6 · verifier 验收门 + 重放<span class="badge b-wired">wired</span></h3>
+<p>模型 submit 后，<code>solve.py:_gate_check</code> 在最终落盘前做一道<strong>强制物理验收</strong>
+（<code>verify_vc_relax</code> / <code>verify_bands_dos</code>）。任一非 advisory 项没过 = <code>hard_fail</code> →
+把具体不满意点拼进 prompt，<strong>重放</strong>（最多 <code>--max-verifier-replays</code>，默认 2 次）。</p>
+<table>
+<tr><th>T1 vc_relax 检查（非全列）</th><th>T2 bands_dos 检查（非全列）</th></tr>
+<tr>
+  <td>文件存在且 ≥1024 B · 末尾含 <code>JOB DONE.</code> · SCF 收敛 · max|F| ≤ 1e-4 Ry/Bohr ·
+      max|σ| ≤ 0.05 kbar · <strong>空间群保持</strong> · 晶格漂移/角度（advisory）</td>
+  <td>scf/bands/dos 四文件齐全 · SCF 收敛 · <code>|E_F|</code> 有限且 &lt;50 eV ·
+      bands.dat 可解析、nbnd≥4 · DOS 行数&gt;10、窗覆盖 E_F±2 eV</td>
+</tr>
+</table>
+<div class="note">这里有个历史伏笔：v5 的强制门曾用 <code>verify_vc_relax(initial=None)</code>，<strong>把空间群/晶格/角度检查全跳过了</strong>
+——守护 0.25 空间群分的门其实没查空间群。<code>944602f</code> 的 <strong>C2</strong> 修好了（从任务<em>输入</em>晶胞取
+initial 事实再喂进门，§6）。</div>
 
 
 <!-- ─────────────────────────────── §3 ─────────────────────────────── -->
-<h2 id="s3">3 · v5.1 改了什么（核心）</h2>
+<h2 id="s3">3 · 路由：claude 和 deepseek 现在都走 SDK 路径（本次新增）</h2>
 
-<p>相对 v5，v5.1 只做了三件事：<strong>(§3.1) 一个共享 preflight 把材料知识喂进 prompt、(§3.2) 三条写死的
-系统提示词 lesson、(§3.3) 移植 v4.2 知识层时顺手补的两个基准泄漏</strong>。底盘没动。</p>
+<p>v5.1 其实有<strong>两条</strong>执行路径：上面 §2 讲的 <strong>SDK 路径</strong>（结构化工具那套），和一条复用 v4 的
+<strong>legacy 手写 tool-use loop</strong>（裸 bash）。<code>944602f</code> 改了分流规则，把 deepseek 从 legacy 挪到了 SDK。</p>
 
-<h3 id="s31">3.1 · preflight 知识层（确定性，喂两条路径）<span class="badge b-wired">wired</span></h3>
+<p>分流就两行（<code>solve.py</code>，原文）：</p>
+<pre><code>def should_use_sdk_path(model, *, base_url):
+    # claude 原生 → SDK；或者只要配了 Anthropic 兼容 base URL（如 deepseek 的）→ SDK
+    return model.startswith("claude-") or bool(base_url)
 
-<p>入口是 <code>agent/preflight.py:run_preflight(prompt_text, workdir)</code>，在 <code>solve.py:amain</code> 里
-紧挨着经验检索之后调用（<code>solve.py:395–406</code>）。它串三步、产出<strong>一段 advice 文本块</strong>，由
-<code>assemble_user_prompt</code> 拼到 prompt 最前面（顺序：preflight ▸ experience ▸ 原始 prompt 殿后）：</p>
+def resolve_anthropic_base_url(model, *, cli_base_url, ...):
+    # 优先级：--anthropic-base-url 旗标 > ANTHROPIC_BASE_URL 环境变量
+    #        > deepseek-* 的内置默认 https://api.deepseek.com/anthropic
+    ...
+    if model.startswith("deepseek-"):
+        return DEEPSEEK_ANTHROPIC_BASE_URL   # = "https://api.deepseek.com/anthropic"
+    return None</code></pre>
 
 <table>
-<tr><th>步</th><th>模块（v4.2 移植）</th><th>干什么</th><th>对 CsPbI₃ 的输出</th></tr>
-<tr>
-  <td>1</td>
-  <td><code>structure_features.extract</code></td>
-  <td>从 prompt 解析晶系 / 化学式 / 元素 / 材料家族 / 原子数（纯解析，无 LLM）</td>
-  <td>orthorhombic, CsPbI₃, [Cs,Pb,I], halide, nat=20</td>
-</tr>
-<tr>
-  <td>2</td>
-  <td><code>skills.select_and_render</code>（5 份 advisor）</td>
-  <td>按 YAML frontmatter 的 <code>trigger</code>（<code>material_family</code> / <code>crystal_system</code> 谓词，
-      <code>any_of</code>/<code>all_of</code>）匹配材料家族 playbook</td>
-  <td>无 skill 命中（halide 不在 5 份里）→ 这一步空；WO₃ 则命中 <code>low-symmetry-oxide</code></td>
-</tr>
-<tr>
-  <td>3</td>
-  <td><code>config_advisor</code>（<strong>仅确定性分类器</strong>）</td>
-  <td>按元素集判金属/绝缘体 → <code>occupations</code> / <code>smearing</code> / <code>ecutrho_factor</code> / <code>nspin</code> 建议；
-      落盘 <code>.config_advice.json</code></td>
-  <td>含电负性 I → 绝缘体 → <code>occupations=fixed</code>, <code>ecutrho_factor=10</code>, <code>nspin=1</code></td>
-</tr>
+<tr><th>模型</th><th>base URL</th><th>走哪条路</th></tr>
+<tr><td><code>claude-*</code></td><td>—</td><td><strong>SDK 路径</strong></td></tr>
+<tr><td><code>deepseek-*</code></td><td>自动取 <code>api.deepseek.com/anthropic</code></td><td><strong>SDK 路径（本次新增）</strong></td></tr>
+<tr><td>其它非 claude（无 base URL）</td><td>无</td><td>legacy 手写 loop（fallback）</td></tr>
 </table>
 
-<div class="concept">
-<span class="lbl">概念</span><h4>为什么是"确定性"且"永不崩"</h4>
-<p>preflight 全程<strong>没有 LLM 调用</strong>——纯 Python 规则，所以又快又可复现。它在两条路径前都跑，等于给任何模型
-一个统一的物理起点。<code>run_preflight</code> 的每一步都包在 <code>try/except</code> 里：任何子步出错只降级为"部分/空"块，
-<strong>绝不让 preflight 拖垮 solver</strong>。注意 <code>config_advisor</code> 的 <strong>LLM 交叉校验
-(<code>config_advisor.run()</code>) 没有启用</strong>——v5.1 只走确定性分支（启用它属于 Phase 2，且当前直接调会
-<code>AttributeError</code>，见 §7 P2-2）。<span class="badge b-wired">wired（确定性）</span></p>
-</div>
+<p>deepseek 通过 Anthropic 兼容端点接进 SDK：API key 从 <code>DEEPSEEK_API_KEY</code> 取（其次
+<code>ANTHROPIC_AUTH_TOKEN</code>/<code>ANTHROPIC_API_KEY</code>），连同 base URL 经 <code>Driver.extra_env</code>
+转发给 SDK 子进程；模型 id 原样传、不重映射。<strong>意义</strong>：deepseek 现在也能用上 §2 那整套结构化工具 +
+卡死检测 + 验收门，而不再是裸 bash。</p>
 
-<h3 id="s32">3.2 · 三条写死的 lesson <span class="badge b-wired">wired</span></h3>
-
-<p>在 <code>agent/system_prompt.py</code> 顶部加了一段以 <code>## V5.1-LESSON</code> 为标记的固定文本，拼进系统提示词最前。
-原文（核对自 <code>system_prompt.py:75–93</code>）：</p>
-
-<pre><code>## V5.1-LESSON — converge ENOUGH, not maximally (wall budget is real)
-
-These vc-relax tasks are graded on a 1% relative lattice tolerance, NOT on
-absolute total energy. Over-converging wastes wall time and TIMES OUT.
-
-- ecutwfc: start at 50 Ry (ecutrho = 10×ecutwfc for USPP/GBRV). 50 Ry
-  lands inside the 1% lattice tolerance for typical cells; pushing to 80 Ry
-  with a dense mesh can time out 20-32 atom cells at the ~4h harness wall.
-- k-mesh: use an ANISOTROPIC, density-based grid, not an isotropic N×N×N.
-  For a cell with very different a/b/c (e.g. a≈4.8, c≈18 Å) a uniform 8×8×8
-  over-samples the long axis and wastes hours. Scale each direction inversely
-  to its lattice constant ... ~40-50 k-points per inverse-angstrom-equivalent.
-- Respect your wall budget. ... If you choose parameters that won't
-  finish, you score ZERO. Do one well-parameterized vc-relax; do not re-run
-  an already-converged cell to "double check".</code></pre>
-
-<p>三条分别对应 §1 根因的三个面：<strong>(1) ecut 起点 50 Ry</strong>、<strong>(2) 各向异性密度型 k 网格</strong>（按各轴
-实空间晶格长度反比取点，长轴稀、短轴密）、<strong>(3) 守住墙钟预算</strong>（不收敛完就交=0；已收敛别"再跑一遍确认"）。
-这是<em>纯 prompt 纪律</em>——它劝模型，但（在 legacy 路径上）不强制。§6 会看到 deepseek 确实照做了。</p>
-
-<h3 id="s33">3.3 · 移植 v4.2 知识层顺手抓出的两个基准泄漏</h3>
-
-<p>把 v4.2 的知识层搬进来时，做了一遍 benchmark-integrity 审计，发现<strong>有两处会把 bench 答案回灌进
-模型</strong>——一处是底盘里旧有的、一处是随知识层一起搬进来的。两处都已修。理解 v5.1 知识层"现在到底装了什么"，
-必须知道这两处，因为它们决定了 advisor 和经验库的<strong>当前形态</strong>。</p>
-
-<h4>① 经验库回灌空间群答案（底盘旧疾）<span class="badge b-wired">已修 wired</span></h4>
-<p>提交 <code>182f431</code>。经验库每条 row 存了 <code>space_group_number</code>——而空间群正是 bench 给 T1 打分的
-<strong>产出量</strong>（占 0.25 分）；检索 <code>retrieve_for_task</code> 按<strong>化学式</strong>匹配、<strong>不排除当前
-task_id</strong>、专挑 <code>score≥0.7</code> 的成功行 → 重复材料的同题正确空间群被原样写进 "Past similar runs" 块
-（已实测：MgSiO₃ 曾被喂回 <code>sg=62, score=1.00</code>）。</p>
-<p>修法 4 处：<code>query(exclude_task_id=...)</code> 排除当前题；<code>format_experience_block</code> 不再打印任何产出量
-（只留 ecut/k-mesh/smearing/walltime 方法论）；<code>store.add()</code> 写入即 <code>scrub_answers()</code>，
-<code>space_group_number</code> 永不落盘、也不再当 embedding key；清库脚本 <code>scrub_experience_answers.py</code> 把数据
-<strong>130 → 13 行</strong>（删 117 行无参数垃圾 + 抹掉空间群）。</p>
-
-<h4>② 知识层里的"答案查表"（随 v4.2 移植进来）<span class="badge b-wired">已修 wired</span></h4>
-<p>提交 <code>21818f0</code>。移植 v4.2 的 <code>config_advisor</code> + <code>_metals.py</code> 时发现里头藏着<strong>按化学式
-查 bench 答案的表</strong>，三个失败模式：</p>
-<ul>
-  <li><code>_metals.py</code> 有三张 <code>frozenset[str]</code>（<code>PBE_NEAR_METAL_FORMULAS</code> /
-      <code>MAGNETIC_TM_OXIDES</code> / <code>METALLIC_TM_OXIDES</code>），内容是<strong>一道题一道题加进去的</strong>——
-      交叉核对 bench 题库，<strong>每个化学式都对应一个 bench task ID</strong>，这些表实质是"这道题的标准协议是 X"的答案查表，
-      而非通用化学规则。</li>
-  <li><code>config_advisor.render_config_advice_block</code> 往系统提示词里直接注入
-      "<code>Bench GT confirms gap_type=metal, band_gap_ev=0</code>" 这种<strong>把方法论变成答案归因</strong>的句子，
-      还夹带 "CoSb₃ 2026-05-25 塌到 0.16 的根因…修后 ~0.95" 这类历史叙事。</li>
-  <li><code>system_prompt.py</code> 有多处 "match bench GT canonical" / "verified on AlAs 2026-05-21" 之类
-      <strong>点名 bench task ID 当物理配方来源</strong>的归因行。</li>
-</ul>
-<p>修法：把化学式白名单<strong>换成元素集化学规则</strong>——<code>_metals.py</code> 现在是
-<code>METAL_ELEMENTS</code> / <code>STRONGLY_ELECTRONEGATIVE</code> 两个元素集 + 启发式函数
-<code>is_likely_magnetic_3d_oxide()</code> / <code>is_likely_narrow_gap_heavy_p()</code>（按"开壳 3d 过渡金属 + O"、
-"重 p 区窄隙阴离子"这类<em>元素特征</em>判断，不点名任何化学式）；advisor 渲染的措辞改成"化学上倾向于…"，
-<strong>绝不说某个评分系统'确认'了什么</strong>。</p>
-
-<div class="concept">
-<span class="lbl">要点</span><h4>v5.1 知识层"现在装的是什么"</h4>
-<p><strong>元素集化学规则 + 已脱敏的方法论经验</strong>，<strong>不是</strong>化学式→答案表。这是理解 §3.1 那个
-<code>config_advisor</code> 输出的前提：它给的是"含电负性 I → 倾向绝缘体"这种<em>从元素推</em>的结论，而不是
-"CsPbI₃ 这道题答案是绝缘体"。两个泄漏修完后 <code>pytest</code> 仍绿（参 v5 文档同款审计）。</p>
+<div class="note" style="background:#fadbd8; border-left-color:#c0392b;">
+<strong>⚠ 一个要诚实说清的"接线缺口"（lesson-gap）</strong>：§4.2 那三条写死的 lesson（50 Ry / 各向异性 k / 守墙钟）
+目前<strong>只在 legacy 的 <code>system_prompt.py</code> 里，没进 SDK 的 <code>executor.md</code></strong>——而且
+<code>executor.md</code> 自己的示例还写着 <code>ecutwfc=60 ... kpts=[8,8,8]</code>（各向同性，正是要避免的反例）。
+<code>build_executor_prompt</code> 只渲染 <code>executor.md</code>，不拼 lesson（已核对）。<br><br>
+<strong>后果</strong>：deepseek 既然挪到了 SDK 路径，就<strong>不再自动拿到这三条 lesson</strong>了——SDK 路径上只有
+<strong>preflight 块</strong>带物理纪律（config 建议永远在；各向异性 k 的建议只对命中 skill 的材料如 WO₃ 才有，§4–5）。
+所以 §8 那些 1.0 的成绩是<strong>legacy 路径</strong>跑出来的（lesson 当时生效）；deepseek-on-SDK 目前只验证了
+<code>M1_T1_Si</code>=1.0（Si 小，本来也不需要这三条 lesson）。把三条 lesson 也接进 SDK 工具层，是 Phase 2 的头号事（§9 P2-1）。
 </div>
 
 
 <!-- ─────────────────────────────── §4 ─────────────────────────────── -->
-<h2 id="s4">4 · preflight 怎么工作：CsPbI₃ 走一遍</h2>
+<h2 id="s4">4 · v5.1 在底盘上加的知识层</h2>
 
-<p>用真实产物把 §3.1 的三步串起来看。下面是 CsPbI₃ 那道题 workdir 里 preflight 落盘的
-<code>.config_advice.json</code>（确定性分类器的输出，原样）：</p>
+<p>相对 v5，v5.1 在 §2 那套底盘上加了三样东西：<strong>(§4.1) 一个共享 preflight、(§4.2) 三条写死的 lesson、
+(§4.3) 移植 v4.2 时顺手补的两个基准泄漏</strong>。底盘本身没动。</p>
 
-<pre><code>{
-  "formula": "CsPbI3",  "elements": ["Cs", "Pb", "I"],
-  "structure_name": "orthorhombic perovskite",
-  "pseudo_family": "GBRV_USPP_PBE_v1.5",  "is_uspp": true,
-  "is_metal": false,          "occupations": "fixed",
-  "smearing": null,           "degauss": null,
-  "ecutrho_factor": 10.0,     "recommend_nspin": 1,
-  "magnetic_tm_oxide": false, "metallic_tm_oxide": false,
-  "rationale": "contains electronegative atom(s) ['I'] -> insulator/semiconductor
-                (ionic or covalent bonding)",
-  "source": "deterministic"
-}</code></pre>
+<h3 id="s41">4.1 · preflight 知识层（确定性，喂 user_prompt）<span class="badge b-wired">wired</span></h3>
+<p>入口 <code>agent/preflight.py:run_preflight(prompt_text, workdir)</code>，串三步、产出一段 advice 文本，由
+<code>assemble_user_prompt</code> 拼到 prompt 最前（§2.1）。全程<strong>无 LLM</strong>，纯规则，又快又可复现；
+每步包 <code>try/except</code>，出错只降级为空块，<strong>绝不拖垮 solver</strong>。</p>
+<table>
+<tr><th>步</th><th>模块（v4.2 移植）</th><th>干什么</th></tr>
+<tr><td>1</td><td><code>structure_features.extract</code></td><td>从 prompt 解析晶系/化学式/元素/材料家族/原子数</td></tr>
+<tr><td>2</td><td><code>skills.select_and_render</code>（5 份 advisor）</td><td>按 frontmatter <code>trigger</code> 匹配材料家族 playbook（如单斜氧化物→各向异性 k）</td></tr>
+<tr><td>3</td><td><code>config_advisor</code>（<strong>仅确定性</strong>）</td><td>按元素集判金属/绝缘体 → <code>occupations</code>/<code>ecutrho_factor</code>/<code>nspin</code> 建议；落盘 <code>.config_advice.json</code></td></tr>
+</table>
+<p>注：<code>config_advisor</code> 的 LLM 交叉校验（<code>run()</code>）<strong>没启用</strong>（直接调会 <code>AttributeError</code>，属 Phase 2 P2-2）。</p>
 
-<p>关键在 <code>rationale</code>：判据是<strong>"元素里有电负性 I"</strong>，不是"CsPbI₃ 这道题"。由此推出
-<code>occupations=fixed</code>（绝缘体不开 smearing）、<code>ecutrho_factor=10</code>（USPP 的 ecutrho=10×ecutwfc）、
-<code>nspin=1</code>（非磁）。这段连同三条 lesson 一起进了 prompt。</p>
+<h3 id="s42">4.2 · 三条写死的 lesson<span class="badge b-wired">wired（仅 legacy 提示词）</span></h3>
+<p>在 <code>agent/system_prompt.py</code> 顶部、以 <code>## V5.1-LESSON</code> 标记的固定文本：
+<strong>(1) ecutwfc 起步 50 Ry</strong>（ecutrho=10×）、<strong>(2) 各向异性密度型 k 网格</strong>（按各轴晶格长度反比取点，
+长轴稀短轴密）、<strong>(3) 守住墙钟预算</strong>（不收敛完就交=0，已收敛别"再跑一遍确认"）。</p>
+<div class="note" style="background:#fadbd8; border-left-color:#c0392b;">
+<strong>这三条目前只在 legacy 提示词里</strong>，没进 SDK 的 <code>executor.md</code>（见 §3 的 lesson-gap 框）。
+也就是说 deepseek 挪到 SDK 后，这三条暂时<strong>够不着</strong>它了——这是 v5.1 当前最该补的接线。</div>
 
-<div class="note">
-<strong>skill 这一步对 CsPbI₃ 是空的</strong>：5 份 advisor（alkali-metal / complex-silicate / low-symmetry-oxide /
-polar-III-V / layered-vdw）没有 halide 钙钛矿这一类，所以 <code>select_and_render</code> 返回空——CsPbI₃ 的物理建议
-全靠上面的 config 块。<strong>WO₃ 则不同</strong>：它是单斜氧化物，命中 <code>low-symmetry-oxide-advisor</code>
-（trigger：<code>material_family: oxide</code> + <code>crystal_system: monoclinic</code>），那份 advisor 专门讲
-"各向异性 k 网格、按实空间晶格长度反比取点"——正好压中 §1 的根因。</div>
+<h3 id="s43">4.3 · 移植 v4.2 顺手抓出的两个基准泄漏<span class="badge b-wired">已修</span></h3>
+<p>搬 v4.2 知识层时做了一遍 benchmark-integrity 审计，发现两处会把 bench 答案回灌进模型，都已修。理解 v5.1
+知识层"现在装的是什么"必须知道这两处。</p>
+<h4>① 经验库回灌空间群答案（底盘旧疾，<code>182f431</code>）</h4>
+<p>经验库每条 row 存了 <code>space_group_number</code>——正是 T1 打分的<strong>产出量</strong>（0.25 分）；检索按化学式匹配、
+不排除当前 task_id、专挑 <code>score≥0.7</code> → 重复材料的正确空间群被原样写进 "Past similar runs"（实测 MgSiO₃ 曾被喂
+<code>sg=62, score=1.00</code>）。修法：排除同题 + 产出量不入 prompt/不落盘 + 写入即 <code>scrub_answers()</code>；清库 <strong>130→13 行</strong>。</p>
+<h4>② 知识层里的"答案查表"（随 v4.2 移植进来，<code>21818f0</code>）</h4>
+<p><code>_metals.py</code> 原有三张按化学式查的 <code>frozenset</code>（每个化学式都对应一个 bench task ID，实为答案查表）；
+<code>config_advisor</code> 还往提示词注入 "Bench GT confirms…"。修法：换成<strong>元素集化学规则</strong>
+（<code>METAL_ELEMENTS</code>/<code>STRONGLY_ELECTRONEGATIVE</code> + <code>is_likely_magnetic_3d_oxide()</code> 等启发式），
+措辞改成"化学上倾向于…"，绝不说某评分系统"确认"了什么。</p>
+<div class="concept">
+<span class="lbl">要点</span><h4>v5.1 知识层"现在装的是什么"</h4>
+<p><strong>元素集化学规则 + 已脱敏的方法论经验</strong>，<strong>不是</strong>化学式→答案表。§5 的 CsPbI₃ 例子里你会看到
+它给的是"含电负性 I → 倾向绝缘体"这种<em>从元素推</em>的结论。</p>
+</div>
 
 
 <!-- ─────────────────────────────── §5 ─────────────────────────────── -->
-<h2 id="s5">5 · v5 vs v5.1 对照表</h2>
+<h2 id="s5">5 · preflight 走一遍：CsPbI₃</h2>
 
-<p>把"v5.1 在 v5 底盘上改了/没改什么"摆一张表。底盘行（工具/ledger/子 agent）原样继承，不复述。</p>
-
-<table>
-<tr><th>维度</th><th>v5</th><th>v5.1</th></tr>
-<tr>
-  <td>ecut 默认起点</td>
-  <td>由模型自挑（deepseek 挑 80 Ry → 超时）</td>
-  <td>lesson 写死"start at 50 Ry"<span class="badge b-wired">wired（prompt）</span></td>
-</tr>
-<tr>
-  <td>k 网格策略</td>
-  <td>由模型自挑（常 isotropic N×N×N）</td>
-  <td>lesson 要求各向异性密度型；WO₃ 还有 low-symmetry-oxide advisor 加持<span class="badge b-wired">wired（prompt）</span></td>
-</tr>
-<tr>
-  <td>墙钟纪律</td>
-  <td>无明确约束</td>
-  <td>lesson"不收敛完就交=0，别重复跑"<span class="badge b-wired">wired（prompt）</span></td>
-</tr>
-<tr>
-  <td>材料家族 advice</td>
-  <td>0 份</td>
-  <td>5 份 skill advisor，frontmatter trigger 按家族/晶系命中<span class="badge b-wired">wired</span></td>
-</tr>
-<tr>
-  <td>金属/绝缘体分类</td>
-  <td>无（SCF 处方表里被动补救）</td>
-  <td>preflight 的 <code>config_advisor</code> 确定性分类（元素集规则）<span class="badge b-wired">wired</span></td>
-</tr>
-<tr>
-  <td>经验库检索</td>
-  <td>会回灌空间群答案（同题不排除、专挑 score≥0.7）</td>
-  <td><strong>已脱敏</strong>：排除同题 + 产出量不落盘/不入 prompt；清库 130→13 行<span class="badge b-wired">已修 wired</span></td>
-</tr>
-<tr>
-  <td><code>config_advisor</code> LLM 交叉校验</td>
-  <td>—</td>
-  <td>仅确定性分支；<code>run()</code> 未启用（直接调会 AttributeError）<span class="badge b-phase2">Phase 2 P2-2</span></td>
-</tr>
-<tr>
-  <td>pw_wall_estimator + bash 超时钩子</td>
-  <td>—</td>
-  <td>模块已移植 + 单测齐全，但<strong>没接进 <code>bash.py</code></strong>（核对：bash.py 无引用）<span class="badge b-unwired">built-unwired</span></td>
-</tr>
-<tr>
-  <td>Claude 路径工具级硬约束</td>
-  <td>—</td>
-  <td>结构化工具仍不强制 ecut/k/墙钟（只有 prompt 劝）<span class="badge b-phase2">Phase 2 P2-1</span></td>
-</tr>
-<tr>
-  <td>orchestrator / planner</td>
-  <td>单 executor，无 planner</td>
-  <td><strong>不变</strong>——仍是 v5 的单 executor 底盘（搬 v4.2 planner 属 Phase 2 P2-3）</td>
-</tr>
-</table>
-
-<div class="note">
-<strong>一句话</strong>：v5.1 的"修"几乎全部落在 <strong>prompt 层</strong>（preflight + 三条 lesson）+ <strong>经验脱敏</strong>，
-底盘和工具行为没动。这在 legacy 路径上够用（§6 实测达标），但也意味着 Claude 路径的工具<em>本身</em>还没长出纪律
-——这正是 Phase 2 的头号任务。</div>
+<p>用真实产物把 §4.1 串起来。下面是 CsPbI₃ 那道题 workdir 里 preflight 落盘的 <code>.config_advice.json</code>（原样）：</p>
+<pre><code>{
+  "formula": "CsPbI3",  "elements": ["Cs", "Pb", "I"],
+  "structure_name": "orthorhombic perovskite",
+  "is_uspp": true,       "is_metal": false,
+  "occupations": "fixed", "ecutrho_factor": 10.0, "recommend_nspin": 1,
+  "rationale": "contains electronegative atom(s) ['I'] -> insulator/semiconductor",
+  "source": "deterministic"
+}</code></pre>
+<p>判据是<strong>"元素里有电负性 I"</strong>，不是"CsPbI₃ 这道题"。由此推出 <code>occupations=fixed</code>（绝缘体不开 smearing）、
+<code>ecutrho=10×ecutwfc</code>（USPP）、<code>nspin=1</code>（非磁）。这段进了 user_prompt。</p>
+<div class="note"><strong>skill 这步对 CsPbI₃ 是空的</strong>：5 份 advisor（alkali-metal / complex-silicate /
+low-symmetry-oxide / polar-III-V / layered-vdw）没有 halide 钙钛矿这一类。<strong>WO₃ 则命中
+<code>low-symmetry-oxide</code></strong>（trigger：氧化物 + 单斜），那份 advisor 专讲"各向异性 k、按晶格长度反比取点"
+——正好压中 §1 的根因。这也是 §3 lesson-gap 下 SDK 路径上 WO₃ 仍有各向异性 k 提示、而 CsPbI₃ 没有的原因。</div>
 
 
 <!-- ─────────────────────────────── §6 ─────────────────────────────── -->
-<h2 id="s6">6 · 跑一题：CsPbI₃ 从超时到 1.0 + 成绩单</h2>
+<h2 id="s6">6 · 944602f 的四个 review 修复（C1–C4）<span class="badge b-fixed">本次新增</span></h2>
 
-<p>顺一遍 CsPbI₃ 在 <code>deepseek-v4-pro</code> / legacy 路径上的真实轨迹（产物取自
-<code>runs_local/2026-05-28T01-35-17Z_M2_T1_CsPbI3_gamma_vc_relax/workdir</code>）：</p>
-
-<pre><code>solve.py amain()
-├─ parse_required_keys(prompt)       → ["vc_relax_out"]
-├─ run_preflight(prompt, workdir)    → 落盘 .config_advice.json
-│     elements=[Cs,Pb,I] → 含电负性 I → 绝缘体 → occupations=fixed, ecutrho×10, nspin=1
-│     skills: 无命中（halide 不在 5 份 advisor 里）
-├─ retrieve_for_task(...)            → 别的材料的方法论参数（排除本题；不含空间群）
-├─ assemble_user_prompt              → [preflight ▸ experience ▸ 原始 prompt]
-│                                       系统提示词最前还有 V5.1-LESSON（50 Ry / 各向异性 k / 墙钟）
-└─ legacy run_loop（deepseek）
-   ├─ 写 vc_relax.in：ecutwfc=50, ecutrho=500, occupations='fixed'   ← 照 lesson + config
-   │                  K_POINTS automatic  9 4 3                       ← 各向异性！
-   │                  （盒子 a=4.85, b=10.65, c=18.03 Å → 短轴密、长轴稀）
-   ├─ run pw.x（vc-relax, nat=20）→ BFGS 每步 6–8 次电子迭代收敛
-   ├─ 终态：press≈-0.02 kbar（&lt;0.05 阈值），所有角 90.00°，Pnma 对称保持
-   │         a=4.887, b=10.876, c=18.193 Å，墙钟 ~79 min
-   └─ submit({"vc_relax_out": "vc_relax.out"})
-→ result.json：total_score = 1.0</code></pre>
-
-<p>这条轨迹正是 §3 的三件事在协同：<strong>config 块</strong>给了 <code>occupations=fixed</code>，<strong>lesson</strong>
-给了 <code>ecutwfc=50</code> 与"各向异性 k"，模型据此写出 <code>9 4 3</code>（沿 c=18 Å 的长轴只取 3 个点，沿 a=4.85 Å 短轴取 9 个），
-单道 vc-relax ~79 min 跑完、空间群保持 → <span class="score-good">1.0</span>。同样的题在 v5 下是 ecut=80 + 8×8×8 → 超时 0 分。</p>
-
-<h3>成绩单（deepseek-v4-pro，2026-05-28；核对自 <code>runs_local/state.db</code>）</h3>
+<p>一次对 v5.1 全栈的复查抓出四个 bug，已全修。其中 <strong>C2、C3 正好补上 v5 评审里点过的两个洞</strong>。修完全套单测 <strong>228 passed</strong>（之前 167）。</p>
 
 <table>
-<tr><th>类别</th><th>结果</th></tr>
+<tr><th>#</th><th>问题</th><th>修法</th><th>文件</th></tr>
 <tr>
-  <td><strong>两道目标题（本次的 KPI）</strong></td>
-  <td>CsPbI₃ vc_relax <span class="score-good">1.0</span> · WO₃ vc_relax <span class="score-good">1.0</span> — <strong>目标达成</strong></td>
+  <td>C1</td>
+  <td>卡死信号 S2/S3/S6/S7 在 SDK 路径<strong>静默失效</strong>——SDK 剥掉自定义返回字段、用驼峰 <code>isError</code>，
+      导致"识别 verify pass / 工具报错"判定失败</td>
+  <td>读 <code>isError</code>（兼容 <code>is_error</code>）+ 从内容文本正则匹配 <code>verdict: pass</code>，信号恢复触发</td>
+  <td><code>hooks.py</code>、<code>progress_ledger.py</code></td>
 </tr>
 <tr>
-  <td>M1 vc_relax（基础）</td>
-  <td>Si / GaAs / NaCl / Cd 均 <span class="score-good">1.0</span></td>
+  <td>C2</td>
+  <td><strong>验收门跳过空间群检查</strong>——<code>_gate_check</code> 之前用 <code>initial=None</code> 调 verify，
+      空间群/晶格漂移/角度三项全被静默关掉（<em>这正是 v5 评审点的洞</em>）</td>
+  <td>新增 <code>structure_features.initial_structure_facts(prompt)</code> 从任务<strong>输入晶胞</strong>解析
+      initial 事实（是输入、不是打分答案），喂进门 → 空间群检查真正跑起来</td>
+  <td><code>solve.py</code>、<code>structure_features.py</code></td>
 </tr>
 <tr>
-  <td>M1/M2 bands_dos（多数）</td>
-  <td>多在 <span class="score-good">0.93–0.99</span>（LiCl 0.997、KF 0.989、HfO₂ 0.990、Ti₃O₅ 0.985、SiO₂ 0.986…）</td>
+  <td>C3</td>
+  <td>SCF 收敛处方<strong>写错 namelist</strong>——<code>electron_maxstep</code> 被塞进 <code>&CONTROL</code>（应在 <code>&ELECTRONS</code>），
+      且 <code>extra_electrons</code> 没贯通到底层写入（<em>v5 评审点的另一个洞</em>）</td>
+  <td>改 <code>convergence_subagent.md</code> 用 <code>extra_electrons=</code>；<code>write_qe_input</code> 贯通 <code>extra_electrons</code> → <code>&ELECTRONS</code></td>
+  <td><code>write_qe_input.py</code>、<code>convergence_subagent.md</code></td>
 </tr>
 <tr>
-  <td>弱点（诚实列出）</td>
-  <td>Rb bands_dos <span class="score-bad">0.22</span> · CaTiO₃ bands_dos <span class="score-mid">0.78</span> ·
-      C_diamond <span class="score-mid">0.84</span> · BN_hex <span class="score-mid">0.85</span></td>
-</tr>
-<tr>
-  <td>失败（计 0）</td>
-  <td>NaCl bands_dos <span class="score-bad">failed</span> · MgSiO₃ bands_dos <span class="score-bad">failed</span></td>
-</tr>
-<tr>
-  <td>M3 磁性批（NiO/MnO/Fe₂O₃/LaMnO₃…30 题）</td>
-  <td><span class="score-mid">queued — 尚无结果</span></td>
+  <td>C4</td>
+  <td><code>run_pw</code> 把"退出码 0"当成功——但 pw.x 在<strong>SCF 没收敛</strong>或<strong>被中途砍断（无 JOB DONE.）</strong>时也退 0，
+      于是物理失败的 run 被当成功，卡死检测和模型都不去修</td>
+  <td>退出码 0 后再过一道 <code>_run_health</code>：缺 <code>JOB DONE.</code> 或 SCF 未收敛 → 标 <code>failed</code> + 给原因</td>
+  <td><code>run_pw.py</code></td>
 </tr>
 </table>
 
-<div class="note">
-<strong>怎么读这张表</strong>：① 全部分数来自 <strong>legacy/deepseek</strong> 路径，Claude 路径本批未实跑；
-② v5.1 解决的是 <strong>vc_relax 超时</strong>这一类——T1 vc_relax 几乎全 1.0；③ 多数掉分集中在 <strong>bands_dos（T2）</strong>
-和金属/近金属体系（Rb 0.22、NaCl/MgSiO₃ 的 bands_dos 失败），这些<strong>不是 v5.1 这次的目标</strong>，而是知识层
-对 T2 / 磁性体系的覆盖还薄——指向 §7 的 Phase 2（尤其磁性批还没跑）。</div>
+<div class="concept">
+<span class="lbl">意义</span><h4>v5.1 把 v5 评审里两处"物理智慧被架空"的地方接回了线</h4>
+<p>v5 评审当时的两个核心吐槽——<strong>守 0.25 空间群分的硬门却没查空间群</strong>（<code>initial=None</code>）、
+<strong>SCF 处方串错 namelist</strong>——在 v5.1 里分别由 C2、C3 修好。加上 C1（SDK 路径上卡死信号真的会响了）和
+C4（非收敛 run 不再冒充成功），v5.1 的"验收 + 断路"这层比 v5 实在了一截。</p>
+</div>
 
 
 <!-- ─────────────────────────────── §7 ─────────────────────────────── -->
-<h2 id="s7">7 · 还没做的（Phase 2）</h2>
-
-<p>v5.1 是刻意"瘦"的一版——只在 prompt 层把 legacy 路径修达标。下面是路线图里<strong>故意推迟</strong>的工作
-（核对自 <code>docs/superpowers/specs/2026-05-27-v5.1-phase2-roadmap.md</code>），按杠杆排序：</p>
+<h2 id="s7">7 · v5 → v5.1 对照表</h2>
 
 <table>
-<tr><th>#</th><th>事项</th><th>为什么推迟 / 要点</th><th>动到哪</th></tr>
-<tr>
-  <td>P2-1</td>
-  <td><strong>Claude 路径工具级硬约束</strong><span class="badge b-phase2">Phase 2</span></td>
-  <td>v5.1 的纪律只在 prompt（legacy 达标）；Claude 的结构化工具仍会过度收敛、像修复前一样超时。该把"默认 ecut=50、
-      各向异性 k、run_pw 估墙钟超预算就拒"<strong>写进工具代码</strong>，而非靠 prompt 劝</td>
-  <td><code>tools/structured/{write_qe_input,run_pw,verify_run}.py</code>、<code>solve.py:_gate_check</code></td>
-</tr>
-<tr>
-  <td>P2-2</td>
-  <td>启用 <code>config_advisor</code> 的 LLM 交叉校验<span class="badge b-phase2">Phase 2</span></td>
-  <td>v5.1 只用确定性分类（CsPbI₃/WO₃ 是明确绝缘体，LLM 校验无增益）。<strong>前置坑</strong>：<code>config_advisor.run()</code>
-      调 <code>LLMClient.from_role</code>，而 v5.1 的 <code>LLMClient</code> 没这方法——现在直接调会 AttributeError，得先补</td>
-  <td><code>agent/llm.py</code>、<code>agent/preflight.py</code></td>
-</tr>
-<tr>
-  <td>P2-3</td>
-  <td>orchestrator 合并（"把两个框架合起来"的大步）<span class="badge b-phase2">Phase 2</span></td>
-  <td>v5.1 按指令保留 v5 单 executor 底盘。搬 v4.2 的 planner-orchestrator + 类型化 step-DAG 是多周的结构改造，单开 spec</td>
-  <td><code>solve.py</code>、新 <code>agent/orchestrator.py</code>、<code>agent/ledger.py</code>、<code>agent/step_kinds/</code> 等</td>
-</tr>
-<tr>
-  <td>P2-4</td>
-  <td>把 <code>pw_wall_estimator</code> 接进 <code>bash.py</code><span class="badge b-unwired">built-unwired</span></td>
-  <td>模块+单测已移植但<strong>未接线</strong>；Phase-1 价值边际（实际超时是 harness 在 4 h 回收，非 bash 杀进程），
-      且改 bash.py 有碰坏 bg-detection 真值表与结构化 <code>run_pw</code> 的回归风险</td>
-  <td><code>agent/tools/bash.py</code></td>
-</tr>
+<tr><th>维度</th><th>v5</th><th>v5.1</th></tr>
+<tr><td>deepseek 走哪条路</td><td>legacy 手写 bash loop</td><td><strong>SDK 路径</strong>（结构化工具全套）<span class="badge b-fixed">944602f</span></td></tr>
+<tr><td>ecut/k/墙钟纪律</td><td>模型自挑（→ 超时）</td><td>三条 lesson（legacy 提示词）+ preflight；<strong>SDK 路径暂缺 lesson</strong>（§3 gap）<span class="badge b-wired">部分</span></td></tr>
+<tr><td>材料 advice</td><td>0 份</td><td>preflight：5 份 skill + 确定性 config 分类<span class="badge b-wired">wired</span></td></tr>
+<tr><td>验收门空间群检查</td><td><code>initial=None</code> → 静默跳过</td><td>从输入晶胞取 initial → <strong>真查</strong><span class="badge b-fixed">C2</span></td></tr>
+<tr><td>SCF 处方 namelist</td><td><code>electron_maxstep</code> 串进 <code>&CONTROL</code></td><td>修正进 <code>&ELECTRONS</code><span class="badge b-fixed">C3</span></td></tr>
+<tr><td>SDK 路径卡死信号</td><td>S2/S3/S6/S7 静默失效</td><td>恢复触发<span class="badge b-fixed">C1</span></td></tr>
+<tr><td><code>run_pw</code> 失败判定</td><td>退出码 0 即成功</td><td>非收敛/无 JOB DONE. 标 failed<span class="badge b-fixed">C4</span></td></tr>
+<tr><td>经验库</td><td>回灌空间群答案</td><td>已脱敏（排除同题、产出量不落盘）<span class="badge b-wired">已修</span></td></tr>
+<tr><td><code>config_advisor</code> LLM 校验</td><td>—</td><td>仅确定性；<code>run()</code> 未启用<span class="badge b-phase2">Phase 2</span></td></tr>
+<tr><td><code>pw_wall_estimator</code> + bash 超时钩</td><td>—</td><td>模块+单测已移植，未接 <code>bash.py</code><span class="badge b-unwired">built-unwired</span></td></tr>
+<tr><td>orchestrator / planner</td><td>单 executor</td><td><strong>不变</strong>（搬 v4.2 planner 属 Phase 2）</td></tr>
 </table>
-
-<p>另有两个<strong>待清理的小毛病</strong>（任意阶段可做）：① <code>pytest</code> 会写到 git 跟踪的真实经验库
-（recorder/store 测试该隔离到临时目录）；② <code>verify_bands_dos</code> 的 docstring 夸大了——实际检查比宣称的简单
-（没有真正的 nbnd-vs-电子数充分性、也没有 <code>[0,12] eV</code> 带隙启发式），该补实现或改文档。</p>
 
 
 <!-- ─────────────────────────────── §8 ─────────────────────────────── -->
-<h2 id="s8">8 · 附录：代码路径</h2>
+<h2 id="s8">8 · 跑一题 + 成绩单</h2>
+
+<div class="note" style="background:#fdebd0; border-left-color:#d35400;">
+<strong>口径声明</strong>：下面这条轨迹和成绩单都来自 <strong>legacy 路径（<code>944602f</code> 之前，deepseek 还走手写 loop）</strong>，
+那时三条 lesson 对 deepseek 生效。<code>944602f</code> 把 deepseek 挪到 SDK 路径后，目前只验证了 <code>M1_T1_Si</code>=1.0，
+<strong>整套 SDK-deepseek 子集还没重跑</strong>（且有 §3 的 lesson-gap）。所以这节是"v5.1 知识层在 legacy 上确实work"的证据，
+不代表当前 SDK 路径的成绩。</div>
+
+<p>CsPbI₃ 在 legacy/deepseek 上的真实轨迹（产物取自 <code>2026-05-28T01-35-17Z_..._CsPbI3_..._vc_relax/workdir</code>）：</p>
+<pre><code>solve.py amain()
+├─ run_preflight → .config_advice.json：含电负性 I → 绝缘体 → occupations=fixed, ecutrho×10
+├─ assemble_user_prompt：preflight ▸ experience ▸ 原题（legacy 系统提示词含 V5.1-LESSON）
+└─ legacy loop（deepseek）
+   ├─ 写 vc_relax.in：ecutwfc=50, ecutrho=500, occupations='fixed'   ← 照 lesson + config
+   │                  K_POINTS automatic  9 4 3                       ← 各向异性！
+   │                  （盒子 a=4.85, b=10.65, c=18.03 Å → 短轴密、长轴稀）
+   ├─ pw.x（vc-relax, nat=20）→ BFGS 每步 6–8 次电子迭代收敛
+   ├─ 终态 press≈-0.02 kbar，所有角 90.00°，Pnma 保持，墙钟 ~79 min
+   └─ submit → total_score = 1.0</code></pre>
+<p>三件事协同：config 给 <code>occupations=fixed</code>，lesson 给 <code>ecut=50</code> 和"各向异性 k"，模型写出 <code>9 4 3</code>
+（沿 c=18 Å 长轴只取 3 点），~79 min 跑完、空间群保持 → <span class="score-good">1.0</span>。同题在 v5 是 ecut=80+8×8×8 → 超时 0 分。</p>
+
+<h3>成绩单（legacy/deepseek，2026-05-28；核对自 <code>runs_local/state.db</code>）</h3>
+<table>
+<tr><th>类别</th><th>结果</th></tr>
+<tr><td><strong>两道目标题（KPI）</strong></td><td>CsPbI₃ <span class="score-good">1.0</span> · WO₃ <span class="score-good">1.0</span> — 达成</td></tr>
+<tr><td>M1 vc_relax</td><td>Si / GaAs / NaCl / Cd 均 <span class="score-good">1.0</span></td></tr>
+<tr><td>M1/M2 bands_dos（多数）</td><td><span class="score-good">0.93–0.99</span>（LiCl 0.997、KF 0.989、HfO₂ 0.990、Ti₃O₅ 0.985…）</td></tr>
+<tr><td>弱点</td><td>Rb bands_dos <span class="score-bad">0.22</span> · CaTiO₃ <span class="score-mid">0.78</span> · C_diamond <span class="score-mid">0.84</span> · BN_hex <span class="score-mid">0.85</span></td></tr>
+<tr><td>失败（计 0）</td><td>NaCl bands_dos <span class="score-bad">failed</span> · MgSiO₃ bands_dos <span class="score-bad">failed</span></td></tr>
+<tr><td>M3 磁性批（NiO/MnO/Fe₂O₃…30 题）</td><td><span class="score-mid">queued — 尚无结果</span></td></tr>
+<tr><td>SDK-deepseek（944602f 后）</td><td><span class="score-mid">仅 M1_T1_Si=1.0 验证；整套子集未重跑</span></td></tr>
+</table>
+<div class="note">掉分集中在 <strong>bands_dos（T2）</strong>和金属/近金属体系（Rb、NaCl/MgSiO₃ 的 bands_dos）——这些<strong>不是 v5.1
+这次的目标</strong>（目标是 vc_relax 超时），而是知识层对 T2/磁性体系覆盖还薄，指向 §9。</div>
+
+
+<!-- ─────────────────────────────── §9 ─────────────────────────────── -->
+<h2 id="s9">9 · 还没做的（Phase 2）</h2>
+
+<p>已在 <code>944602f</code> 修掉的（不再属 Phase 2）：C1 卡死信号 / C2 空间群门 / C3 namelist / C4 失败判定。仍待办：</p>
+<table>
+<tr><th>#</th><th>事项</th><th>要点</th></tr>
+<tr>
+  <td>P2-1</td>
+  <td>把三条 lesson 接进 SDK 工具层<span class="badge b-phase2">Phase 2 · 现在最急</span></td>
+  <td>§3 的 lesson-gap：deepseek 挪到 SDK 后够不着三条 lesson。该把"默认 ecut=50、各向异性 k、估墙钟超预算就拒"
+      <strong>写进 <code>write_qe_input</code>/<code>run_pw</code> 代码</strong>（而非只靠提示词），并修 <code>executor.md</code> 那个 8×8×8 示例</td>
+</tr>
+<tr><td>P2-2</td><td>启用 <code>config_advisor</code> LLM 交叉校验<span class="badge b-phase2">Phase 2</span></td><td>前置坑：<code>config_advisor.run()</code> 调的 <code>LLMClient.from_role</code> 当前不存在，直接调会 AttributeError，得先补</td></tr>
+<tr><td>P2-3</td><td>orchestrator 合并<span class="badge b-phase2">Phase 2</span></td><td>搬 v4.2 的 planner + 类型化 step-DAG，是多周结构改造，单开 spec</td></tr>
+<tr><td>P2-4</td><td>把 <code>pw_wall_estimator</code> 接进 <code>bash.py</code><span class="badge b-unwired">built-unwired</span></td><td>模块+单测已移植但未接线；改 bash.py 有碰坏 bg-detection 真值表的回归风险</td></tr>
+</table>
+<p>另有小毛病：<code>pytest</code> 会写到真实经验库（该隔离临时目录）；<code>verify_bands_dos</code> 的 docstring 夸大了实际检查。</p>
+
+
+<!-- ─────────────────────────────── §10 ─────────────────────────────── -->
+<h2 id="s10">10 · 附录：代码路径</h2>
 
 <table>
 <tr><th>组件</th><th>文件（<code>/srv/shared/science/solver/v5.1/</code> 下）</th></tr>
-<tr><td>入口 / 双路径分流 / 复核硬门</td><td><code>solve.py</code>（preflight 接线 <code>:395–406</code>，<code>assemble_user_prompt</code> <code>:125</code>）</td></tr>
-<tr><td><strong>preflight 编排（v5.1 新增）</strong></td><td><code>agent/preflight.py:run_preflight</code></td></tr>
-<tr><td>结构特征解析</td><td><code>agent/structure_features.py:extract</code>（v4.2 移植）</td></tr>
-<tr><td>5 份材料 skill advisor</td><td><code>agent/skills/</code>（<code>loader.py</code> + <code>*-advisor.md</code>，frontmatter trigger）</td></tr>
-<tr><td>确定性配置分类器</td><td><code>agent/subagents/config_advisor.py</code> + <code>agent/subagents/_metals.py</code>（元素集规则，<code>run()</code> 未启用）</td></tr>
-<tr><td>三条 lesson</td><td><code>agent/system_prompt.py</code>（<code>V5.1-LESSON</code> 块在 <code>:75–93</code>）</td></tr>
-<tr><td>经验库（已脱敏）</td><td><code>agent/experience/</code>（retriever / store，<code>scrub_answers()</code>）+ <code>scripts/scrub_experience_answers.py</code></td></tr>
-<tr><td>墙钟估计（建好没接）</td><td><code>agent/pw_wall_estimator.py</code> + <code>agent/step_timeout_floor.py</code>（bash.py 未引用）</td></tr>
-<tr><td>v5 底盘（原样继承）</td><td><code>agent/runtime/driver.py</code>、<code>agent/runtime/progress_ledger.py</code>、<code>agent/tools/structured/</code></td></tr>
-<tr><td>计划 / 路线图文档</td><td><code>docs/superpowers/plans/2026-05-27-v5.1-knowledge-layer.md</code>、<code>docs/superpowers/specs/2026-05-27-v5.1-phase2-roadmap.md</code></td></tr>
+<tr><td>入口 / prompt 装配 / 验收门 / 重放</td><td><code>solve.py</code>（<code>assemble_user_prompt</code>、<code>_gate_check</code>、<code>resolve_anthropic_base_url</code>、<code>should_use_sdk_path</code>）</td></tr>
+<tr><td>SDK executor 主循环</td><td><code>agent/runtime/driver.py</code>（<code>Driver</code>、<code>build_executor_prompt</code>，渲染 <code>agent/prompts/executor.md</code>）</td></tr>
+<tr><td>卡死 ledger（S1–S7）+ 钩子</td><td><code>agent/runtime/progress_ledger.py</code>、<code>agent/runtime/hooks.py</code></td></tr>
+<tr><td>7 个结构化工具</td><td><code>agent/tools/structured/</code>（<code>server.py</code> + 各 tool；<code>run_pw.py</code> 含 C4 <code>_run_health</code>）</td></tr>
+<tr><td>物理验收</td><td><code>agent/tools/structured/verify_run.py</code>（<code>verify_vc_relax</code>/<code>verify_bands_dos</code>）</td></tr>
+<tr><td>收敛子 agent</td><td><code>agent/subagents/convergence.py</code> + <code>agent/prompts/convergence_subagent.md</code></td></tr>
+<tr><td>preflight 编排</td><td><code>agent/preflight.py</code> · <code>structure_features.py</code>（含 C2 <code>initial_structure_facts</code>）· <code>agent/skills/</code> · <code>agent/subagents/config_advisor.py</code>+<code>_metals.py</code></td></tr>
+<tr><td>三条 lesson（仅 legacy 提示词）</td><td><code>agent/system_prompt.py</code>（<code>V5.1-LESSON</code> 块）</td></tr>
+<tr><td>经验库（已脱敏）</td><td><code>agent/experience/</code> + <code>scripts/scrub_experience_answers.py</code></td></tr>
+<tr><td>墙钟估计（建好没接）</td><td><code>agent/pw_wall_estimator.py</code> + <code>agent/step_timeout_floor.py</code></td></tr>
 </table>
 
-<p><strong>关键提交</strong>：<code>42ef04b</code>（preflight 接进 solve.py）·
-<code>c9dc7d8</code>（三条 lesson）· <code>182f431</code>（经验库空间群脱敏）· <code>21818f0</code>（去除答案查表，改元素集规则）。</p>
+<p><strong>关键提交</strong>：<code>944602f</code>（DeepSeek-on-SDK + C1–C4 + driver teardown，228 passed）·
+<code>42ef04b</code>（preflight 接进 solve.py）· <code>c9dc7d8</code>（三条 lesson）·
+<code>182f431</code>（经验库空间群脱敏）· <code>21818f0</code>（去答案查表，改元素集规则）。</p>
 
-<p><strong>相关报告</strong>：
-<a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构（底盘，前篇）</a> ·
-<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构（知识层来源）</a> ·
-<a href="solver-versions-explained-2026-05-17.html">四版本 solver 入门教程</a> ·
+<p><strong>相关报告（非必读）</strong>：
+<a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构评审</a> ·
+<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构</a> ·
+<a href="solver-versions-explained-2026-05-17.html">四版本入门教程</a> ·
 <a href="index.html">← 返回报告索引</a></p>
 
 <p style="color:#7f8c8d; font-size:13px; margin-top:30px;">
-本文所有阈值 / 行号 / 分数均于 2026-05-29 亲自核对自 <code>/srv/shared/science/solver/v5.1/</code> 源码、git log
-与 <code>runs_local/state.db</code>。接线状态徽章反映核对当时的 live path 实际调用关系，非设计意图。
+本文所有阈值 / 行号 / 分数 / 路由规则均于 2026-05-29 亲自核对自 <code>/srv/shared/science/solver/v5.1/</code> 源码
+（HEAD <code>944602f</code>）、git log 与 <code>runs_local/state.db</code>。接线状态徽章反映核对当时的 live path 实际调用关系，非设计意图。
+v2 更新：补结构设计主干（§2）、路由变化（§3）、C1–C4 修复（§6）。
 </p>
 
 </body>
