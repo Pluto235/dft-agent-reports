@@ -26,6 +26,12 @@ a:hover { text-decoration: underline; }
 
 <ul>
   <li>
+    <b><a href="agent-v5-1-architecture-2026-05-29.html">
+      v5.1 Solver 架构 · v5 chassis + v4.2 知识层（设计讲解）
+    </a></b>
+    <small>2026-05-29 · 给合作者和自己看的 v5.1 设计讲解，<a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构</a>的续篇 · explainer 取向 · <strong>一句话：v5.1 = v5 底盘 + 把 v4.2 "知识层"以一个共享 <code>preflight</code> 搬进来 + 三条写死的系统提示词 lesson</strong> · 解决 v5 在 deepseek/legacy 上 M2 vc-relax 自挑 <code>ecut=80/ecutrho=800/8×8×8</code> 撞穿 ~4h 墙钟被回收 = 0 分 · <strong>三条 lesson</strong>（<code>V5.1-LESSON</code>）：ecut 起步 50 Ry / 各向异性密度型 k 网格 / 守墙钟预算（"converge ENOUGH, not maximally"）· <strong>preflight</strong>（确定性、无 LLM、永不崩）：<code>structure_features</code> → 5 份 skill advisor → <code>config_advisor</code> 元素集分类，喂 claude + legacy 两条路径 · <strong>§3.3 移植 v4.2 顺手抓出的两个基准泄漏</strong>：① 经验库回灌空间群答案（<code>182f431</code>，清库 130→13 行）② <code>_metals.py</code> 化学式白名单=答案查表 → 改元素集化学规则（<code>21818f0</code>）· <strong>实测（deepseek-v4-pro，2026-05-28）</strong>：CsPbI₃ / WO₃ vc_relax 双双 <strong>1.0</strong>（目标达成；CsPbI₃ ecut=50 + <code>9 4 3</code> 各向异性 k，~79 min，Pnma 保持）· 诚实弱点：Rb bands_dos 0.22 / NaCl·MgSiO₃ bands_dos failed / M3 磁性批仍 queued · <strong>§7 Phase 2</strong>：claude 路径工具级硬约束 / <code>config_advisor</code> LLM 校验 / orchestrator 合并 / 接线 <code>pw_wall_estimator</code>（现 built-unwired）· 接线徽章 wired/built-unwired/Phase-2 · 1 张 SVG · self-contained</small>
+  </li>
+  <li>
     <b><a href="solver-v42-standard27-2026-05-25.html">
       Solver v4.2 · 27 题标准档 · 2026-05-25 batch 复盘
     </a></b>

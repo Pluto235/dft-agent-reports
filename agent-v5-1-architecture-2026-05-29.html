@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v5.1 Solver 架构 · v5 chassis + v4.2 知识层 · 2026-05-29（explainer）</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+         'Microsoft YaHei', sans-serif;
+         max-width: 920px; margin: 40px auto; padding: 0 28px; color: #2c3e50; line-height: 1.75; }
+  h1 { color: #34495e; border-bottom: 3px solid #3498db; padding-bottom: 12px; margin-top: 30px; }
+  h2 { color: #34495e; border-left: 5px solid #3498db; padding-left: 12px; margin-top: 50px; }
+  h3 { color: #2c3e50; margin-top: 30px; }
+  h4 { color: #34495e; margin-top: 22px; }
+  p { margin: 12px 0; }
+  a { color: #2980b9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+         background: #ecf0f1; padding: 2px 5px; border-radius: 3px; font-size: 90%; color: #c0392b; }
+  pre { background: #2c3e50; color: #ecf0f1; padding: 16px 20px; border-radius: 6px;
+        overflow-x: auto; font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 13px; line-height: 1.55; }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+
+  .meta { background: #ecf0f1; border-left: 4px solid #3498db; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .note { background: #fdf2e9; border-left: 4px solid #e67e22; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .qbox { background: #eafaf1; border: 1px solid #58d68d; border-left: 5px solid #27ae60;
+          padding: 14px 18px; margin: 22px 0; border-radius: 6px; }
+  .qbox h4 { margin: 0 0 8px 0; color: #1d8348; }
+  .qbox ul { margin: 6px 0; padding-left: 22px; }
+  .qbox li { margin: 4px 0; }
+
+  .concept { background: #fef9e7; border: 1px solid #f4d03f; border-radius: 8px;
+             padding: 16px 20px; margin: 24px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .concept .lbl { display: inline-block; background: #f1c40f; color: #fff;
+                  font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+                  margin-right: 8px; }
+  .concept h4 { margin: 0 0 8px 0; display: inline; color: #7d6608; }
+  .concept p { margin: 8px 0 0 0; }
+
+  .analogy { background: #eaf2f8; border-left: 4px solid #5dade2;
+             padding: 12px 18px; margin: 18px 0; border-radius: 4px;
+             font-size: 15px; }
+  .analogy::before { content: "🌰 类比 · "; font-weight: 700; color: #21618c; }
+
+  .diagram-caption { text-align: center; color: #7f8c8d; font-style: italic;
+                     font-size: 14px; margin: 6px 0 30px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #d5dbdb; text-align: left;
+           vertical-align: top; }
+  th { background: #34495e; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  td code { font-size: 12px; }
+
+  nav.toc { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 16px 24px; margin: 24px 0; }
+  nav.toc h3 { margin-top: 0; color: #34495e; }
+  nav.toc ol { padding-left: 24px; }
+  nav.toc li { padding: 3px 0; }
+
+  .svg-wrap { text-align: center; margin: 24px 0 6px; padding: 16px;
+              background: #fafbfc; border-radius: 8px; border: 1px solid #ecf0f1; }
+  .svg-wrap svg { max-width: 100%; height: auto; }
+
+  details { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 8px 14px; margin: 14px 0; }
+  details summary { cursor: pointer; color: #34495e; font-weight: 600; }
+  details[open] summary { margin-bottom: 8px; }
+
+  /* wiring-status badges (same vocabulary as the v5 doc) */
+  .badge { display: inline-block; font-weight: 700; padding: 1px 9px; border-radius: 11px;
+           font-size: 11px; vertical-align: middle; margin-left: 4px; white-space: nowrap; }
+  .b-wired   { background: #d5f5e3; color: #1d8348; border: 1px solid #58d68d; }
+  .b-unwired { background: #fdebd0; color: #9c640c; border: 1px solid #e59866; }
+  .b-phase2  { background: #ebdef0; color: #6c3483; border: 1px solid #bb8fce; }
+  .legend span { margin-right: 14px; }
+  .score-good { color: #1d8348; font-weight: 700; }
+  .score-mid  { color: #9c640c; font-weight: 700; }
+  .score-bad  { color: #a93226; font-weight: 700; }
+
+  h2[id], h3[id], .concept[id] { scroll-margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>v5.1 Solver 架构 · v5 chassis + v4.2 知识层</h1>
+
+<p style="margin: -8px 0 14px; color: #7f8c8d; font-size: 13px;">
+<strong style="background: #d6eaf8; color: #1b4f72; padding: 2px 10px; border-radius: 12px;
+border: 1px solid #2980b9;">explainer · as-wired · 2026-05-29</strong>
+&nbsp;这是 <a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构文档</a> 的续篇。
+v5 文档讲的是 <em>chassis</em>（结构化工具 / 卡死检测 / 子 agent / 经验库）；<strong>本文讲 v5.1
+在那个底盘上加了什么</strong>，目标是让合作者和我自己都能看懂 v5.1 的设计与取舍。建议先读 v5 文档的 §2/§3 建立画面。
+</p>
+
+<div class="note" style="background: #d5f5e3; border-left-color: #1d8348;">
+<strong>一句话：v5.1 = v5 底盘 + 把 v4.2 的"知识层"以一个共享 <code>preflight</code> 搬进来 + 三条写死的系统提示词
+lesson。</strong> 它解决的是一个具体的失败：v5 在 <code>deepseek-v4-pro</code>（legacy 路径）上跑 M2 vc-relax 时
+自己挑了 <code>ecutwfc=80 / ecutrho=800 / 8×8×8（=512 k）</code>，单道 vc-relax 撞穿 ~4 h 的 harness 墙钟被回收 → 0 分。
+v5.1 让它<strong>"够用就行，别过度收敛"</strong>。<br><br>
+<strong>结果（实测，<code>deepseek-v4-pro</code>，2026-05-28）</strong>：两道目标题都到
+<span class="score-good">1.0</span> —
+<code>M2_T1_CsPbI3_gamma_vc_relax</code>（1.0，墙钟 ~79 min）和 <code>M2_T1_WO3_roomT_vc_relax</code>（1.0）。目标达成（§6）。
+</div>
+
+<div class="note">
+<strong>接线状态徽章（同 v5 文档的词汇，2026-05-29 亲自核对代码 / git log / runs DB）</strong>：
+v5.1 只把知识层的<strong>确定性部分</strong>接上了线；几个组件是"建好没接"或"留给 Phase 2"。每个机制贴一个状态徽章：
+<div class="legend" style="margin-top: 8px;">
+<span class="badge b-wired">已接线 wired</span>live path 真调用 ·
+<span class="badge b-unwired">建好没接 built-unwired</span>代码+单测齐全但 live path 不调用 ·
+<span class="badge b-phase2">Phase 2</span>路线图里、尚未实现
+</div>
+</div>
+
+<div class="meta">
+<strong>给谁看</strong>：DFT / Quantum ESPRESSO 实战熟练、想搞懂 v5.1 在做什么的合作者（以及未来的我）。<br>
+<strong>读完你会知道</strong>：v5.1 相对 v5 改了哪三件事、preflight 怎么把材料知识喂进去、为什么移植 v4.2
+顺手补了两个"背题"漏洞、它在 bench 上到底跑成什么样、以及哪些故意留给了 Phase 2。<br>
+<strong>对应代码</strong>：<code>/srv/shared/science/solver/v5.1/</code>（git 分支 <code>v5.1</code>）<br>
+<strong>相关报告</strong>：
+<a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构（底盘，前篇）</a> ·
+<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构（知识层来源）</a> ·
+<a href="solver-versions-explained-2026-05-17.html">四版本入门教程</a><br>
+<strong>预计阅读</strong>：12–18 分钟。
+</div>
+
+<nav class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">起因：v5 在 deepseek 上为什么会超时</a></li>
+  <li><a href="#s2">v5 底盘速览（双路径）</a></li>
+  <li><a href="#s3"><strong>v5.1 改了什么（核心）</strong>
+    <ol>
+      <li><a href="#s31">preflight 知识层（确定性，喂两条路径）</a></li>
+      <li><a href="#s32">三条写死的 lesson（50 Ry / 各向异性 k / 墙钟预算）</a></li>
+      <li><a href="#s33">移植 v4.2 顺手抓出的两个基准泄漏</a></li>
+    </ol>
+  </li>
+  <li><a href="#s4">preflight 怎么工作：CsPbI₃ 走一遍</a></li>
+  <li><a href="#s5">v5 vs v5.1 对照表</a></li>
+  <li><a href="#s6">跑一题：CsPbI₃ 从超时到 1.0 + 成绩单</a></li>
+  <li><a href="#s7">还没做的（Phase 2）</a></li>
+  <li><a href="#s8">附录：代码路径</a></li>
+</ol>
+</nav>
+
+
+<!-- ─────────────────────────────── §1 ─────────────────────────────── -->
+<h2 id="s1">1 · 起因：v5 在 deepseek 上为什么会超时</h2>
+
+<p>v5 的底盘很漂亮，但在一类题上反复 0 分：<strong>M2 的 20–32 原子 vc-relax</strong>（CsPbI₃、WO₃ 这种）。
+根因不是物理错，而是<strong>参数过度收敛 + 墙钟用尽</strong>：</p>
+
+<ul>
+  <li>模型（这里是 <code>deepseek-v4-pro</code>，走 legacy 路径）自己挑了 <code>ecutwfc=80, ecutrho=800</code>，
+      又配了各向同性的 <code>K_POINTS 8×8×8 = 512</code> 个 k 点；</li>
+  <li>20–32 原子的盒子在这个参数下，单道 vc-relax 的墙钟超过 harness 的 ~4 h 上限 → 进程被回收 → 该题直接计 0。</li>
+  <li>而这些题是按 <strong>1% 相对晶格容差</strong>打分的，不是按绝对总能 —— 这个容差在 <code>ecut=50</code> 就已经满足
+      （任务 JSON 自带的 ecut 扫描可证），<code>ecut=50</code> + 合理 k 网格 ~1.5–3 h 就能跑完。</li>
+</ul>
+
+<div class="concept">
+<span class="lbl">核心概念</span><h4>converge ENOUGH, not maximally</h4>
+<p>对这些 vc-relax 题，"更高的 ecut / 更密的 k" 不会换来更高的分，只会换来更长的墙钟——而墙钟一旦用尽，分数从可能的
+1.0 直接掉到 0。<strong>过度收敛在这里是纯粹的负收益。</strong>v5.1 的全部改动都围绕这一句话。</p>
+</div>
+
+<div class="analogy">
+v5 像个<strong>追求极致精度、却没带表的工程师</strong>——他能把活干得很漂亮，但常常在交付截止前还在"再多收敛一位小数"，
+结果什么都没交上去。v5.1 没换人，只是<strong>塞给他一张便条（preflight + 三条 lesson）</strong>："这活 50 Ry 就够，
+长轴别过采样，留好时间，跑完一次就交"。便条不强制，但他照着做了。</p>
+</div>
+
+
+<!-- ─────────────────────────────── §2 ─────────────────────────────── -->
+<h2 id="s2">2 · v5 底盘速览（双路径）</h2>
+
+<p>这一节是<strong>背景</strong>，只为后面定位 preflight 插在哪。底盘细节（7 个结构化工具、卡死 ledger、收敛子 agent）见
+<a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 文档</a>，这里不重复。</p>
+
+<p><code>solve.py:amain</code> 按模型名分流成<strong>两条路径</strong>，但 v5.1 的知识层（preflight）+ 经验库是
+<strong>两条都喂</strong>的——这是 v5.1 设计上一个关键点：</p>
+
+<table>
+<tr><th>路径</th><th>触发</th><th>怎么跑</th><th>v5.1 在这条路径上的状态</th></tr>
+<tr>
+  <td><strong>Claude 路径</strong></td>
+  <td><code>--model claude-*</code></td>
+  <td><code>Driver</code>（<code>claude-agent-sdk</code>）+ 7 个结构化 MCP 工具 + 卡死 ledger（S1–S7）+ 收敛子 agent + verifier 硬门</td>
+  <td>收到 preflight + 三条 lesson，但<strong>只通过 prompt</strong>；结构化工具<em>本身</em>还没强制 50 Ry / 各向异性 k（留给 Phase 2，见 §7）</td>
+</tr>
+<tr>
+  <td><strong>legacy 路径</strong></td>
+  <td>其它模型（<code>deepseek-v4-pro</code> 等）</td>
+  <td>原样复用 v4 的手写 tool-use loop（<code>agent/loop.py:run_loop</code>）+ 裸 <code>BashTool</code></td>
+  <td>同样收到 preflight + 三条 lesson；<strong>v5.1 至今的全部实测跑分都在这条路径上</strong></td>
+</tr>
+</table>
+
+<div class="note">
+<strong>读者注意</strong>：v5.1 这一版的实测结果（§6）<strong>全部来自 legacy / deepseek 路径</strong>——这也是被修的那条。
+Claude 路径继承了同样的 preflight 与 lesson，但本批次没有用 Claude 模型实跑，所以 Claude 路径"修没修好"目前没有数据，
+而且它缺少工具级的硬约束（§7 P2-1）。下文凡谈"成绩"均指 legacy/deepseek。
+</div>
+
+<div class="svg-wrap">
+<svg viewBox="0 0 880 430" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+  <!-- task in -->
+  <rect x="20" y="24" width="160" height="46" rx="6" fill="#f5eef8" stroke="#8e44ad"/>
+  <text x="100" y="44" text-anchor="middle" fill="#6c3483">task_prompt.txt</text>
+  <text x="100" y="61" text-anchor="middle" fill="#6c3483" font-size="11">required keys / 材料</text>
+  <!-- PREFLIGHT (the new v5.1 block) -->
+  <rect x="20" y="120" width="250" height="150" rx="8" fill="#fef9e7" stroke="#d4ac0d" stroke-width="2.5"/>
+  <text x="145" y="142" text-anchor="middle" fill="#7d6608" font-weight="bold">preflight 知识层（v5.1 新增）</text>
+  <text x="145" y="166" text-anchor="middle" font-size="11" fill="#5b4d09">structure_features.extract</text>
+  <text x="145" y="184" text-anchor="middle" font-size="11" fill="#5b4d09">↓ 晶系 / 家族 / 元素</text>
+  <text x="145" y="204" text-anchor="middle" font-size="11" fill="#5b4d09">skills.select_and_render（5 份）</text>
+  <text x="145" y="224" text-anchor="middle" font-size="11" fill="#5b4d09">config_advisor（确定性分类）</text>
+  <text x="145" y="248" text-anchor="middle" font-size="10" fill="#7f8c8d">→ 一段 advice 块 + .config_advice.json</text>
+  <line x1="100" y1="70" x2="120" y2="118" stroke="#8e44ad" marker-end="url(#ahp)"/>
+  <!-- assemble -->
+  <rect x="330" y="150" width="200" height="90" rx="8" fill="#d6eaf8" stroke="#2980b9" stroke-width="2"/>
+  <text x="430" y="178" text-anchor="middle" fill="#1b4f72" font-weight="bold">assemble_user_prompt</text>
+  <text x="430" y="200" text-anchor="middle" font-size="11" fill="#1b4f72">preflight ▸ experience ▸</text>
+  <text x="430" y="218" text-anchor="middle" font-size="11" fill="#1b4f72">base prompt（最后）</text>
+  <line x1="270" y1="195" x2="328" y2="195" stroke="#2980b9" marker-end="url(#ah)"/>
+  <!-- system prompt lessons -->
+  <rect x="330" y="30" width="200" height="86" rx="8" fill="#eafaf1" stroke="#27ae60"/>
+  <text x="430" y="54" text-anchor="middle" fill="#196f3d" font-weight="bold">system_prompt.py</text>
+  <text x="430" y="76" text-anchor="middle" font-size="11" fill="#196f3d">V5.1-LESSON：50 Ry /</text>
+  <text x="430" y="94" text-anchor="middle" font-size="11" fill="#196f3d">各向异性 k / 墙钟预算</text>
+  <!-- router -->
+  <rect x="600" y="150" width="250" height="92" rx="8" fill="#fafbfc" stroke="#d5dbdb"/>
+  <text x="725" y="172" text-anchor="middle" fill="#34495e" font-weight="bold">solve.py 按模型分流</text>
+  <text x="725" y="196" text-anchor="middle" font-size="11" fill="#2c3e50">claude-* → Driver（SDK，7 工具）</text>
+  <text x="725" y="216" text-anchor="middle" font-size="11" fill="#2c3e50">其它 → legacy run_loop（deepseek）</text>
+  <text x="725" y="234" text-anchor="middle" font-size="10" fill="#7f8c8d">两条都收到上面的 user_prompt</text>
+  <line x1="530" y1="195" x2="598" y2="195" stroke="#2980b9" marker-end="url(#ah)"/>
+  <line x1="530" y1="73" x2="565" y2="73" stroke="#27ae60"/>
+  <path d="M565 73 Q585 73 585 150" fill="none" stroke="#27ae60" marker-end="url(#ahg)"/>
+  <!-- result -->
+  <rect x="600" y="320" width="250" height="56" rx="8" fill="#d5f5e3" stroke="#229954"/>
+  <text x="725" y="344" text-anchor="middle" fill="#196f3d" font-weight="bold">result.json + 记录经验</text>
+  <text x="725" y="364" text-anchor="middle" font-size="11" fill="#196f3d">（经验已 scrub 产出量，§3.3）</text>
+  <line x1="725" y1="242" x2="725" y2="318" stroke="#229954" marker-end="url(#ahr)"/>
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#2980b9"/></marker>
+    <marker id="ahg" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#27ae60"/></marker>
+    <marker id="ahp" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#8e44ad"/></marker>
+    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#229954"/></marker>
+  </defs>
+</svg>
+</div>
+<p class="diagram-caption">图 1 · v5.1 的数据流。黄框 preflight 与绿框 lesson 是 v5.1 相对 v5 的全部新增；两者汇入
+<code>assemble_user_prompt</code>，再分流给两条路径。底盘（工具/ledger/子 agent）原封不动。</p>
+
+
+<!-- ─────────────────────────────── §3 ─────────────────────────────── -->
+<h2 id="s3">3 · v5.1 改了什么（核心）</h2>
+
+<p>相对 v5，v5.1 只做了三件事：<strong>(§3.1) 一个共享 preflight 把材料知识喂进 prompt、(§3.2) 三条写死的
+系统提示词 lesson、(§3.3) 移植 v4.2 知识层时顺手补的两个基准泄漏</strong>。底盘没动。</p>
+
+<h3 id="s31">3.1 · preflight 知识层（确定性，喂两条路径）<span class="badge b-wired">wired</span></h3>
+
+<p>入口是 <code>agent/preflight.py:run_preflight(prompt_text, workdir)</code>，在 <code>solve.py:amain</code> 里
+紧挨着经验检索之后调用（<code>solve.py:395–406</code>）。它串三步、产出<strong>一段 advice 文本块</strong>，由
+<code>assemble_user_prompt</code> 拼到 prompt 最前面（顺序：preflight ▸ experience ▸ 原始 prompt 殿后）：</p>
+
+<table>
+<tr><th>步</th><th>模块（v4.2 移植）</th><th>干什么</th><th>对 CsPbI₃ 的输出</th></tr>
+<tr>
+  <td>1</td>
+  <td><code>structure_features.extract</code></td>
+  <td>从 prompt 解析晶系 / 化学式 / 元素 / 材料家族 / 原子数（纯解析，无 LLM）</td>
+  <td>orthorhombic, CsPbI₃, [Cs,Pb,I], halide, nat=20</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><code>skills.select_and_render</code>（5 份 advisor）</td>
+  <td>按 YAML frontmatter 的 <code>trigger</code>（<code>material_family</code> / <code>crystal_system</code> 谓词，
+      <code>any_of</code>/<code>all_of</code>）匹配材料家族 playbook</td>
+  <td>无 skill 命中（halide 不在 5 份里）→ 这一步空；WO₃ 则命中 <code>low-symmetry-oxide</code></td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>config_advisor</code>（<strong>仅确定性分类器</strong>）</td>
+  <td>按元素集判金属/绝缘体 → <code>occupations</code> / <code>smearing</code> / <code>ecutrho_factor</code> / <code>nspin</code> 建议；
+      落盘 <code>.config_advice.json</code></td>
+  <td>含电负性 I → 绝缘体 → <code>occupations=fixed</code>, <code>ecutrho_factor=10</code>, <code>nspin=1</code></td>
+</tr>
+</table>
+
+<div class="concept">
+<span class="lbl">概念</span><h4>为什么是"确定性"且"永不崩"</h4>
+<p>preflight 全程<strong>没有 LLM 调用</strong>——纯 Python 规则，所以又快又可复现。它在两条路径前都跑，等于给任何模型
+一个统一的物理起点。<code>run_preflight</code> 的每一步都包在 <code>try/except</code> 里：任何子步出错只降级为"部分/空"块，
+<strong>绝不让 preflight 拖垮 solver</strong>。注意 <code>config_advisor</code> 的 <strong>LLM 交叉校验
+(<code>config_advisor.run()</code>) 没有启用</strong>——v5.1 只走确定性分支（启用它属于 Phase 2，且当前直接调会
+<code>AttributeError</code>，见 §7 P2-2）。<span class="badge b-wired">wired（确定性）</span></p>
+</div>
+
+<h3 id="s32">3.2 · 三条写死的 lesson <span class="badge b-wired">wired</span></h3>
+
+<p>在 <code>agent/system_prompt.py</code> 顶部加了一段以 <code>## V5.1-LESSON</code> 为标记的固定文本，拼进系统提示词最前。
+原文（核对自 <code>system_prompt.py:75–93</code>）：</p>
+
+<pre><code>## V5.1-LESSON — converge ENOUGH, not maximally (wall budget is real)
+
+These vc-relax tasks are graded on a 1% relative lattice tolerance, NOT on
+absolute total energy. Over-converging wastes wall time and TIMES OUT.
+
+- ecutwfc: start at 50 Ry (ecutrho = 10×ecutwfc for USPP/GBRV). 50 Ry
+  lands inside the 1% lattice tolerance for typical cells; pushing to 80 Ry
+  with a dense mesh can time out 20-32 atom cells at the ~4h harness wall.
+- k-mesh: use an ANISOTROPIC, density-based grid, not an isotropic N×N×N.
+  For a cell with very different a/b/c (e.g. a≈4.8, c≈18 Å) a uniform 8×8×8
+  over-samples the long axis and wastes hours. Scale each direction inversely
+  to its lattice constant ... ~40-50 k-points per inverse-angstrom-equivalent.
+- Respect your wall budget. ... If you choose parameters that won't
+  finish, you score ZERO. Do one well-parameterized vc-relax; do not re-run
+  an already-converged cell to "double check".</code></pre>
+
+<p>三条分别对应 §1 根因的三个面：<strong>(1) ecut 起点 50 Ry</strong>、<strong>(2) 各向异性密度型 k 网格</strong>（按各轴
+实空间晶格长度反比取点，长轴稀、短轴密）、<strong>(3) 守住墙钟预算</strong>（不收敛完就交=0；已收敛别"再跑一遍确认"）。
+这是<em>纯 prompt 纪律</em>——它劝模型，但（在 legacy 路径上）不强制。§6 会看到 deepseek 确实照做了。</p>
+
+<h3 id="s33">3.3 · 移植 v4.2 知识层顺手抓出的两个基准泄漏</h3>
+
+<p>把 v4.2 的知识层搬进来时，做了一遍 benchmark-integrity 审计，发现<strong>有两处会把 bench 答案回灌进
+模型</strong>——一处是底盘里旧有的、一处是随知识层一起搬进来的。两处都已修。理解 v5.1 知识层"现在到底装了什么"，
+必须知道这两处，因为它们决定了 advisor 和经验库的<strong>当前形态</strong>。</p>
+
+<h4>① 经验库回灌空间群答案（底盘旧疾）<span class="badge b-wired">已修 wired</span></h4>
+<p>提交 <code>182f431</code>。经验库每条 row 存了 <code>space_group_number</code>——而空间群正是 bench 给 T1 打分的
+<strong>产出量</strong>（占 0.25 分）；检索 <code>retrieve_for_task</code> 按<strong>化学式</strong>匹配、<strong>不排除当前
+task_id</strong>、专挑 <code>score≥0.7</code> 的成功行 → 重复材料的同题正确空间群被原样写进 "Past similar runs" 块
+（已实测：MgSiO₃ 曾被喂回 <code>sg=62, score=1.00</code>）。</p>
+<p>修法 4 处：<code>query(exclude_task_id=...)</code> 排除当前题；<code>format_experience_block</code> 不再打印任何产出量
+（只留 ecut/k-mesh/smearing/walltime 方法论）；<code>store.add()</code> 写入即 <code>scrub_answers()</code>，
+<code>space_group_number</code> 永不落盘、也不再当 embedding key；清库脚本 <code>scrub_experience_answers.py</code> 把数据
+<strong>130 → 13 行</strong>（删 117 行无参数垃圾 + 抹掉空间群）。</p>
+
+<h4>② 知识层里的"答案查表"（随 v4.2 移植进来）<span class="badge b-wired">已修 wired</span></h4>
+<p>提交 <code>21818f0</code>。移植 v4.2 的 <code>config_advisor</code> + <code>_metals.py</code> 时发现里头藏着<strong>按化学式
+查 bench 答案的表</strong>，三个失败模式：</p>
+<ul>
+  <li><code>_metals.py</code> 有三张 <code>frozenset[str]</code>（<code>PBE_NEAR_METAL_FORMULAS</code> /
+      <code>MAGNETIC_TM_OXIDES</code> / <code>METALLIC_TM_OXIDES</code>），内容是<strong>一道题一道题加进去的</strong>——
+      交叉核对 bench 题库，<strong>每个化学式都对应一个 bench task ID</strong>，这些表实质是"这道题的标准协议是 X"的答案查表，
+      而非通用化学规则。</li>
+  <li><code>config_advisor.render_config_advice_block</code> 往系统提示词里直接注入
+      "<code>Bench GT confirms gap_type=metal, band_gap_ev=0</code>" 这种<strong>把方法论变成答案归因</strong>的句子，
+      还夹带 "CoSb₃ 2026-05-25 塌到 0.16 的根因…修后 ~0.95" 这类历史叙事。</li>
+  <li><code>system_prompt.py</code> 有多处 "match bench GT canonical" / "verified on AlAs 2026-05-21" 之类
+      <strong>点名 bench task ID 当物理配方来源</strong>的归因行。</li>
+</ul>
+<p>修法：把化学式白名单<strong>换成元素集化学规则</strong>——<code>_metals.py</code> 现在是
+<code>METAL_ELEMENTS</code> / <code>STRONGLY_ELECTRONEGATIVE</code> 两个元素集 + 启发式函数
+<code>is_likely_magnetic_3d_oxide()</code> / <code>is_likely_narrow_gap_heavy_p()</code>（按"开壳 3d 过渡金属 + O"、
+"重 p 区窄隙阴离子"这类<em>元素特征</em>判断，不点名任何化学式）；advisor 渲染的措辞改成"化学上倾向于…"，
+<strong>绝不说某个评分系统'确认'了什么</strong>。</p>
+
+<div class="concept">
+<span class="lbl">要点</span><h4>v5.1 知识层"现在装的是什么"</h4>
+<p><strong>元素集化学规则 + 已脱敏的方法论经验</strong>，<strong>不是</strong>化学式→答案表。这是理解 §3.1 那个
+<code>config_advisor</code> 输出的前提：它给的是"含电负性 I → 倾向绝缘体"这种<em>从元素推</em>的结论，而不是
+"CsPbI₃ 这道题答案是绝缘体"。两个泄漏修完后 <code>pytest</code> 仍绿（参 v5 文档同款审计）。</p>
+</div>
+
+
+<!-- ─────────────────────────────── §4 ─────────────────────────────── -->
+<h2 id="s4">4 · preflight 怎么工作：CsPbI₃ 走一遍</h2>
+
+<p>用真实产物把 §3.1 的三步串起来看。下面是 CsPbI₃ 那道题 workdir 里 preflight 落盘的
+<code>.config_advice.json</code>（确定性分类器的输出，原样）：</p>
+
+<pre><code>{
+  "formula": "CsPbI3",  "elements": ["Cs", "Pb", "I"],
+  "structure_name": "orthorhombic perovskite",
+  "pseudo_family": "GBRV_USPP_PBE_v1.5",  "is_uspp": true,
+  "is_metal": false,          "occupations": "fixed",
+  "smearing": null,           "degauss": null,
+  "ecutrho_factor": 10.0,     "recommend_nspin": 1,
+  "magnetic_tm_oxide": false, "metallic_tm_oxide": false,
+  "rationale": "contains electronegative atom(s) ['I'] -> insulator/semiconductor
+                (ionic or covalent bonding)",
+  "source": "deterministic"
+}</code></pre>
+
+<p>关键在 <code>rationale</code>：判据是<strong>"元素里有电负性 I"</strong>，不是"CsPbI₃ 这道题"。由此推出
+<code>occupations=fixed</code>（绝缘体不开 smearing）、<code>ecutrho_factor=10</code>（USPP 的 ecutrho=10×ecutwfc）、
+<code>nspin=1</code>（非磁）。这段连同三条 lesson 一起进了 prompt。</p>
+
+<div class="note">
+<strong>skill 这一步对 CsPbI₃ 是空的</strong>：5 份 advisor（alkali-metal / complex-silicate / low-symmetry-oxide /
+polar-III-V / layered-vdw）没有 halide 钙钛矿这一类，所以 <code>select_and_render</code> 返回空——CsPbI₃ 的物理建议
+全靠上面的 config 块。<strong>WO₃ 则不同</strong>：它是单斜氧化物，命中 <code>low-symmetry-oxide-advisor</code>
+（trigger：<code>material_family: oxide</code> + <code>crystal_system: monoclinic</code>），那份 advisor 专门讲
+"各向异性 k 网格、按实空间晶格长度反比取点"——正好压中 §1 的根因。</div>
+
+
+<!-- ─────────────────────────────── §5 ─────────────────────────────── -->
+<h2 id="s5">5 · v5 vs v5.1 对照表</h2>
+
+<p>把"v5.1 在 v5 底盘上改了/没改什么"摆一张表。底盘行（工具/ledger/子 agent）原样继承，不复述。</p>
+
+<table>
+<tr><th>维度</th><th>v5</th><th>v5.1</th></tr>
+<tr>
+  <td>ecut 默认起点</td>
+  <td>由模型自挑（deepseek 挑 80 Ry → 超时）</td>
+  <td>lesson 写死"start at 50 Ry"<span class="badge b-wired">wired（prompt）</span></td>
+</tr>
+<tr>
+  <td>k 网格策略</td>
+  <td>由模型自挑（常 isotropic N×N×N）</td>
+  <td>lesson 要求各向异性密度型；WO₃ 还有 low-symmetry-oxide advisor 加持<span class="badge b-wired">wired（prompt）</span></td>
+</tr>
+<tr>
+  <td>墙钟纪律</td>
+  <td>无明确约束</td>
+  <td>lesson"不收敛完就交=0，别重复跑"<span class="badge b-wired">wired（prompt）</span></td>
+</tr>
+<tr>
+  <td>材料家族 advice</td>
+  <td>0 份</td>
+  <td>5 份 skill advisor，frontmatter trigger 按家族/晶系命中<span class="badge b-wired">wired</span></td>
+</tr>
+<tr>
+  <td>金属/绝缘体分类</td>
+  <td>无（SCF 处方表里被动补救）</td>
+  <td>preflight 的 <code>config_advisor</code> 确定性分类（元素集规则）<span class="badge b-wired">wired</span></td>
+</tr>
+<tr>
+  <td>经验库检索</td>
+  <td>会回灌空间群答案（同题不排除、专挑 score≥0.7）</td>
+  <td><strong>已脱敏</strong>：排除同题 + 产出量不落盘/不入 prompt；清库 130→13 行<span class="badge b-wired">已修 wired</span></td>
+</tr>
+<tr>
+  <td><code>config_advisor</code> LLM 交叉校验</td>
+  <td>—</td>
+  <td>仅确定性分支；<code>run()</code> 未启用（直接调会 AttributeError）<span class="badge b-phase2">Phase 2 P2-2</span></td>
+</tr>
+<tr>
+  <td>pw_wall_estimator + bash 超时钩子</td>
+  <td>—</td>
+  <td>模块已移植 + 单测齐全，但<strong>没接进 <code>bash.py</code></strong>（核对：bash.py 无引用）<span class="badge b-unwired">built-unwired</span></td>
+</tr>
+<tr>
+  <td>Claude 路径工具级硬约束</td>
+  <td>—</td>
+  <td>结构化工具仍不强制 ecut/k/墙钟（只有 prompt 劝）<span class="badge b-phase2">Phase 2 P2-1</span></td>
+</tr>
+<tr>
+  <td>orchestrator / planner</td>
+  <td>单 executor，无 planner</td>
+  <td><strong>不变</strong>——仍是 v5 的单 executor 底盘（搬 v4.2 planner 属 Phase 2 P2-3）</td>
+</tr>
+</table>
+
+<div class="note">
+<strong>一句话</strong>：v5.1 的"修"几乎全部落在 <strong>prompt 层</strong>（preflight + 三条 lesson）+ <strong>经验脱敏</strong>，
+底盘和工具行为没动。这在 legacy 路径上够用（§6 实测达标），但也意味着 Claude 路径的工具<em>本身</em>还没长出纪律
+——这正是 Phase 2 的头号任务。</div>
+
+
+<!-- ─────────────────────────────── §6 ─────────────────────────────── -->
+<h2 id="s6">6 · 跑一题：CsPbI₃ 从超时到 1.0 + 成绩单</h2>
+
+<p>顺一遍 CsPbI₃ 在 <code>deepseek-v4-pro</code> / legacy 路径上的真实轨迹（产物取自
+<code>runs_local/2026-05-28T01-35-17Z_M2_T1_CsPbI3_gamma_vc_relax/workdir</code>）：</p>
+
+<pre><code>solve.py amain()
+├─ parse_required_keys(prompt)       → ["vc_relax_out"]
+├─ run_preflight(prompt, workdir)    → 落盘 .config_advice.json
+│     elements=[Cs,Pb,I] → 含电负性 I → 绝缘体 → occupations=fixed, ecutrho×10, nspin=1
+│     skills: 无命中（halide 不在 5 份 advisor 里）
+├─ retrieve_for_task(...)            → 别的材料的方法论参数（排除本题；不含空间群）
+├─ assemble_user_prompt              → [preflight ▸ experience ▸ 原始 prompt]
+│                                       系统提示词最前还有 V5.1-LESSON（50 Ry / 各向异性 k / 墙钟）
+└─ legacy run_loop（deepseek）
+   ├─ 写 vc_relax.in：ecutwfc=50, ecutrho=500, occupations='fixed'   ← 照 lesson + config
+   │                  K_POINTS automatic  9 4 3                       ← 各向异性！
+   │                  （盒子 a=4.85, b=10.65, c=18.03 Å → 短轴密、长轴稀）
+   ├─ run pw.x（vc-relax, nat=20）→ BFGS 每步 6–8 次电子迭代收敛
+   ├─ 终态：press≈-0.02 kbar（&lt;0.05 阈值），所有角 90.00°，Pnma 对称保持
+   │         a=4.887, b=10.876, c=18.193 Å，墙钟 ~79 min
+   └─ submit({"vc_relax_out": "vc_relax.out"})
+→ result.json：total_score = 1.0</code></pre>
+
+<p>这条轨迹正是 §3 的三件事在协同：<strong>config 块</strong>给了 <code>occupations=fixed</code>，<strong>lesson</strong>
+给了 <code>ecutwfc=50</code> 与"各向异性 k"，模型据此写出 <code>9 4 3</code>（沿 c=18 Å 的长轴只取 3 个点，沿 a=4.85 Å 短轴取 9 个），
+单道 vc-relax ~79 min 跑完、空间群保持 → <span class="score-good">1.0</span>。同样的题在 v5 下是 ecut=80 + 8×8×8 → 超时 0 分。</p>
+
+<h3>成绩单（deepseek-v4-pro，2026-05-28；核对自 <code>runs_local/state.db</code>）</h3>
+
+<table>
+<tr><th>类别</th><th>结果</th></tr>
+<tr>
+  <td><strong>两道目标题（本次的 KPI）</strong></td>
+  <td>CsPbI₃ vc_relax <span class="score-good">1.0</span> · WO₃ vc_relax <span class="score-good">1.0</span> — <strong>目标达成</strong></td>
+</tr>
+<tr>
+  <td>M1 vc_relax（基础）</td>
+  <td>Si / GaAs / NaCl / Cd 均 <span class="score-good">1.0</span></td>
+</tr>
+<tr>
+  <td>M1/M2 bands_dos（多数）</td>
+  <td>多在 <span class="score-good">0.93–0.99</span>（LiCl 0.997、KF 0.989、HfO₂ 0.990、Ti₃O₅ 0.985、SiO₂ 0.986…）</td>
+</tr>
+<tr>
+  <td>弱点（诚实列出）</td>
+  <td>Rb bands_dos <span class="score-bad">0.22</span> · CaTiO₃ bands_dos <span class="score-mid">0.78</span> ·
+      C_diamond <span class="score-mid">0.84</span> · BN_hex <span class="score-mid">0.85</span></td>
+</tr>
+<tr>
+  <td>失败（计 0）</td>
+  <td>NaCl bands_dos <span class="score-bad">failed</span> · MgSiO₃ bands_dos <span class="score-bad">failed</span></td>
+</tr>
+<tr>
+  <td>M3 磁性批（NiO/MnO/Fe₂O₃/LaMnO₃…30 题）</td>
+  <td><span class="score-mid">queued — 尚无结果</span></td>
+</tr>
+</table>
+
+<div class="note">
+<strong>怎么读这张表</strong>：① 全部分数来自 <strong>legacy/deepseek</strong> 路径，Claude 路径本批未实跑；
+② v5.1 解决的是 <strong>vc_relax 超时</strong>这一类——T1 vc_relax 几乎全 1.0；③ 多数掉分集中在 <strong>bands_dos（T2）</strong>
+和金属/近金属体系（Rb 0.22、NaCl/MgSiO₃ 的 bands_dos 失败），这些<strong>不是 v5.1 这次的目标</strong>，而是知识层
+对 T2 / 磁性体系的覆盖还薄——指向 §7 的 Phase 2（尤其磁性批还没跑）。</div>
+
+
+<!-- ─────────────────────────────── §7 ─────────────────────────────── -->
+<h2 id="s7">7 · 还没做的（Phase 2）</h2>
+
+<p>v5.1 是刻意"瘦"的一版——只在 prompt 层把 legacy 路径修达标。下面是路线图里<strong>故意推迟</strong>的工作
+（核对自 <code>docs/superpowers/specs/2026-05-27-v5.1-phase2-roadmap.md</code>），按杠杆排序：</p>
+
+<table>
+<tr><th>#</th><th>事项</th><th>为什么推迟 / 要点</th><th>动到哪</th></tr>
+<tr>
+  <td>P2-1</td>
+  <td><strong>Claude 路径工具级硬约束</strong><span class="badge b-phase2">Phase 2</span></td>
+  <td>v5.1 的纪律只在 prompt（legacy 达标）；Claude 的结构化工具仍会过度收敛、像修复前一样超时。该把"默认 ecut=50、
+      各向异性 k、run_pw 估墙钟超预算就拒"<strong>写进工具代码</strong>，而非靠 prompt 劝</td>
+  <td><code>tools/structured/{write_qe_input,run_pw,verify_run}.py</code>、<code>solve.py:_gate_check</code></td>
+</tr>
+<tr>
+  <td>P2-2</td>
+  <td>启用 <code>config_advisor</code> 的 LLM 交叉校验<span class="badge b-phase2">Phase 2</span></td>
+  <td>v5.1 只用确定性分类（CsPbI₃/WO₃ 是明确绝缘体，LLM 校验无增益）。<strong>前置坑</strong>：<code>config_advisor.run()</code>
+      调 <code>LLMClient.from_role</code>，而 v5.1 的 <code>LLMClient</code> 没这方法——现在直接调会 AttributeError，得先补</td>
+  <td><code>agent/llm.py</code>、<code>agent/preflight.py</code></td>
+</tr>
+<tr>
+  <td>P2-3</td>
+  <td>orchestrator 合并（"把两个框架合起来"的大步）<span class="badge b-phase2">Phase 2</span></td>
+  <td>v5.1 按指令保留 v5 单 executor 底盘。搬 v4.2 的 planner-orchestrator + 类型化 step-DAG 是多周的结构改造，单开 spec</td>
+  <td><code>solve.py</code>、新 <code>agent/orchestrator.py</code>、<code>agent/ledger.py</code>、<code>agent/step_kinds/</code> 等</td>
+</tr>
+<tr>
+  <td>P2-4</td>
+  <td>把 <code>pw_wall_estimator</code> 接进 <code>bash.py</code><span class="badge b-unwired">built-unwired</span></td>
+  <td>模块+单测已移植但<strong>未接线</strong>；Phase-1 价值边际（实际超时是 harness 在 4 h 回收，非 bash 杀进程），
+      且改 bash.py 有碰坏 bg-detection 真值表与结构化 <code>run_pw</code> 的回归风险</td>
+  <td><code>agent/tools/bash.py</code></td>
+</tr>
+</table>
+
+<p>另有两个<strong>待清理的小毛病</strong>（任意阶段可做）：① <code>pytest</code> 会写到 git 跟踪的真实经验库
+（recorder/store 测试该隔离到临时目录）；② <code>verify_bands_dos</code> 的 docstring 夸大了——实际检查比宣称的简单
+（没有真正的 nbnd-vs-电子数充分性、也没有 <code>[0,12] eV</code> 带隙启发式），该补实现或改文档。</p>
+
+
+<!-- ─────────────────────────────── §8 ─────────────────────────────── -->
+<h2 id="s8">8 · 附录：代码路径</h2>
+
+<table>
+<tr><th>组件</th><th>文件（<code>/srv/shared/science/solver/v5.1/</code> 下）</th></tr>
+<tr><td>入口 / 双路径分流 / 复核硬门</td><td><code>solve.py</code>（preflight 接线 <code>:395–406</code>，<code>assemble_user_prompt</code> <code>:125</code>）</td></tr>
+<tr><td><strong>preflight 编排（v5.1 新增）</strong></td><td><code>agent/preflight.py:run_preflight</code></td></tr>
+<tr><td>结构特征解析</td><td><code>agent/structure_features.py:extract</code>（v4.2 移植）</td></tr>
+<tr><td>5 份材料 skill advisor</td><td><code>agent/skills/</code>（<code>loader.py</code> + <code>*-advisor.md</code>，frontmatter trigger）</td></tr>
+<tr><td>确定性配置分类器</td><td><code>agent/subagents/config_advisor.py</code> + <code>agent/subagents/_metals.py</code>（元素集规则，<code>run()</code> 未启用）</td></tr>
+<tr><td>三条 lesson</td><td><code>agent/system_prompt.py</code>（<code>V5.1-LESSON</code> 块在 <code>:75–93</code>）</td></tr>
+<tr><td>经验库（已脱敏）</td><td><code>agent/experience/</code>（retriever / store，<code>scrub_answers()</code>）+ <code>scripts/scrub_experience_answers.py</code></td></tr>
+<tr><td>墙钟估计（建好没接）</td><td><code>agent/pw_wall_estimator.py</code> + <code>agent/step_timeout_floor.py</code>（bash.py 未引用）</td></tr>
+<tr><td>v5 底盘（原样继承）</td><td><code>agent/runtime/driver.py</code>、<code>agent/runtime/progress_ledger.py</code>、<code>agent/tools/structured/</code></td></tr>
+<tr><td>计划 / 路线图文档</td><td><code>docs/superpowers/plans/2026-05-27-v5.1-knowledge-layer.md</code>、<code>docs/superpowers/specs/2026-05-27-v5.1-phase2-roadmap.md</code></td></tr>
+</table>
+
+<p><strong>关键提交</strong>：<code>42ef04b</code>（preflight 接进 solve.py）·
+<code>c9dc7d8</code>（三条 lesson）· <code>182f431</code>（经验库空间群脱敏）· <code>21818f0</code>（去除答案查表，改元素集规则）。</p>
+
+<p><strong>相关报告</strong>：
+<a href="agent-v5-architecture-for-dft-review-2026-05-27.html">v5 架构（底盘，前篇）</a> ·
+<a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构（知识层来源）</a> ·
+<a href="solver-versions-explained-2026-05-17.html">四版本 solver 入门教程</a> ·
+<a href="index.html">← 返回报告索引</a></p>
+
+<p style="color:#7f8c8d; font-size:13px; margin-top:30px;">
+本文所有阈值 / 行号 / 分数均于 2026-05-29 亲自核对自 <code>/srv/shared/science/solver/v5.1/</code> 源码、git log
+与 <code>runs_local/state.db</code>。接线状态徽章反映核对当时的 live path 实际调用关系，非设计意图。
+</p>
+
+</body>
+</html>
