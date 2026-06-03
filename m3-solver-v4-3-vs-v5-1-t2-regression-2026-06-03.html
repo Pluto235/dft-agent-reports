@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M3 · v4.3 vs v5.1 · T2 回归归因 · 2026-06-03</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+         'Microsoft YaHei', sans-serif;
+         max-width: 960px; margin: 40px auto; padding: 0 28px; color: #2c3e50; line-height: 1.75; }
+  h1 { color: #34495e; border-bottom: 3px solid #c0392b; padding-bottom: 12px; margin-top: 30px; }
+  h2 { color: #34495e; border-left: 5px solid #c0392b; padding-left: 12px; margin-top: 50px; }
+  h3 { color: #2c3e50; margin-top: 30px; }
+  h4 { color: #34495e; margin-top: 22px; }
+  p { margin: 12px 0; }
+  a { color: #2980b9; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+         background: #ecf0f1; padding: 2px 5px; border-radius: 3px; font-size: 90%; color: #c0392b; }
+  pre { background: #2c3e50; color: #ecf0f1; padding: 16px 20px; border-radius: 6px;
+        overflow-x: auto; font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+        font-size: 13px; line-height: 1.55; }
+  pre code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+
+  .meta { background: #ecf0f1; border-left: 4px solid #3498db; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .note { background: #fdf2e9; border-left: 4px solid #e67e22; padding: 14px 18px;
+          margin: 20px 0; border-radius: 4px; }
+  .tldr { background: #fdedec; border-left: 5px solid #c0392b; padding: 16px 20px;
+          margin: 20px 0; border-radius: 4px; }
+  .good { background: #d5f5e3; border-left: 5px solid #1d8348; padding: 16px 20px;
+          margin: 20px 0; border-radius: 4px; }
+
+  .concept { background: #fef9e7; border: 1px solid #f4d03f; border-radius: 8px;
+             padding: 16px 20px; margin: 24px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .concept .lbl { display: inline-block; background: #f1c40f; color: #fff;
+                  font-weight: 700; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+                  margin-right: 8px; }
+  .concept h4 { margin: 0 0 8px 0; display: inline; color: #7d6608; }
+  .concept p { margin: 8px 0 0 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  th, td { padding: 8px 11px; border-bottom: 1px solid #d5dbdb; text-align: left;
+           vertical-align: top; }
+  th { background: #34495e; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  td code { font-size: 12px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; font-family: 'SF Mono','Consolas',monospace; }
+  caption { caption-side: top; text-align: left; color: #7f8c8d; font-size: 13px;
+            font-style: italic; margin-bottom: 6px; }
+
+  /* score cells */
+  .ok   { background: #d5f5e3 !important; color: #1d8348; font-weight: 700; text-align: center; }
+  .bad  { background: #fadbd8 !important; color: #a93226; font-weight: 700; text-align: center; }
+  .part { background: #fef5e7 !important; color: #9c640c; font-weight: 700; text-align: center;
+          font-variant-numeric: tabular-nums; }
+  .na   { background: #eaeded !important; color: #7f8c8d; text-align: center; }
+
+  .score-good { color: #1d8348; font-weight: 700; }
+  .score-mid  { color: #9c640c; font-weight: 700; }
+  .score-bad  { color: #a93226; font-weight: 700; }
+  .win { font-weight: 700; }
+
+  .tag { display:inline-block; font-weight:700; padding:1px 8px; border-radius:10px;
+         font-size:11px; vertical-align:middle; }
+  .t-io   { background:#fadbd8; color:#922b21; border:1px solid #e6b0aa; }
+  .t-gate { background:#ebdef0; color:#6c3483; border:1px solid #bb8fce; }
+  .t-know { background:#fdebd0; color:#9c640c; border:1px solid #e59866; }
+  .t-shared { background:#d6eaf8; color:#1b4f72; border:1px solid #5dade2; }
+
+  nav.toc { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 16px 24px; margin: 24px 0; }
+  nav.toc h3 { margin-top: 0; color: #34495e; }
+  nav.toc ol { padding-left: 24px; }
+  nav.toc li { padding: 3px 0; }
+
+  details { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
+            padding: 8px 14px; margin: 14px 0; }
+  details summary { cursor: pointer; color: #34495e; font-weight: 600; }
+  details[open] summary { margin-bottom: 8px; }
+
+  h2[id], h3[id] { scroll-margin-top: 20px; }
+  .fix { background:#f4f9f4; border:1px solid #abebc6; border-left:5px solid #1d8348;
+         border-radius:6px; padding:12px 18px; margin:14px 0; }
+  .fix .pri { display:inline-block; background:#1d8348; color:#fff; font-weight:700;
+              padding:1px 9px; border-radius:10px; font-size:11px; margin-right:8px; }
+</style>
+</head>
+<body>
+
+<h1>M3 磁性材料 · solver v4.3 vs v5.1 · T2 回归归因</h1>
+
+<p style="margin:-8px 0 14px; color:#7f8c8d; font-size:13px;">
+<strong style="background:#fdedec; color:#922b21; padding:2px 10px; border-radius:12px;
+border:1px solid #c0392b;">post-mortem · 2026-06-03</strong>
+&nbsp;同一模型（<code>deepseek-v4-pro</code>）、同一题集、两个 solver 版本的对照复盘。本文自带上下文。
+</p>
+
+<div class="tldr">
+<strong>一句话结论</strong>：v5.1 的总分（0.590）确实低于 v4.3（0.705），但
+<strong>差距 100% 落在 T2（bands+dos），且 79% 只来自两道题（Cr_bcc、MnO）</strong>。
+这两道的失分<strong>不是物理或知识问题，而是 v5.1 新 SDK 路径在 <code>bands.dat</code> 文件处理上的两个 IO bug</strong>
+（提交了稠密网格的 bands.dat / 只含自旋上分量的 bands.dat），让打分器解析出 <code>null</code>。
+<strong>T1（vc_relax）v5.1 反而略高于 v4.3（0.906 vs 0.892）</strong>——v5.1 的底盘在物理上不弱。
+把这几个 IO/编排 bug 修掉，v5.1 的 T2 应回到 ~0.47–0.48、与 v4.3 持平，叠加 T1 的小幅领先，
+v5.1 即可整体反超。<strong>结论不是"退回 v4.3"，而是"修 3 个 bug 再重跑"。</strong>
+</div>
+
+<div class="note">
+<strong>两个批次</strong>：
+<code>d383f692c1de4f60868c292c615ed53c</code> = <strong>v4.3</strong>（legacy 手写循环路径）·
+<code>7daa97116b01444a8630a5d3dfc30a7c</code> = <strong>v5.1</strong>（SDK / 结构化工具路径）。<br>
+两批<strong>同模型 <code>deepseek-v4-pro</code>、同 6 种材料 ×（T1 vc_relax + T2 bands_dos）= 各 12 题</strong>。
+这是一次干净的"同模型、换底盘"对照，隔离的是 <strong>solver 编排</strong>而非模型能力。
+</div>
+
+<div class="meta">
+<strong>给谁看</strong>：维护这个 solver 的合作者（以及未来的我）。读完你会知道：成绩差在哪（§2–3）、
+T2 回归的逐题归因与根因证据（§4）、两版共有的结构性弱点（§5）、为什么是 v5.1 这条路踩到这些坑（§6）、
+按优先级排好的修复清单（§7）。<br>
+<strong>对应代码</strong>：<code>/srv/shared/science/solver/{v4.3,v5.1}/</code>　·
+<strong>run 数据</strong>：<code>/srv/shared/science/web/runs_local/</code>　·
+<strong>题目 / GT</strong>：<code>/srv/shared/science/bench/questions/M3_T2/</code><br>
+<strong>口径</strong>：所有总分为<strong>该 6 题子集上的逐 run 算术平均</strong>；v5.1 的 <code>M3_T2_Fe2O3</code> 撞墙钟超时无提交，计 0。
+</div>
+
+<nav class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">背景：两个批次差在哪条路径</a></li>
+  <li><a href="#s2">成绩单：差距全在 T2</a></li>
+  <li><a href="#s3">逐题失分点（T1 + T2）</a></li>
+  <li><a href="#s4">T2 回归归因：79% 是两个 bands.dat IO bug</a></li>
+  <li><a href="#s5">共性 / 结构性问题（两版都中）</a></li>
+  <li><a href="#s6">为什么是 v5.1 这条路踩坑</a></li>
+  <li><a href="#s7">修复清单（按优先级）</a></li>
+  <li><a href="#s8">结论与下一步</a></li>
+  <li><a href="#s9">附录：完整逐 run 字段表 / 方法</a></li>
+</ol>
+</nav>
+
+
+<!-- ───────────────────────────── §1 ───────────────────────────── -->
+<h2 id="s1">1 · 背景：两个批次差在哪条路径</h2>
+
+<p>M3 = <strong>磁性材料</strong>题集（PBE、<code>nspin=2</code>、起始磁化，无 Hubbard +U）。本次两批各跑了 6 种材料的
+两类任务：</p>
+<ul>
+  <li><strong>T1 = <code>vc_relax</code></strong>：变胞结构弛豫，交晶格常数 / 角度 / 空间群 / 点群 / 晶系 / 总磁矩 / 绝对磁矩（按 <strong>1% 相对晶格容差</strong>等打分）。</li>
+  <li><strong>T2 = <code>bands_dos</code></strong>：电子结构。交 6 个字段，<strong>权重</strong>如下（这套权重在 §2 的成绩单里逐题对得上）：</li>
+</ul>
+
+<table>
+<caption>表 1 · T2 打分 rubric（权重之和 = 1.0）</caption>
+<thead><tr><th>字段</th><th>权重</th><th>判定</th></tr></thead>
+<tbody>
+<tr><td><code>band_gap_ev</code></td><td class="num">0.40</td><td>绝对值，±0.1 eV 容差（分级）</td></tr>
+<tr><td><code>gap_type</code></td><td class="num">0.15</td><td>精确匹配（metal / direct / indirect）</td></tr>
+<tr><td><code>vbm_k_label</code></td><td class="num">0.10</td><td>高对称 k 点标签 / 坐标匹配</td></tr>
+<tr><td><code>cbm_k_label</code></td><td class="num">0.10</td><td>同上</td></tr>
+<tr><td><code>dos_e_fermi</code></td><td class="num">0.05</td><td>绝对值，±0.1 eV</td></tr>
+<tr><td><code>dos_curve</code></td><td class="num">0.20</td><td>DOS 曲线 F1 匹配（连续分）</td></tr>
+</tbody>
+</table>
+
+<div class="concept">
+<span class="lbl">关键背景</span><h4>同模型，但走了不同的路径</h4>
+<p>v4.3 跑 <code>deepseek-v4-pro</code> 时走的是 <strong>legacy 手写 ReAct 循环</strong>（裸 <code>bash</code>，模型自己写 QE 输入、自己跑、
+自己 grep 输出）。v5.1 的 <code>should_use_sdk_path()</code> 把 <strong><code>deepseek-*</code> 也路由到 SDK 路径</strong>
+（结构化工具 <code>write_qe_input/run_pw/read_qe_output/verify_run/submit</code> + 卡死 ledger + SCF 子 agent + 提交前验收门）。
+这是 v5.1 <strong>有意</strong>的 go-forward 配置。所以下面看到的回归，是<strong>这条新路径上的 bug，不是路由失误</strong>——
+该修的是 bug，不是把 deepseek 退回 legacy。</p>
+</div>
+
+
+<!-- ───────────────────────────── §2 ───────────────────────────── -->
+<h2 id="s2">2 · 成绩单：差距全在 T2</h2>
+
+<table>
+<caption>表 2 · 总览（6 材料子集，逐 run 均分；越高越好）</caption>
+<thead><tr><th>分组</th><th class="num">v4.3 <code>d383f6</code></th><th class="num">v5.1 <code>7daa97</code></th><th class="num">Δ（v5.1 − v4.3）</th><th>谁赢</th></tr></thead>
+<tbody>
+<tr><td><strong>T1 · vc_relax（6 题）</strong></td><td class="num">0.892</td><td class="num">0.906</td><td class="num score-good">+0.014</td><td class="win">v5.1（略）</td></tr>
+<tr><td><strong>T2 · bands_dos（6 题）</strong></td><td class="num">0.518</td><td class="num">0.273</td><td class="num score-bad">−0.245</td><td class="win">v4.3（≈1.9×）</td></tr>
+<tr><td><strong>总分（12 题）</strong></td><td class="num"><strong>0.705</strong></td><td class="num"><strong>0.590</strong></td><td class="num score-bad">−0.115</td><td class="win">v4.3</td></tr>
+</tbody>
+</table>
+
+<p>读法：<strong>T1 是平局（v5.1 还略高），全部 0.115 的总分差来自 T2，而 T2 自己差了 0.245。</strong>
+换句话说，"v4.3 分高"这个直觉是对的，但它<strong>只在 T2 成立</strong>，而且——往下看——主要是被两道题拖出来的。</p>
+
+<h3>T1 逐题（vc_relax）</h3>
+<table>
+<caption>表 3 · T1 逐题总分。两版各有翻车，净持平；<code>Fe_bcc</code> 是两版共同的难题。</caption>
+<thead><tr><th>材料</th><th class="num">v4.3</th><th class="num">v5.1</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td>Cr_bcc</td><td class="num">1.000</td><td class="num">0.850</td><td>v5.1 丢 <code>absolute_magnetization</code></td></tr>
+<tr><td>Fe_bcc</td><td class="num score-bad">0.350</td><td class="num score-mid">0.739</td><td>两版都没弄对：找到畸变胞 / 对称性与磁矩偏差</td></tr>
+<tr><td>Fe2O3_hematite</td><td class="num">1.000</td><td class="num">0.850</td><td>v5.1 丢 <code>space_group/point_group</code>（且 T1 此题撞 36000s 超时仍提交了 0.85）</td></tr>
+<tr><td>MnF2</td><td class="num">1.000</td><td class="num">1.000</td><td>—</td></tr>
+<tr><td>MnO</td><td class="num">1.000</td><td class="num">1.000</td><td>—</td></tr>
+<tr><td>Ni_fcc</td><td class="num">1.000</td><td class="num">1.000</td><td>—</td></tr>
+<tr><td><strong>均分</strong></td><td class="num"><strong>0.892</strong></td><td class="num"><strong>0.906</strong></td><td>≈ 平局</td></tr>
+</tbody>
+</table>
+
+<h3>T2 逐题 + 字段热力图（bands_dos）</h3>
+<p>下表把每道 T2 题拆成 6 个字段：<span class="ok" style="padding:0 6px">绿=满分</span>
+<span class="bad" style="padding:0 6px">红=0</span>　<span class="part" style="padding:0 6px">黄=部分分（标数值）</span>。
+<code>dos_curve</code> 是连续 F1，几乎从不满分。</p>
+
+<table>
+<caption>表 4 · v4.3 的 T2 字段热力图</caption>
+<thead><tr><th>材料</th><th>总分</th><th>band_gap<br>.40</th><th>gap_type<br>.15</th><th>vbm_k<br>.10</th><th>cbm_k<br>.10</th><th>dos_Ef<br>.05</th><th>dos_curve<br>.20</th></tr></thead>
+<tbody>
+<tr><td>Cr_bcc</td><td class="num score-good">0.969</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="part">.85</td></tr>
+<tr><td>Fe_bcc</td><td class="num score-good">0.933</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="part">.67</td></tr>
+<tr><td>MnO</td><td class="num score-mid">0.500</td><td class="ok">✓</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="part">.50</td></tr>
+<tr><td>MnF2</td><td class="num score-mid">0.480</td><td class="ok">✓</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="part">.40</td></tr>
+<tr><td>Ni_fcc</td><td class="num score-bad">0.128</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="ok">✓</td><td class="part">.39</td></tr>
+<tr><td>Fe2O3</td><td class="num score-bad">0.097</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="part">.48</td></tr>
+</tbody>
+</table>
+
+<table>
+<caption>表 5 · v5.1 的 T2 字段热力图（红圈处 = 相对 v4.3 的回归）</caption>
+<thead><tr><th>材料</th><th>总分</th><th>band_gap<br>.40</th><th>gap_type<br>.15</th><th>vbm_k<br>.10</th><th>cbm_k<br>.10</th><th>dos_Ef<br>.05</th><th>dos_curve<br>.20</th></tr></thead>
+<tbody>
+<tr><td>Cr_bcc</td><td class="num score-bad">0.133</td><td class="bad">✗⤵</td><td class="bad">✗⤵</td><td class="bad">✗⤵</td><td class="bad">✗⤵</td><td class="bad">✗⤵</td><td class="part">.67</td></tr>
+<tr><td>Fe_bcc</td><td class="num score-good">0.827</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td class="bad">✗⤵</td><td class="part">.38</td></tr>
+<tr><td>MnO</td><td class="num score-bad">0.173</td><td class="bad">✗⤵</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="ok">✓</td><td class="part">.62</td></tr>
+<tr><td>MnF2</td><td class="num score-mid">0.462</td><td class="ok">✓</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="part">.31</td></tr>
+<tr><td>Ni_fcc</td><td class="num score-bad">0.043</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗</td><td class="bad">✗⤵</td><td class="part">.21</td></tr>
+<tr><td>Fe2O3</td><td class="num score-bad">0.000</td><td class="na" colspan="6">超时无提交（撞 36000s 墙钟）</td></tr>
+</tbody>
+</table>
+
+<p><code>⤵</code> = 相对 v4.3 的该字段回归。一眼可见：<strong>v5.1 的 T2 损失高度集中在 Cr_bcc（整行塌掉）和 MnO（band_gap 翻车），
+外加几处 <code>dos_Ef</code> 和一个超时。</strong></p>
+
+
+<!-- ───────────────────────────── §3 ───────────────────────────── -->
+<h2 id="s3">3 · 逐题失分点（T1 + T2）</h2>
+
+<h3>T1 失分点</h3>
+<ul>
+  <li><strong>共同难题 <code>Fe_bcc</code></strong>：两版都没拿满。v4.3 只有 0.35——弛豫到一个<strong>畸变胞</strong>（<code>c</code>、三个角、点群、磁矩全错，
+  只有 <code>a/b</code>、空间群编号、晶系对）；v5.1 好一些（0.739），但 <code>c</code> 偏长、空间群 / 晶系判错、磁矩偏。
+  bcc 铁的磁性 + 立方对称对这两条路径都偏脆。</li>
+  <li><strong>v5.1 的零星小丢分</strong>：Cr_bcc 丢绝对磁矩、Fe2O3 丢空间群 / 点群。属于 0.075–0.15 量级的单字段抖动，不成系统。</li>
+  <li><strong>净结论</strong>：T1 两版互有胜负，整体持平，<strong>没有结构性回归</strong>。</li>
+</ul>
+
+<h3>T2 失分点（这是重点）</h3>
+<p>把 T2 的失分按字段归类，能看出<strong>哪些是两版共有、哪些是 v5.1 独有</strong>：</p>
+<table>
+<caption>表 6 · T2 失分来源分类</caption>
+<thead><tr><th>失分来源</th><th>谁中招</th><th>权重影响</th><th>性质</th></tr></thead>
+<tbody>
+<tr><td><code>gap_type</code>+<code>vbm_k</code>+<code>cbm_k</code> 对所有绝缘体恒为 <code>null</code></td><td>v4.3 & v5.1</td><td class="num">0.35 / 题</td><td><span class="tag t-shared">共性结构问题</span></td></tr>
+<tr><td>Ni_fcc 金属被误判成有小带隙</td><td>v4.3 & v5.1</td><td class="num">0.70</td><td><span class="tag t-shared">共性结构问题</span></td></tr>
+<tr><td>Cr_bcc 提交稠密网格 <code>bands.dat</code> → 4 个能带字段全 null</td><td>仅 v5.1</td><td class="num">0.75</td><td><span class="tag t-io">v5.1 IO bug</span></td></tr>
+<tr><td>MnO 的 <code>bands.dat</code> 只含自旋上 → band_gap null</td><td>仅 v5.1</td><td class="num">0.40</td><td><span class="tag t-io">v5.1 IO bug</span></td></tr>
+<tr><td>金属的 <code>dos_e_fermi</code> 读偏 0.6–2 eV</td><td>仅 v5.1（金属）</td><td class="num">0.05 / 题</td><td><span class="tag t-io">v5.1 参考系</span></td></tr>
+<tr><td>Fe2O3 算完不提交 → 超时</td><td>仅 v5.1</td><td class="num">全题</td><td><span class="tag t-gate">v5.1 编排</span></td></tr>
+<tr><td><code>dos_curve</code> 永远只有部分分</td><td>v4.3 & v5.1</td><td class="num">~0.04–0.16 / 题</td><td><span class="tag t-shared">共性</span></td></tr>
+</tbody>
+</table>
+
+
+<!-- ───────────────────────────── §4 ───────────────────────────── -->
+<h2 id="s4">4 · T2 回归归因：79% 是两个 bands.dat IO bug</h2>
+
+<p>先把 T2 的 0.245 差距<strong>逐题拆开</strong>，看它到底来自哪里：</p>
+
+<table>
+<caption>表 7 · T2 逐题回归分解（Δ = v4.3 − v5.1，正数 = v5.1 比 v4.3 差多少）</caption>
+<thead><tr><th>材料</th><th class="num">v4.3</th><th class="num">v5.1</th><th class="num">Δ</th><th class="num">占总回归</th><th>根因</th></tr></thead>
+<tbody>
+<tr><td><strong>Cr_bcc</strong></td><td class="num">0.969</td><td class="num">0.133</td><td class="num score-bad">0.836</td><td class="num"><strong>57%</strong></td><td><span class="tag t-io">IO</span> 稠密网格 bands.dat</td></tr>
+<tr><td><strong>MnO</strong></td><td class="num">0.500</td><td class="num">0.173</td><td class="num score-bad">0.327</td><td class="num"><strong>22%</strong></td><td><span class="tag t-io">IO</span> 自旋上 only bands.dat</td></tr>
+<tr><td>Fe_bcc</td><td class="num">0.933</td><td class="num">0.827</td><td class="num score-mid">0.107</td><td class="num">7%</td><td><span class="tag t-io">参考系</span> dos_Ef 读偏</td></tr>
+<tr><td>Fe2O3</td><td class="num">0.097</td><td class="num">0.000</td><td class="num score-mid">0.097</td><td class="num">7%</td><td><span class="tag t-gate">编排</span> 不提交 → 超时</td></tr>
+<tr><td>Ni_fcc</td><td class="num">0.128</td><td class="num">0.043</td><td class="num score-mid">0.085</td><td class="num">6%</td><td>dos_Ef + dos_curve 偏低</td></tr>
+<tr><td>MnF2</td><td class="num">0.480</td><td class="num">0.462</td><td class="num">0.018</td><td class="num">1%</td><td>≈ 平局（共性弱点）</td></tr>
+<tr><td><strong>T2 合计</strong></td><td class="num"><strong>3.107</strong></td><td class="num"><strong>1.638</strong></td><td class="num"><strong>1.470</strong></td><td class="num"><strong>100%</strong></td><td><strong>Cr + MnO = 79%</strong></td></tr>
+</tbody>
+</table>
+
+<div class="note">
+<strong>反事实</strong>：若只把 Cr_bcc、MnO 修回 v4.3 水平、并让 Fe2O3 正常提交（≈0.097），v5.1 的 T2 合计 ≈
+<code>1.638 − 0.133 − 0.173 + 0.969 + 0.500 + 0.097 ≈ 2.90</code> → 均分 <strong>≈ 0.48，与 v4.3 的 0.518 基本持平</strong>
+（剩余差为金属 <code>dos_Ef</code> 的 0.05 量级）。<strong>即：v5.1 在 T2 上"输"的几乎全部是这 3 类 bug，而非物理能力。</strong>
+</div>
+
+<h3 id="c-cr">根因 ① <span class="tag t-io">IO</span>　Cr_bcc：提交了稠密网格的 bands.dat（−0.836，全场最大单项）</h3>
+<p>T2 的能带字段（<code>band_gap/gap_type/vbm_k/cbm_k</code>，共 0.75 权重）由打分器去解析 <code>bands.dat</code>。
+该解析器需要的是<strong>高对称 k 路径</strong>上的本征值（带标签的 Γ/H/N/P… 点），typically ~180–210 个 k 点。
+而 v5.1 在本批 Cr_bcc run（<code>2026-06-01T13-57-23Z</code>）最终提交的 <code>bands.dat</code> 头是：</p>
+<pre><code>$ head -1 .../2026-06-01T13-57-23Z_M3_T2_Cr_bcc_bands_dos/workdir/bands.dat
+ &plot nbnd=  32, nks=  2052 /          ← 2052 = 稠密自动网格，不是 k 路径</code></pre>
+<p>2052 个 k 点是 DOS 用的稠密网格，不是能带路径。解析器拿到它认不出高对称点，
+4 个能带字段全部返回 <code>null</code>：</p>
+<pre><code>report.json extracted_fields:  band_gap_ev=null  gap_type=null  vbm_k_label=null  cbm_k_label=null</code></pre>
+<p>对照 v4.3 同题：<code>band_gap=0 / gap_type="metal" / vbm="metal" / cbm="metal"</code> 全对（金属，0.969）。
+<strong>v5.1 其实把高对称能带也算出来过</strong>（calcs 里有正确的 k 路径 NSCF），<strong>但提交 / 落盘环节用错了文件</strong>——
+这是结构化工具路径下 "calc_id → 输出文件" 多一层间接带来的<strong>文件张冠李戴</strong>，不是没算对。
+<br><span style="color:#7f8c8d;font-size:13px;">（核对说明：另有一个 <code>2026-06-01T07-38-46Z</code> 的 Cr_bcc run，其 bands.dat 为正确的 211 点，
+但 <code>run_meta</code> 显示它属于<strong>另一批次 <code>82f32c…</code>、agent <code>v4_3</code></strong>，不在本次对照内。本批 v5.1 的 Cr_bcc 就是 2052 点那个。）</span></p>
+
+<h3 id="c-mno">根因 ② <span class="tag t-io">IO</span>　MnO：bands.dat 只写了自旋上分量（−0.327）</h3>
+<p>MnO 是 AFM rocksalt，<code>nspin=2</code>。正常 <code>bands.dat</code> 每个 k 点应有 <strong>2 个自旋通道</strong>的本征值
+（这里 nbnd=30 → 每 k 点应 ~6 行）。v5.1 落盘的文件每 k 点只有 <strong>3 行（仅自旋上）</strong>：</p>
+<pre><code>transcript 末段自检：
+  "K-vector lines: 270, Band data lines: 813, Band lines per kpt: 3.0"
+  "WARNING: only 8943 values, expected 16531"   ← 少了一半（自旋下丢失）</code></pre>
+<p>解析器因数据量对不上而失败，<code>band_gap_ev</code> 返回 <code>null</code> → 该字段 0 分（丢 0.40）。
+对照 v4.3 同题提交 <code>band_gap=0.8777 eV</code>（GT ≈ 0.867，<strong>命中</strong>，得 0.40）。
+<strong>根因：v5.1 SDK 路径的能带后处理 / 解析没有正确处理 <code>nspin=2</code> 的双自旋通道</strong>——
+这和 Cr 是<strong>同一类毛病：bands.dat 的生成 / 解析在自旋极化体系下不可靠</strong>。</p>
+
+<h3 id="c-dosef">根因 ③ <span class="tag t-io">参考系</span>　金属的 dos_e_fermi 读偏（小权重，但系统性）</h3>
+<p><code>dos_e_fermi</code> 容差 ±0.1 eV、权重仅 0.05。但模式很清楚：</p>
+<table>
+<caption>表 8 · dos_e_fermi 提交值 vs 参考（金属三连）</caption>
+<thead><tr><th>材料</th><th class="num">v4.3 提交</th><th class="num">v5.1 提交</th><th class="num">GT（约）</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>Cr_bcc</td><td class="num">19.021 ✓</td><td class="num">16.897 ✗</td><td class="num">≈18.94</td><td>v5.1 偏低 ~2 eV</td></tr>
+<tr><td>Fe_bcc</td><td class="num">18.128 ✓</td><td class="num">17.578 ✗</td><td class="num">≈18.19</td><td>v5.1 偏低 ~0.6 eV</td></tr>
+<tr><td>Ni_fcc</td><td class="num">17.846 ✓</td><td class="num">18.764 ✗</td><td class="num">≈17.8</td><td>v5.1 偏高 ~0.9 eV</td></tr>
+</tbody>
+</table>
+<p>v4.3 在三个金属上的 <code>E_F</code> 都命中，v5.1 都偏。原因指向 v5.1 <strong>从稠密 NSCF/DOS 那次计算读 Fermi</strong>
+（而该次因占据方式 / 收敛与 SCF 不完全一致），而非从 SCF 读。属真实的参考系 bug，但因权重小，只占总回归 ~7%（主要体现在 Fe_bcc、Ni_fcc）。
+<br><span style="color:#7f8c8d;font-size:13px;">（注：v4.3 在绝缘体上 <code>E_F</code> 反而常丢分——隙中位置定义本就含糊——所以这是个材料相关的此消彼长，不必过度解读。）</span></p>
+
+<h3 id="c-fe2o3">根因 ④ <span class="tag t-gate">编排</span>　Fe2O3 T2：算完了却不提交 → 超时</h3>
+<p>这道<strong>不是算不动</strong>。从日志看，SCF 收敛后，bands NSCF（517s）与 dos NSCF（2857s）都 <code>JOB DONE</code>，
+<code>bands.dat</code> 和 <code>dos.dat</code> 都已生成，此时<strong>墙钟还剩 ~8 小时</strong>。然后 agent 卡在反复
+<code>write_qe_input</code>/编辑 + Python 自检里，<strong>始终没调 <code>verify_run</code> → <code>submit</code></strong>；
+ledger 的 S3/S6 卡死信号点亮了也没能把它救回提交。最后一根稻草是 SDK 侧的 <code>Stream closed</code> 报错，
+solver 在墙钟耗尽时只能返回 best-effort 的 incomplete payload：</p>
+<pre><code>solver_stderr:  WARNING solve: wall budget exhausted during initial run; returning best-effort payload
+harness.log:    [harness] solver exit_code=-1 status=timeout wall=36000.0s</code></pre>
+<p><strong>根因：完成判定（completion gate）有漏洞</strong>——"产物已齐、预算尚足"时没有强制走到 <code>submit</code>，
+叠加 SDK 流中断未做重试 / 兜底提交。代价不止这 0.097 分，更是<strong>白烧了 ~10 小时机时</strong>。</p>
+
+
+<!-- ───────────────────────────── §5 ───────────────────────────── -->
+<h2 id="s5">5 · 共性 / 结构性问题（两版都中，与版本无关）</h2>
+
+<p>把 v5.1 的 bug 修完，T2 也只能回到 ~0.5——因为<strong>还有一层天花板是两版共有的</strong>。这部分其实比版本回归更值得长期重视。</p>
+
+<div class="concept">
+<span class="lbl">结构性天花板</span><h4>所有绝缘体的 gap_type + VBM/CBM k 标签恒为 null</h4>
+<p>看表 4/表 5：对 <strong>Fe2O3、MnO、MnF2</strong> 这些<strong>真有带隙</strong>的材料，<strong>两版的
+<code>gap_type</code>、<code>vbm_k_label</code>、<code>cbm_k_label</code> 全是 <code>null</code></strong>——
+每道题<strong>白丢 0.35 权重</strong>。能"得到"这三项的只有金属（Cr/Fe），因为答案就是字符串 <code>"metal"</code>，不需要定位 k 点。
+也就是说：<strong>两条路径目前都不会把 VBM/CBM 映射回高对称 k 点标签</strong>——它们能算出带隙<strong>大小</strong>（<code>band_gap_ev</code> 常对），
+却交不出带隙<strong>在哪、什么类型</strong>。这把每道绝缘体 T2 的上限压到 ~0.65。</p>
+</div>
+
+<ul>
+  <li><strong>Ni_fcc 金属被两版一致误判成小带隙半导体</strong>：v4.3 报 0.178 eV indirect、v5.1 报 0.274 eV direct，
+  GT 是 metal。Ni 的窄 d 带贴着 <code>E_F</code>，采样 / 展宽稍偏就会"看出"一个假隙。这是 bands_dos 工作流对
+  <strong>窄带金属</strong>的共性脆点（对照 Cr/Fe 这种宽带金属两版都对）。</li>
+  <li><strong><code>dos_curve</code> 永远部分分</strong>：F1 在 0.21–0.85 之间，从不满分。属于 DOS 曲线对齐 / 展宽 / 网格的系统性偏差，两版同病。</li>
+</ul>
+
+<p><strong>含义</strong>：即便 solver 这边全修好，T2 的分数仍被"k 标签能力缺失"和"窄带金属误判"压着。
+这两条要么<strong>给 agent 配一个 <code>bands.x → seekpath</code> 的 VBM/CBM 标签映射 helper</strong>，
+要么回头看 rubric 对 k 标签的判定是否过严——属于 benchmark / 能力层面的事，单靠版本迭代修不掉。</p>
+
+
+<!-- ───────────────────────────── §6 ───────────────────────────── -->
+<h2 id="s6">6 · 为什么是 v5.1 这条路踩这些坑</h2>
+
+<p>同一个 deepseek，v4.3 没踩、v5.1 踩了，差别在<strong>路径形态</strong>：</p>
+
+<table>
+<caption>表 9 · 两条路径对 bands.dat / 提交的处理差异</caption>
+<thead><tr><th>环节</th><th>v4.3 legacy（裸 bash）</th><th>v5.1 SDK（结构化工具）</th></tr></thead>
+<tbody>
+<tr><td>文件管理</td><td>模型自己 <code>cd</code>、自己持有 <code>bands.dat</code> 路径，"算的就是交的"</td><td>经 <code>calc_id</code> 注册 + 开窗读，"算的文件"与"交的文件"之间多一层间接 → <strong>易张冠李戴</strong>（Cr）</td></tr>
+<tr><td>nspin=2 能带</td><td>模型手写后处理，碰巧覆盖双自旋</td><td>结构化后处理未稳妥处理双通道 → <strong>只落自旋上</strong>（MnO）</td></tr>
+<tr><td>提交闭环</td><td>循环简单，算完即 grep + submit</td><td>verify_run / gate / ledger 多步，<strong>"产物齐但没人按提交键"</strong>的状态可发生（Fe2O3）</td></tr>
+</tbody>
+</table>
+
+<p>讽刺的是：<strong>v5.1 为提升可靠性加的机制（结构化工具、ledger、子 agent、验收门），在 T2 上没帮上忙，反而引入了新的失败面。</strong>
+这不是说这套机制错——而是它的<strong>文件流与完成判定还没在"bands_dos 这种多步、多文件、自旋极化"的场景下打磨到位</strong>。</p>
+
+<div class="note">
+<strong>关于"丢了三条 lesson"——给个诚实的边界</strong>：v5.1 把 <code>deepseek</code> 路由到 SDK 路径后，模型拿到的是
+<code>executor.md</code>，而 v4.3 legacy 的 <code>system_prompt</code> 里那套<strong>逐任务的 ecut / k 网格密度公式 + "够用即可"的墙钟纪律</strong>
+（以及 v5.1 写在 <code>system_prompt.py</code> 里、却只喂 legacy 路径的 <code>V5.1-LESSON</code> 块）<strong>SDK 路径都读不到</strong>。
+这条<strong>属实</strong>（已在源码 + 实际 transcript 双向核对：SDK 路径的 Cr run 用了 ecut=60、各向同性 12³，没有那套公式）。
+<strong>但要说清楚因果</strong>：本次 T2 的大额失分是上面 §4 那几个 IO / 编排 bug，<strong>不是</strong>这套 lesson 缺失直接造成的
+（Cr 是立方，各向异性 k 本来也不影响它）。lesson 缺失更像一个<strong>潜伏的结构性风险</strong>，主要体现在 <strong>T1/长任务的墙钟</strong>上——
+本批 v5.1 的 <code>Fe_bcc T1</code> 跑了 35253s、<code>Fe2O3 T1</code> 直接撞 36000s，正是这类风险的影子。<strong>所以这条要修，但别把它当成 T2 回归的主因。</strong>
+</div>
+
+
+<!-- ───────────────────────────── §7 ───────────────────────────── -->
+<h2 id="s7">7 · 修复清单（按优先级）</h2>
+
+<div class="fix"><span class="pri">P0</span><strong>bands.dat 提交校验：交给打分器的必须是 k 路径文件，不是稠密网格。</strong>
+在 <code>verify_run</code> / 提交门加一条硬检查：被解析的 <code>bands.dat</code> 的 <code>nks</code> 要等于本次能带 NSCF k 路径长度（~180–210），
+若等于稠密网格规模（&gt;1000）则判 hard_fail 并重放。<span style="color:#1d8348">预期收回：Cr 类 ~+0.84/题。</span></div>
+
+<div class="fix"><span class="pri">P0</span><strong>nspin=2 能带后处理 / 解析覆盖双自旋。</strong>
+确保自旋极化体系的 <code>bands.dat</code> 同时落自旋上 / 下；解析端按 <code>2×nbnd</code> 校验行数，不足即报错重算。
+<span style="color:#1d8348">预期收回：MnO 类 ~+0.33/题。</span></div>
+
+<div class="fix"><span class="pri">P1</span><strong>完成门兜底：产物齐 + 预算足 → 强制 verify_run→submit。</strong>
+当 <code>bands.dat</code>/<code>dos.dat</code> 已存在且墙钟仍有余量却长时间没提交时，由 gate 主动触发一次验收并提交；
+对 SDK <code>Stream closed</code> 做重试 / best-effort 提交，别让算完的活儿烂在手里。<span style="color:#1d8348">收回 Fe2O3 那道 + 省 ~10h 机时。</span></div>
+
+<div class="fix"><span class="pri">P2</span><strong>dos_e_fermi 取数源固定为 SCF（或与 GT 同一约定的那次计算）。</strong>
+不要从稠密 NSCF/DOS 读 Fermi。<span style="color:#1d8348">收回金属 dos_Ef，~+0.05/金属题。</span></div>
+
+<div class="fix"><span class="pri">P2</span><strong>把 ecut / k 网格密度 / 墙钟纪律补进 SDK <code>executor.md</code>。</strong>
+让 deepseek 走 SDK 路径时也拿到这套参数 scaffolding（主要降 T1/长任务墙钟风险，见 §6）。</div>
+
+<div class="fix"><span class="pri">benchmark</span><strong>（跨版本）补 VBM/CBM k 标签能力。</strong>
+给 agent 一个 <code>bands.x → seekpath</code> 的标签映射 helper，让它对绝缘体也能交出 <code>gap_type/vbm_k/cbm_k</code>；
+并复核 rubric 对 k 标签匹配是否过严。这条修的是 §5 的结构性天花板，<strong>v4.3、v5.1 同时受益</strong>。</div>
+
+
+<!-- ───────────────────────────── §8 ───────────────────────────── -->
+<h2 id="s8">8 · 结论与下一步</h2>
+
+<div class="good">
+<strong>结论</strong>：<br>
+① "v4.3 分高"成立，但仅在 T2，且 <strong>79% 来自 Cr_bcc + MnO 两道</strong>，根因是 v5.1 SDK 路径的
+<strong>两个 <code>bands.dat</code> IO bug</strong>（稠密网格文件 / 只含自旋上），<strong>不是物理或模型能力</strong>。<br>
+② <strong>T1 上 v5.1 反而略胜</strong>（0.906 vs 0.892），说明新底盘的物理不弱。<br>
+③ 还有一层<strong>两版共有的结构性天花板</strong>：绝缘体的 k 标签 / gap_type 恒空、窄带金属（Ni）误判——这部分单靠 solver 修不掉。<br>
+④ <strong>不建议退回 v4.3</strong>。建议按 §7 修掉 P0/P1（Cr、MnO、Fe2O3 三类，工作量不大），预期 v5.1 的 T2 即回到 ~0.48 与 v4.3 持平、整体反超，然后<strong>在 M3 同一 6 材料子集上重跑一批做验证</strong>。
+</div>
+
+<p><strong>下一步建议顺序</strong>：P0 两个 IO 修复 → 在 Cr_bcc / MnO 两题做最小复现验证 → P1 完成门 → 全 6 材料 ×（T1+T2）重跑一个新批次 → 与本文表 2 对账。</p>
+
+
+<!-- ───────────────────────────── §9 ───────────────────────────── -->
+<h2 id="s9">9 · 附录：完整逐 run 字段表 / 方法</h2>
+
+<details>
+<summary>A · 全 24 run 的 total_score（点开）</summary>
+<table>
+<thead><tr><th>task</th><th class="num">v4.3</th><th class="num">v5.1</th></tr></thead>
+<tbody>
+<tr><td>T1 Cr_bcc</td><td class="num">1.000</td><td class="num">0.850</td></tr>
+<tr><td>T1 Fe_bcc</td><td class="num">0.350</td><td class="num">0.739</td></tr>
+<tr><td>T1 Fe2O3</td><td class="num">1.000</td><td class="num">0.850</td></tr>
+<tr><td>T1 MnF2</td><td class="num">1.000</td><td class="num">1.000</td></tr>
+<tr><td>T1 MnO</td><td class="num">1.000</td><td class="num">1.000</td></tr>
+<tr><td>T1 Ni_fcc</td><td class="num">1.000</td><td class="num">1.000</td></tr>
+<tr><td>T2 Cr_bcc</td><td class="num">0.969</td><td class="num">0.133</td></tr>
+<tr><td>T2 Fe_bcc</td><td class="num">0.933</td><td class="num">0.827</td></tr>
+<tr><td>T2 Fe2O3</td><td class="num">0.097</td><td class="num">0.000*</td></tr>
+<tr><td>T2 MnF2</td><td class="num">0.480</td><td class="num">0.462</td></tr>
+<tr><td>T2 MnO</td><td class="num">0.500</td><td class="num">0.173</td></tr>
+<tr><td>T2 Ni_fcc</td><td class="num">0.128</td><td class="num">0.043</td></tr>
+</tbody>
+</table>
+<p style="font-size:13px;color:#7f8c8d;">* 超时无提交，计 0。若把该题从两批同时剔除（11 题口径）：v4.3 = 0.760、v5.1 = 0.643，差距与结论不变。</p>
+</details>
+
+<details>
+<summary>B · run 目录与代码路径</summary>
+<pre><code>批次 v4.3 = d383f692c1de4f60868c292c615ed53c   (2026-06-02 跑)
+批次 v5.1 = 7daa97116b01444a8630a5d3dfc30a7c   (2026-06-01 跑)
+run 数据    /srv/shared/science/web/runs_local/&lt;ISO时间&gt;_M3_T{1,2}_&lt;mat&gt;/
+  ├─ report.json              total_score / per_field_scores / extracted_fields
+  └─ workdir/{transcript.json, calcs.json, bands.dat, dos.dat, bash.log}
+题目 / GT   /srv/shared/science/bench/questions/M3_T2/*.json
+solver      /srv/shared/science/solver/v4.3/   (legacy 路径)
+            /srv/shared/science/solver/v5.1/   (SDK 路径; should_use_sdk_path(), agent/prompts/executor.md)
+关键证据    Cr  .../2026-06-01T13-57-23Z_M3_T2_Cr_bcc_bands_dos/workdir/bands.dat  → nks=2052
+            MnO .../2026-06-01T22-04-06Z_M3_T2_MnO_bands_dos/workdir/bands.dat   → 3 lines/kpt
+            Fe2O3 .../2026-06-01T18-52-14Z_M3_T2_Fe2O3_hematite_bands_dos/{harness.log,solver_stderr.log}</code></pre>
+</details>
+
+<details>
+<summary>C · 方法 / 口径</summary>
+<ul>
+<li>总分 = 该 6 材料子集上 12 个 run 的 <code>total_score</code> 算术平均；T2 超时题计 0。</li>
+<li>T2 字段权重（表 1）已用全部 11 个有效 T2 run 反推校验，可逐题重构出 <code>total_score</code>（误差 &lt; 1e-4）。</li>
+<li>"✓/✗"按 <code>per_field_scores</code> 是否 = 1 判定；<code>dos_curve</code> 为连续 F1，标原值。</li>
+<li>GT 值取自 <code>bench/questions/M3_T2/*.json</code> 的标定收敛点（<code>dos_e_fermi</code> 等随收敛点略有浮动，表 8 标"约"）。</li>
+<li>所有 per-field / extracted 数字直接来自 <code>report.json</code>，非二手转述。</li>
+</ul>
+</details>
+
+<p style="margin-top:40px; color:#7f8c8d; font-size:13px; border-top:1px solid #d5dbdb; padding-top:14px;">
+生成于 2026-06-03 · 数据源 <code>/srv/shared/science/</code> · 同模型 <code>deepseek-v4-pro</code> · self-contained，无外部依赖。
+</p>
+
+</body>
+</html>

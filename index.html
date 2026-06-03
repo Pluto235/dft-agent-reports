@@ -26,6 +26,12 @@ a:hover { text-decoration: underline; }
 
 <ul>
   <li>
+    <b><a href="m3-solver-v4-3-vs-v5-1-t2-regression-2026-06-03.html">
+      M3 磁性材料 · v4.3 vs v5.1 · T2 回归归因（post-mortem）
+    </a></b>
+    <small>2026-06-03 · 同模型 <code>deepseek-v4-pro</code>、同 6 材料 ×（T1+T2）、两批对照：v4.3 <code>d383f6…</code>（legacy 手写循环）vs v5.1 <code>7daa97…</code>（SDK 结构化工具路径）· <strong>一句话：v5.1 总分 0.590 &lt; v4.3 0.705，但差距 100% 在 T2、且 79% 只来自 Cr_bcc + MnO 两道；根因是 v5.1 SDK 路径的两个 <code>bands.dat</code> IO bug，不是物理/模型能力</strong> · <strong>T1 反而 v5.1 略胜（0.906 vs 0.892）</strong> · <strong>§4 逐题归因 + 硬证据</strong>：① Cr 提交了稠密网格 bands.dat（<code>nks=2052</code> 而非 ~200 点 k 路径）→ 4 个能带字段全 null（−0.836，全场最大单项）② MnO 的 bands.dat 只落自旋上分量（<code>nspin=2</code> 双通道没处理，3 行/kpt 而非 6）→ band_gap null（−0.327）③ 金属 <code>dos_e_fermi</code> 从稠密 NSCF 读偏 0.6–2 eV ④ Fe2O3 算完（bands/dos 都 JOB DONE、余 ~8h）却不 <code>submit</code> + SDK <code>Stream closed</code> → 撞 36000s 超时、白烧 ~10h · <strong>§5 共性结构天花板（两版同病）</strong>：绝缘体的 <code>gap_type/vbm_k/cbm_k</code> 恒 null（每题白丢 0.35）、Ni 窄带金属被误判成小带隙、<code>dos_curve</code> 永远部分分 · <strong>§6 为什么是 v5.1 踩坑</strong>：结构化工具的 calc_id→文件多一层间接易张冠李戴 + 完成门有漏；<strong>诚实边界</strong>：SDK <code>executor.md</code> 确实丢了 legacy 的 ecut/k 网格/墙钟 lesson，但那是 T1 墙钟潜伏风险、非本次 T2 主因 · <strong>§7 修复清单（P0：bands.dat 提交校验 nks==k路径长 / nspin=2 双自旋覆盖；P1：产物齐+预算足强制 submit）+ 反事实：修完 T2≈0.48 与 v4.3 持平、整体反超</strong> · <strong>结论：不退回 v4.3，修 3 个 bug 再重跑</strong> · 字段权重已反推校验、数字直取 report.json · self-contained</small>
+  </li>
+  <li>
     <b><a href="agent-v5-1-architecture-2026-05-29.html">
       v5.1 Solver 架构 · v5 chassis + v4.2 知识层（设计讲解）
     </a></b>
