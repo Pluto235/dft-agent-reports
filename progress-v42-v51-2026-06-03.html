@@ -120,7 +120,7 @@
 <body>
 
 <h1>DFT-Agent 进度汇报：v4.2 基线 · v4.3 与 v5.1 两条并行线</h1>
-<p class="dateline"><strong>进度汇报 · v4 · 2026-06-04</strong> &nbsp;v4 更新：加入 <strong>v1 baseline 对照组</strong>（裸 LLM ReAct，反映模型自身能力）；M3 仍以最新 12 材料广集为准。主线仍为"两条并行轨道、各自推进、暂不判输赢"。本文自带上下文，DFT / 工程细节从简。</p>
+<p class="dateline"><strong>进度汇报 · v5 · 2026-06-04</strong> &nbsp;v5 更新：§5 待杨博确认的问题<strong>核查后收敛到 2 条</strong>（金属判据、DOS 归一化已修复）；含 v1 baseline 对照组。主线仍为"两条并行轨道、各自推进、暂不判输赢"。本文自带上下文，DFT / 工程细节从简。</p>
 
 <div class="tldr">
 <strong>一句话总览</strong>
@@ -149,7 +149,7 @@
 <li><a href="#s2">v4.2：通用成熟基线，标准集 27 题 0.918</a></li>
 <li><a href="#s3">两条路线分叉：v4.3（磁性特化）与 v5.1（SDK 新底盘）</a></li>
 <li><a href="#s4">磁性材料 M3 对决：v4.3 vs v5.1（最新 12 材料广集）</a></li>
-<li><a href="#s5">需要和 DFT 专家杨博确认的问题（4 条）</a></li>
+<li><a href="#s5">需要和 DFT 专家杨博确认的问题（核查后收敛到 2 条）</a></li>
 <li><a href="#s6">双线短期路线图（未来 1–2 周）</a></li>
 </ol>
 </nav>
@@ -408,7 +408,7 @@
 </table>
 <p>裸模型在磁性材料上只有 <strong>0.31</strong>，脚手架把它抬到 <strong>0.43–0.51</strong>——磁性这种难骨头上脚手架价值更大；v5.1 在这组上也领先 v4.3，和 12 道的结论一致。</p>
 
-<p>还有一个<strong>两个版本都一样</strong>的"天花板"：真有带隙的绝缘体，其<em>能带类型 / VBM / CBM 位置</em>现在一律拿不到分。这不是某个版本的问题，而是 bench 打分口径的问题——正是下一节要找杨博敲定的。</p>
+<p>还有一个<strong>两个版本都一样</strong>的现象：真有带隙的绝缘体，当<strong>价带顶 / 导带底落在非高对称 k 点</strong>时，VBM / CBM 的 k-label 仍拿不到分（<code>gap_type</code> 现已能判对）。这不是某个版本的问题，而是 bench 打分口径问题——下一节会找杨博敲定。</p>
 
 <details>
 <summary>展开：最新 12 材料每题分数</summary>
@@ -435,31 +435,28 @@ v4.3 的 4 道失败：Cr_bcc / Fe₃O₄ / LaMnO₃ 墙钟超时（没产出结
 </details>
 
 <!-- ───────────────────────────── §5 ───────────────────────────── -->
-<h2 id="s5">5 · 需要和 DFT 专家杨博确认的问题（4 条）</h2>
-<p>下面 4 条是我们<strong>已经定位到的卡点</strong>，但属于"打分口径 / 物理判据"层面，需要杨博拍板。它们也正好解释了<strong>为什么 T2 有天花板、而且对两个版本都一样</strong>——不是 agent 算错。</p>
+<h2 id="s5">5 · 需要和 DFT 专家杨博确认的问题（核查后收敛到 2 条）</h2>
+<p>05-25 那版列了 4 条；这次重新核过<strong>当前 bench 代码 + 实测最新分数</strong>，其中 <strong>2 条已经修掉</strong>（见本节末），真正还<strong>开放、需要杨博拍板</strong>的收敛到下面 2 条。</p>
 
 <div class="qbox">
-<span class="qn">问题 1</span><strong>"算出来几乎是零带隙"的金属判据，前后差 100 倍</strong>
-<p>同一个"带隙接近零"的物理事实，bench 用了两套差 100× 的标准：带隙数值容忍 ±0.1 eV（100 meV），但"是不是金属"的分类判定要 &lt; 1 meV 才算金属。结果 Ge（算出 23 meV）、Rb（20–43 meV）这种近零带隙材料，<strong>带隙值判对、但金属/方向/k 点三个分类字段连环判错</strong>。</p>
-<p class="why">▸ <strong>为什么重要</strong>：这类失分不是我们算错，是判据自相矛盾。需要杨博定一个合理的"多小算金属"口径。</p>
+<span class="qn">问题 1</span><strong>极值落在非高对称 k 点时，VBM / CBM 的 k-label 仍拿不到分</strong>
+<p>好消息：现在 <code>gap_type</code>、以及"极值在高对称点"的 k-label <strong>都能拿分了</strong>。<strong>残留</strong>：当价带顶 / 导带底落在<strong>非高对称 k 点</strong>（偏离能带路径上的命名点）时，匹配仍失败、丢满分。当前 scorer 实测（最新磁性集）：</p>
+<ul>
+<li><strong>MnO</strong>：vbm_k = 0 / cbm_k = 1.0 → 丢 0.10</li>
+<li><strong>NiO</strong>：vbm_k = 0 / cbm_k = 0 → 丢 0.20</li>
+<li>对照 <strong>MnF₂</strong>：vbm_k / cbm_k 都 = 1.0（极值在高对称点，能拿分）→ 说明问题只在"极值离高对称点"时</li>
+</ul>
+<p class="why">▸ <strong>给杨博的问题</strong>：对"极值不在高对称点"的绝缘体，k-label 怎么判才公平？放宽 0.05 的匹配容差，还是允许按到最近命名点的方向给部分分？<small style="color:#7f8c8d;">（标准集的 MgSiO₃ / CaTiO₃ / LiAlSi₂O₆ / BN_hex 疑似同类，待用新 scorer 复核。）</small></p>
 </div>
 
 <div class="qbox">
-<span class="qn">问题 2</span><strong>绝缘体的 VBM / CBM 位置拿不到分 → T2 被封顶</strong>
-<p>所有真有带隙的绝缘体，<em>能带类型 / 价带顶位置 / 导带底位置</em>三个字段现在<strong>一律拿不到分</strong>（占每题 0.35 权重），等于绝缘体 T2 被封顶在 ~0.65。<strong>两个版本都一样。</strong></p>
-<p class="why">▸ <strong>为什么重要</strong>：这是 T2 分数最大的系统性天花板。需要 bench 侧加一个"把能带极值映射回高对称 k 点标签"的能力，并和杨博确认 k 点匹配口径是不是过严。</p>
+<span class="qn">问题 2</span><strong>绝缘体的 dos_e_fermi 参考系 + DOS 曲线打分</strong>
+<p>绝缘体的 <code>dos_e_fermi</code> 现在仍是把<strong>价带顶绝对能量</strong>按 ±0.1 eV 绝对容差比——BN_hex 有稳定 0.36 eV 的系统偏移（不是抖动）直接判 0；实测最新磁性集 MnO / MnF₂ 的 <code>dos_e_fermi</code> 也都 = 0。另外 DOS 曲线用面积重叠 F1 打分，对"形状对、协议略偏"太宽容（实测 dos_curve 普遍只 0.2–0.4）。</p>
+<p class="why">▸ <strong>给杨博的问题</strong>：① 绝缘体的费米能 / 价带顶该用什么参考系比（绝对 vs 相对、或跳过绝对 VBM）？② DOS 曲线该不该换更严的形状度量（KL 散度 / 归一化互相关）？</p>
 </div>
 
-<div class="qbox">
-<span class="qn">问题 3</span><strong>态密度（DOS）的归一化基准</strong>
-<p>标准答案的 DOS 是"每化学式"归一，QE 默认输出是"每原胞"，对 BN 这种原胞 = 2 个化学式的材料，我们的曲线天然<strong>高 2 倍</strong>。</p>
-<p class="why">▸ <strong>为什么重要</strong>：是个一行就能修的口径问题，但要先和杨博确认归一化基准从哪取，避免冤枉失分。</p>
-</div>
-
-<div class="qbox">
-<span class="qn">问题 4</span><strong>DOS 费米能 / 曲线的参考系与打分方式</strong>
-<p>绝缘体的"费米能"字段实际比的是价带顶绝对能量，BN 出现稳定 0.36 eV 的<strong>系统偏移</strong>（不是抖动），更像"能量零点参考系"没对齐；而 DOS 曲线用面积重叠打分，对"形状对、协议错"太宽容。</p>
-<p class="why">▸ <strong>为什么重要</strong>：需要杨博定费米能/价带顶的参考系，以及 DOS 曲线该不该换更严的形状度量。</p>
+<div class="note" style="background:#eef7ee; border-left-color:#1d8348; font-size:13.5px;">
+<strong>本节末 · 已修复、无需再讨论</strong>：① <strong>金属判据 100× 不一致</strong>（原议题）——"多小算金属"阈值已从 1 meV 抬到 10 meV，并按 GT 的金属标志 gate（已并 main），近零带隙绝缘体不再连环判错；仅剩 Rb 类（20–43 meV）的小边角。② <strong>DOS 每化学式归一化</strong>——已修（GT 侧重新生成成同基准）。
 </div>
 
 <!-- ───────────────────────────── §6 ───────────────────────────── -->
@@ -477,12 +474,12 @@ v4.3 的 4 道失败：Cr_bcc / Fe₃O₄ / LaMnO₃ 墙钟超时（没产出结
 <div class="fix" style="border-left-color:#9c640c;background:#fdf9f2;border-color:#f0d9b5;"><span class="pri" style="background:#9c640c;">收尾</span><strong>清 T1 边角</strong>：Cd 类已修（0.445 → 0.948），继续把零星失分的结构弛豫案例收掉。</div>
 
 <p class="track-h track-sh">两条线共用（bench 侧 · 和杨博）</p>
-<div class="fix"><span class="pri bench">bench 侧</span><strong>加 VBM/CBM 的 k-label 映射 + 复核打分口径</strong>：第 5 节那 4 条。<span class="t-shared" style="color:#1b4f72;">利好两个版本。</span></div>
+<div class="fix"><span class="pri bench">bench 侧</span><strong>复核第 5 节剩下的 2 条打分口径</strong>：离路径极值的 k-label、绝缘体 dos_e_fermi 参考系。<span class="t-shared" style="color:#1b4f72;">利好两个版本。</span></div>
 
 <p style="margin-top:24px;"><strong>一句话收尾</strong>：v4.2 已经把"能不能做对"证明了（0.918）；在它之上，<strong>v4.3</strong> 把磁性材料这块硬骨头啃成了单题质量很高的生产线（短板是大体系会超时），<strong>v5.1</strong> 把"更安全、更可维护、可扩展"的新底盘搭了起来、这轮还把鲁棒性做到了零失败反超。两条线各有所长、都在往前走，下一步是把上面这些明确、可修的工程项收掉，并和杨博敲定打分口径。</p>
 
 <footer>
-生成于 2026-06-03 · v4 更新 2026-06-04（加入 v1 baseline 对照组）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
+生成于 2026-06-03 · v5 更新 2026-06-04（§5 核查后收敛到 2 条真·开放问题）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
 配套详报（更细）：
 <a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构</a> ·
 <a href="solver-v42-standard27-2026-05-25.html">v4.2 标准集 27 题</a> ·
