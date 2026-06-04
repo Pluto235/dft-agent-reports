@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DFT-Agent 进度汇报 · v4.2 基线 → v5.1 新底盘 · 2026-06-03</title>
+<title>DFT-Agent 进度汇报 · v4.2 基线 · v4.3 与 v5.1 两条并行线 · 2026-06-04</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
          'Microsoft YaHei', sans-serif;
@@ -53,12 +53,16 @@
   .score-mid  { color: #9c640c; font-weight: 700; }
   .score-bad  { color: #a93226; font-weight: 700; }
   .win { font-weight: 700; }
+  .col-43 { background:#fdf6ec !important; }
+  .col-51 { background:#eef4fb !important; }
 
   .tag { display:inline-block; font-weight:700; padding:1px 8px; border-radius:10px;
          font-size:11px; vertical-align:middle; }
   .t-io     { background:#fadbd8; color:#922b21; border:1px solid #e6b0aa; }
   .t-good   { background:#d5f5e3; color:#1d8348; border:1px solid #58d68d; }
   .t-shared { background:#d6eaf8; color:#1b4f72; border:1px solid #5dade2; }
+  .t-43 { background:#fdebd0; color:#9c640c; border:1px solid #e59866; }
+  .t-51 { background:#d6eaf8; color:#1b4f72; border:1px solid #5dade2; }
 
   nav.toc { background: #f8f9f9; border: 1px solid #d5dbdb; border-radius: 6px;
             padding: 16px 24px; margin: 24px 0; }
@@ -79,6 +83,11 @@
   .fix .pri.p2   { background:#8e44ad; }
   .fix .pri.next { background:#16a085; }
   .fix .pri.bench{ background:#d35400; }
+  .track-h { font-weight:700; margin:22px 0 4px; padding:4px 12px; border-radius:6px;
+             display:inline-block; }
+  .track-43 { background:#fdebd0; color:#9c640c; }
+  .track-51 { background:#d6eaf8; color:#1b4f72; }
+  .track-sh { background:#eaeded; color:#566573; }
 
   .qbox { background:#eafaf1; border:1px solid #abebc6; border-left:5px solid #1d8348;
           border-radius:6px; padding:14px 18px; margin:16px 0; }
@@ -92,6 +101,7 @@
           display:flex; flex-direction:column; justify-content:center; }
   .fbox small { display:block; font-weight:400; color:#5a7a93; font-size:11px; margin-top:3px; }
   .fbox.know { background:#fdebd0; border-color:#e59866; color:#9c640c; }
+  .fbox.mag  { background:#fce9ef; border-color:#e8a9bf; color:#a13a5d; }
   .farrow { align-self:center; color:#7f8c8d; font-weight:700; font-size:18px; }
   .fwrap { background:#f4f7fb; border:1px dashed #aed0ef; border-radius:8px; padding:6px 12px 2px; margin:8px 0; }
   .fcap { color:#7f8c8d; font-size:12px; font-style:italic; margin:2px 0 14px; }
@@ -103,23 +113,24 @@
 </head>
 <body>
 
-<h1>DFT-Agent 进度汇报：v4.2 成熟基线 → v5.1 新底盘</h1>
-<p class="dateline"><strong>进度汇报 · 2026-06-03</strong> &nbsp;一句话：成熟版 v4.2 已把"能不能做对"证明了；新一代底盘 v5.1 已落地、方向正确，卡在几个明确的工程 bug 上。本文自带上下文，DFT/工程细节从简。</p>
+<h1>DFT-Agent 进度汇报：v4.2 基线 · v4.3 与 v5.1 两条并行线</h1>
+<p class="dateline"><strong>进度汇报 · v2 · 2026-06-04</strong> &nbsp;v2 更新：加入 <strong>v4.3</strong>（v4.2 的磁性特化版），并把主线定为"<strong>两条并行轨道、各自推进、暂不判输赢</strong>"。本文自带上下文，DFT / 工程细节从简。</p>
 
 <div class="tldr">
 <strong>一句话总览</strong>
-<strong>v4.2</strong>（成熟版）在标准集 27 题拿到 <strong>0.918 分、27 题全过</strong>，比上月 +19%。我们在它之上换了<strong>新一代 SDK 底盘 v5.1</strong>——结构化工具、自动断路、提交前物理验收，工程上更安全、更可维护、可扩展。v5.1 在磁性材料集 M3 上<strong>结构弛豫（T1）已经反超</strong>老版本，能带（T2）暂时落后；但<strong>落后的 79% 只来自两道题的文件读写 bug（物理其实算对了）</strong>，修完即与老版本打平。
+我们从成熟的通用版 <strong>v4.2</strong>（标准集 27 题 <strong>0.918</strong>）出发，现在<strong>并行推进两条轨道</strong>：
 <ul style="margin:10px 0 0;">
-<li>✅ <strong>v4.2 把"对"证明了</strong>：标准集 27 题 0.918 / 全过 / 中位数 0.991。</li>
-<li>🔧 <strong>v5.1 把"稳和可扩展"的底盘搭好了</strong>：T1 已反超老版本，T2 暂落后但根因是已定位、可修的 IO bug。</li>
-<li>🧭 <strong>下一步很清楚</strong>：修 3 个 bug 重跑、把标准集对比补全、和杨博敲定几条打分口径。</li>
+<li>✅ <strong>v4.2 通用基线已证明"能做对"</strong>：标准集 27 题 0.918 / 全过 / 中位数 0.991。</li>
+<li>🟠 <strong>v4.3（磁性生产线）</strong> = 把 v4.2 针对磁性材料手动特化的成熟版本；在磁性集 M3 上 <strong>0.705</strong>，仍在活跃迭代（金属能带、磁序）。</li>
+<li>🔵 <strong>v5.1（新 SDK 架构）</strong> = 全新结构化工具底盘（更安全、可维护、易扩展），还在打磨；M3 总分 <strong>0.590</strong>，但<strong>已在 v4.3 的主场 T1 反超</strong>、T2 落后的 79% 是<strong>已定位的文件 IO bug</strong>（物理算对了），修复后 ≈ 打平。</li>
 </ul>
+<strong>两条线各有进展，暂不判定谁取代谁</strong>——v4.3 是当前能打的生产主力，v5.1 是工程更优、正在 de-risk 的另一条架构。
 </div>
 
 <div class="meta">
 <strong>给谁看</strong>：进度汇报（技术管理者视角，DFT 与 agent 细节从简）。<br>
 <strong>数据源</strong>：<code>/srv/shared/science/</code>（runs / bench / solver 共享区）；分数均直取 bench <code>report.json</code>。<br>
-<strong>口径</strong>：v4.2 标准集 batch <code>10351c77</code>；M3 两批 v4.3 <code>d383f6…</code> / v5.1 <code>7daa97…</code>，<strong>同模型</strong> <code>deepseek-v4-pro</code>（比的是底盘，不是模型）。<br>
+<strong>口径</strong>：v4.2 标准集 batch <code>10351c77</code>；M3 同模型 <code>deepseek-v4-pro</code> 对照 —— v4.3 <code>d383f6…</code>（六材料）/ <code>d9bf61d4…</code>（更广 30 材料），v5.1 <code>7daa97…</code>（六材料）。<strong>注意：v4.2 的 0.918 来自通用标准集，v4.3/v5.1 的 M3 是更难的磁性集——不是同一张卷子，分数不可直接横比。</strong><br>
 <strong>配套详报</strong>（更细，非必读）：见文末链接。
 </div>
 
@@ -127,11 +138,11 @@
 <h3>目录</h3>
 <ol>
 <li><a href="#s1">我们在做什么（30 秒背景）</a></li>
-<li><a href="#s2">v4.2：成熟基线，标准集 27 题 0.918</a></li>
-<li><a href="#s3">v5.1：新底盘 —— 为什么换、更新了什么</a></li>
-<li><a href="#s4">v5.1 现在到哪了：M3 磁性材料结果</a></li>
+<li><a href="#s2">v4.2：通用成熟基线，标准集 27 题 0.918</a></li>
+<li><a href="#s3">两条路线分叉：v4.3（磁性特化）与 v5.1（SDK 新底盘）</a></li>
+<li><a href="#s4">磁性材料 M3 对决：v4.3 vs v5.1</a></li>
 <li><a href="#s5">需要和 DFT 专家杨博确认的问题（4 条）</a></li>
-<li><a href="#s6">短期改进规划（未来 1–2 周）</a></li>
+<li><a href="#s6">双线短期路线图（未来 1–2 周）</a></li>
 </ol>
 </nav>
 
@@ -141,10 +152,8 @@
 <p>有一个独立的 <strong>bench（测评系统）</strong>给每道题<strong>自动打分</strong>（0–1 分），对照标准答案算每个物理量对不对。所以"agent 强不强"是一个可量化、可对比的分数。下面所有数字都来自这个 bench。</p>
 
 <!-- ───────────────────────────── §2 ───────────────────────────── -->
-<h2 id="s2">2 · v4.2：成熟基线，标准集 27 题 0.918</h2>
-
-<h3>架构（一句话 + 一张图）</h3>
-<p>v4.2 把一道题拆成"<strong>规划 → 执行 → 验收</strong>"三段流水线，每段由一个大模型角色负责；验收不过就自动重试 / 重新规划。</p>
+<h2 id="s2">2 · v4.2：通用成熟基线，标准集 27 题 0.918</h2>
+<p>v4.2 是<strong>两条轨道共同的起点</strong>，也是目前最成熟的通用版本。它把一道题拆成"<strong>规划 → 执行 → 验收</strong>"三段流水线，每段由一个大模型角色负责；验收不过就自动重试 / 重新规划。</p>
 
 <div class="flow">
   <div class="fbox">题目<small>+ 两道开场功课</small></div>
@@ -157,11 +166,11 @@
   <div class="farrow">→</div>
   <div class="fbox">结果<small>交卷打分</small></div>
 </div>
-<p class="fcap">验收失败 → 自动重试 / 重新规划。两道"开场功课"（判金属还是绝缘体、先把结构预弛豫一下）由纯代码完成，不劳烦模型。</p>
+<p class="fcap">验收失败 → 自动重试 / 重新规划。两道"开场功课"（判金属还是绝缘体、先把结构预弛豫一下）由纯代码完成，不劳烦模型。执行环节由模型操作 shell 命令，外加一层"输入自动纠错"（auto-lint）兜底。</p>
 
 <div class="concept">
 <span class="lbl">核心思想</span><h4>把 DFT 知识写成"模型绕不过的代码硬约束"</h4>
-<p>老版本（v1）是把 DFT 经验<em>写在提示词里</em>，指望模型照做；v4.2 的关键升级是把这些经验<strong>变成代码层的硬规则</strong>——比如交卷前自动检查、自动纠正输入参数、独立验收清单。模型"想偷懒也偷不了"。这让成绩从"看模型心情"变成"稳定可控"。</p>
+<p>老版本是把 DFT 经验<em>写在提示词里</em>，指望模型照做；v4.2 的关键升级是把这些经验<strong>变成代码层的硬规则</strong>——交卷前自动检查、自动纠正输入参数、独立验收清单。模型"想偷懒也偷不了"。这让成绩从"看模型心情"变成"稳定可控"。</p>
 </div>
 
 <h3>成绩：27 题全过，平均 0.918</h3>
@@ -176,18 +185,37 @@
 <tr><td>满分级（≥0.99）题数</td><td class="num">0</td><td class="num score-good">15 / 27</td><td class="num score-good">+15</td></tr>
 </tbody>
 </table>
-<p>27 题<strong>全部通过</strong>（其中 3 题靠 bench 自动重试救回），成本仅 <strong>$1.73</strong>（约 $0.06/题）。最大的进步在 T2（能带+DOS）这类难题，从 0.716 提到 0.921；唯一的小回退在 T1，因为 Cd 这一道相变到了"长 c 轴"的局部最优，单题失分（这是已知的待修项）。</p>
-<p class="note" style="font-size:13.5px;"><strong>诚实脚注</strong>：0.918 是 best-of（含 bench 自动重试）口径；若只算<strong>单次跑</strong>（不靠重试）总分是 <strong>0.832</strong>。两个数都真实——前者是"系统整体能力"，后者是"单跑鲁棒性"，提升鲁棒性也在路线图里。</p>
+<p>27 题<strong>全部通过</strong>（其中 3 题靠 bench 自动重试救回），成本仅 <strong>$1.73</strong>（约 $0.06/题）。最大的进步在 T2（能带+DOS）这类难题；唯一的小回退在 T1，因为 Cd 这一道落到了"长 c 轴"的局部最优、单题失分 0.445——<strong>这个问题后来在 v4.3 里修掉了</strong>（见 §3）。</p>
+<p class="note" style="font-size:13.5px;"><strong>诚实脚注</strong>：0.918 是 best-of（含 bench 自动重试）口径；若只算<strong>单次跑</strong>是 <strong>0.832</strong>。两个数都真实——前者是"系统整体能力"，后者是"单跑鲁棒性"。</p>
 
 <!-- ───────────────────────────── §3 ───────────────────────────── -->
-<h2 id="s3">3 · v5.1：新底盘 —— 为什么换、更新了什么</h2>
+<h2 id="s3">3 · 两条路线分叉：v4.3（磁性特化）与 v5.1（SDK 新底盘）</h2>
+<p>从 v4.2 出发，我们现在<strong>并行走两条路</strong>：一条继续打磨成熟的"手写循环"架构、专门攻磁性材料这块硬骨头（<strong>v4.3</strong>）；另一条换成全新的、工程更优的结构化工具底盘（<strong>v5.1</strong>）。先用一张表看清三者的关系：</p>
 
-<div class="note" style="background:#eef3f8; border-left-color:#3498db; font-size:13.5px;">
-<strong>30 秒理清版本</strong>：我们有两条并行实现线——<strong>手写线</strong>（v1 → … → v4.2 → v4.3，自己写的循环，能跑任何模型）和<strong>新 SDK 线</strong>（v5 → v5.1，基于官方 agent SDK 的结构化工具）。<strong>v4.2 / v4.3 是手写线的成熟版本，v5.1 是新线。</strong>后面 M3 的对照，就是拿新线 v5.1 和手写线当前头 v4.3 跑<strong>同一个模型</strong>做 A/B。
-</div>
+<table>
+<caption>表 2 · 三个版本一览（v4.2 的卷子与 v4.3/v5.1 不同，分数见各自语境，勿直接横比）</caption>
+<thead><tr><th>&nbsp;</th><th>v4.2</th><th class="col-43">v4.3</th><th class="col-51">v5.1</th></tr></thead>
+<tbody>
+<tr><td><strong>是什么</strong></td><td>通用成熟基线</td><td class="col-43">v4.2 的磁性特化版</td><td class="col-51">全新 SDK 架构</td></tr>
+<tr><td><strong>架构</strong></td><td>规划→执行→验收（手写循环）</td><td class="col-43">同 v4.2（直接 fork）</td><td class="col-51">结构化工具底盘 + v4.2 知识层</td></tr>
+<tr><td><strong>工具层</strong></td><td>裸 shell + 输入自动纠错</td><td class="col-43">同 v4.2</td><td class="col-51">结构化工具（带类型的"按钮"）</td></tr>
+<tr><td><strong>主场 / 状态</strong></td><td>通用 · 生产</td><td class="col-43">磁性材料 · 生产</td><td class="col-51">磁性材料 · 打磨中</td></tr>
+<tr><td><strong>代表成绩</strong></td><td>标准集 27 题 <strong>0.918</strong></td><td class="col-43">M3 六材料 <strong>0.705</strong></td><td class="col-51">M3 六材料 <strong>0.590</strong></td></tr>
+</tbody>
+</table>
 
-<h3>为什么换底盘</h3>
-<p>v4.2 物理很强，但工程上"脆"——模型直接拼 shell 命令操作，容易出幺蛾子、不好维护。v5 改用官方 <strong>agent SDK 的结构化工具</strong>底盘：模型不再自由打字敲命令，而是按一组<strong>带类型的"按钮"</strong>操作，更安全、更可控、更容易加新能力。<strong>v5.1 = 这套新底盘 + 把 v4.2 的"材料知识层"搬回来</strong>，争取"新底盘的工程 + 老版本的物理"。</p>
+<p class="track-h track-43">v4.3 · 手写线的磁性特化版</p>
+<p>v4.3 是把 v4.2 <strong>直接 fork 出来</strong>、专门为<strong>磁性 / 金属材料</strong>特化的版本。<strong>架构和 v4.2 完全一样</strong>（同样的"规划→执行→验收"三段式，见上图），区别在于针对磁性材料这类"难收敛、易判错"的体系，加了一组特化处理：</p>
+<ul>
+<li><strong>磁序探针</strong>：自动试"铁磁 vs 反铁磁"两种磁排列，跑两个单点能量、选更低的那个——磁性材料算对的<strong>第一步关键</strong>。</li>
+<li><strong>金属能带保证</strong>：跑完后检查金属费米面附近有没有假"缝"，有就<strong>自动加密 k 点重算</strong>，避免金属被误判成半导体（典型如 Ni）。</li>
+<li><strong>一组磁性工程修复</strong>：强制自旋极化（nspin=2）、反铁磁原子标记归一化、把总态密度的两个自旋通道加起来、单条命令墙钟封顶防超时。</li>
+<li><strong>顺手修了 v4.2 的边角</strong>：例如上一节 Cd 失分（0.445）——v4.3 把它的截断从 50 提到 80 Ry 后<strong>回到 0.948</strong>。</li>
+</ul>
+<p class="fcap">一句话：v4.3 = 把成熟的 v4.2 针对"磁性材料"这块硬骨头手动打磨过的<strong>生产版本</strong>；相对 v4.2 多了约 5500 行磁性 / 金属 / 墙钟相关的修复代码。</p>
+
+<p class="track-h track-51">v5.1 · 全新 SDK 结构化工具底盘</p>
+<p>另一条路不再让模型自由拼 shell 命令，而是换成官方 <strong>agent SDK 的结构化工具</strong>：模型按一组<strong>带类型的"按钮"</strong>操作（写 QE 输入 / 跑 pw.x / 读输出 …），更安全、更可控、更容易加新能力、更好维护。<strong>v5.1 = 这套新底盘 + 把 v4.2 的"材料知识层"搬回来当开场功课。</strong></p>
 
 <div class="fwrap">
 <div class="flow">
@@ -200,48 +228,41 @@
   <div class="fbox">结果</div>
 </div>
 </div>
-<p class="fcap">执行循环旁挂着两个"安全件"：卡死自动<strong>断路器</strong>、SCF 不收敛时交给一个<strong>专门的修复子 agent</strong>（干净脑子、按故障树修）。外框 = v5 的 SDK 底盘。</p>
+<p class="fcap">执行循环旁挂着两个"安全件"：卡死自动<strong>断路器</strong>、SCF 不收敛时交给一个<strong>专门的修复子 agent</strong>。这次还把 DeepSeek 也切到了这条 SDK 路径，并修了 4 个评审 bug（把 v5 里两处"物理验收被架空"的地方接回了线）。单元测试 167 → 336 全过。</p>
 
-<h3>v5.1 更新了什么（相比手写线）</h3>
-<ul>
-<li><strong>结构化工具替代裸命令</strong>：模型按"写 QE 输入 / 跑 pw.x / 读输出"等带类型的按钮操作，更安全、更难出错。</li>
-<li><strong>读输出"开窗"</strong>：只给模型看输出的关键片段（报错、受力、费米能…），不灌几千行——省上下文、少幻觉。</li>
-<li><strong>卡死断路器</strong>：纯代码监控，发现模型原地打转（重复同一操作、长时间没进展）就自动打断并提示换招。</li>
-<li><strong>SCF 修复子 agent</strong>：自洽算不收敛时，交给一个"没看过失败现场"的专门子 agent 重新诊断。</li>
-<li><strong>提交前物理验收 gate</strong>：模型说"做完了"不算数，程序再做一遍物理检查（收敛没、空间群保住没、能带文件能不能解析），不过就打回重做。</li>
-<li><strong>DeepSeek 也切到 SDK 路径</strong>：这次让 DeepSeek 也走上面这套结构化底盘（之前走裸命令）。</li>
-<li><strong>修了 4 个评审 bug（C1–C4）</strong>：把 v5 里两处"物理验收被架空"的地方接回了线，并修了"跑挂了却被当成功"等问题。单元测试 167 → 336 全过。</li>
-</ul>
+<div class="note" style="background:#eef3f8; border-left-color:#3498db; font-size:13.5px;">
+<strong>怎么理解两条线</strong>：v4.2 / v4.3 是"<strong>手写循环</strong>"架构——成熟、能打，但靠不断叠加修复代码维护；v5.1 是"<strong>结构化工具</strong>"架构——工程上更安全、更可维护、更易扩展，但还年轻、在打磨。<strong>现阶段不急于判定谁取代谁</strong>：v4.3 是当前磁性生产主力，v5.1 在 de-risk。
+</div>
 
 <!-- ───────────────────────────── §4 ───────────────────────────── -->
-<h2 id="s4">4 · v5.1 现在到哪了：M3 磁性材料结果</h2>
-<p>M3 是<strong>磁性材料</strong>专项集（自旋极化、不加 +U），这次跑了 6 种材料 ×（T1 结构弛豫 + T2 能带/DOS）= 12 道。用<strong>同一个模型</strong> deepseek-v4-pro，把新线 v5.1 和手写线 v4.3 做了一次干净的 A/B——模型一样，比的就是<strong>底盘本身</strong>。</p>
+<h2 id="s4">4 · 磁性材料 M3 对决：v4.3 vs v5.1</h2>
+<p>M3 是<strong>磁性材料</strong>专项集（自旋极化、不加 +U）。这次跑了 6 种材料 ×（T1 结构弛豫 + T2 能带/DOS）= 12 道，用<strong>同一个模型</strong> deepseek-v4-pro 把两条线做了干净的 A/B——模型一样，比的就是<strong>底盘本身</strong>。注意：<strong>这是 v4.3 的主场</strong>（它专门为这类磁性材料特化过），v5.1 是来"踢馆"的全新通用架构。</p>
 
 <table>
-<caption>表 2 · M3 总览（6 材料 × T1/T2，分数越高越好）</caption>
-<thead><tr><th>任务类型</th><th class="num">v4.3（手写线）</th><th class="num">v5.1（SDK 新线）</th><th class="num">差</th><th>赢家</th></tr></thead>
+<caption>表 3 · M3 总览（6 材料 × T1/T2，分数越高越好）</caption>
+<thead><tr><th>任务类型</th><th class="num col-43">v4.3（磁性特化）</th><th class="num col-51">v5.1（SDK 新线）</th><th class="num">差</th><th>赢家</th></tr></thead>
 <tbody>
-<tr><td>T1 · 结构弛豫（×6）</td><td class="num">0.892</td><td class="num score-good">0.906</td><td class="num score-good">+0.014</td><td class="win" style="color:#1d8348;">v5.1 ✓</td></tr>
-<tr><td>T2 · 能带 + DOS（×6）</td><td class="num">0.518</td><td class="num score-bad">0.273</td><td class="num score-bad">−0.245</td><td>v4.3</td></tr>
-<tr><td><strong>总分（×12）</strong></td><td class="num"><strong>0.705</strong></td><td class="num score-bad"><strong>0.590</strong></td><td class="num score-bad"><strong>−0.115</strong></td><td>v4.3</td></tr>
+<tr><td>T1 · 结构弛豫（×6）</td><td class="num col-43">0.892</td><td class="num col-51 score-good">0.906</td><td class="num score-good">+0.014</td><td class="win" style="color:#1d8348;">v5.1 ✓</td></tr>
+<tr><td>T2 · 能带 + DOS（×6）</td><td class="num col-43">0.518</td><td class="num col-51 score-bad">0.273</td><td class="num score-bad">−0.245</td><td>v4.3</td></tr>
+<tr><td><strong>总分（×12）</strong></td><td class="num col-43"><strong>0.705</strong></td><td class="num col-51 score-bad"><strong>0.590</strong></td><td class="num score-bad"><strong>−0.115</strong></td><td>v4.3</td></tr>
 </tbody>
 </table>
 
-<h3>怎么读这张表（关键）</h3>
-<p>总分 v5.1 暂时落后，但<strong>拆开看方向是好的</strong>：</p>
+<h3>怎么读这张表</h3>
+<p>总分 v4.3 领先（这是它的主场，意料之中），但<strong>对一条全新架构来说，v5.1 的表现是很说明问题的</strong>：</p>
 <ul>
-<li><strong>结构弛豫 T1，v5.1 反而赢</strong>（0.906 vs 0.892）。其中 Fe 这道两个版本都难，v5.1（0.739）比 v4.3（0.350）<strong>好一倍多</strong>。说明新底盘的物理<strong>不更弱</strong>。</li>
+<li><strong>结构弛豫 T1，v5.1 反而赢</strong>（0.906 vs 0.892）。其中 Fe 这道两个版本都难，v5.1（0.739）比 v4.3（0.350）<strong>好一倍多</strong>。说明新底盘的物理底子<strong>不更弱</strong>。</li>
 <li><strong>落后 100% 在 T2，且其中 79% 只来自两道题</strong>（Cr、MnO）。</li>
 <li><strong>这两道的根因是文件读写 bug，不是物理 / 模型能力</strong>——详见下表。</li>
 </ul>
 
 <table>
-<caption>表 3 · T2 落后的两个主因（占 T2 回归的 79%）</caption>
-<thead><tr><th>材料</th><th class="num">v4.3</th><th class="num">v5.1</th><th class="num">占回归</th><th>根因</th></tr></thead>
+<caption>表 4 · v5.1 在 T2 落后的两个主因（占 T2 回归的 79%）</caption>
+<thead><tr><th>材料</th><th class="num col-43">v4.3</th><th class="num col-51">v5.1</th><th class="num">占回归</th><th>根因</th></tr></thead>
 <tbody>
-<tr><td>Cr</td><td class="num">0.969</td><td class="num score-bad">0.133</td><td class="num">57%</td><td><span class="tag t-io">IO</span> 抓错文件：交了 2052 点的稠密网格，而非 ~211 点的能带 k-路径</td></tr>
-<tr><td>MnO</td><td class="num">0.500</td><td class="num score-bad">0.173</td><td class="num">22%</td><td><span class="tag t-io">IO</span> 漏写自旋：自旋极化体系只写了"自旋向上"一个通道（少一半数据）</td></tr>
-<tr><td>其余 4 道</td><td class="num" colspan="2" style="text-align:center;color:#7f8c8d;">小项 / 共性</td><td class="num">21%</td><td>含 Fe₂O₃"算完没交卷"超时（见下）</td></tr>
+<tr><td>Cr</td><td class="num col-43">0.969</td><td class="num col-51 score-bad">0.133</td><td class="num">57%</td><td><span class="tag t-io">IO</span> 抓错文件：交了 2052 点的稠密网格，而非 ~211 点的能带 k-路径</td></tr>
+<tr><td>MnO</td><td class="num col-43">0.500</td><td class="num col-51 score-bad">0.173</td><td class="num">22%</td><td><span class="tag t-io">IO</span> 漏写自旋：自旋极化体系只写了"自旋向上"一个通道（少一半数据）</td></tr>
+<tr><td>其余 4 道</td><td class="num col-43" colspan="2" style="text-align:center;color:#7f8c8d;">小项 / 共性</td><td class="num">21%</td><td>含 Fe₂O₃"算完没交卷"超时（见折叠表）</td></tr>
 </tbody>
 </table>
 
@@ -251,13 +272,13 @@
 </div>
 
 <div class="good">
-<strong>修复后的反推（正面落点）</strong>：把 Cr、MnO 恢复到正常水平、Fe₂O₃ 正常交卷，v5.1 的 T2 约回到 <strong>0.48</strong>，和 v4.3 的 0.518 <strong>基本持平</strong>；叠加 T1 的领先，整体 <strong>≈ 打平</strong>。也就是说：新底盘在"还很早、IO 还没打磨"的阶段，已经追平了打磨成熟的老版本——这正是我们认为<strong>这条路线值得继续投</strong>的原因。M3 报告本身的结论也是"<strong>修这几个 bug 重跑，而不是退回老版本</strong>"。
+<strong>两条线各自的进展（正面落点）</strong>：① 在 v4.3 的主场上，全新的 v5.1 已经 <strong>T1 反超</strong>；把 Cr、MnO、Fe₂O₃ 这几个 IO bug 修掉后，v5.1 的 T2 约回到 <strong>0.48</strong>、与 v4.3 的 0.518 <strong>基本持平</strong>——说明新底盘的物理底子扎实，落后是工程打磨问题、不是能力问题。② v4.3 这边也<strong>仍在活跃迭代</strong>：金属能带的新修复正把 Ni 这类原本失分的案例大幅拉高，并在更广的磁性材料集上扩展覆盖。<strong>两条线都在往前走，现阶段不急于判输赢。</strong>
 </div>
 
-<p>另外有一个<strong>两个版本都一样</strong>的"天花板"：所有绝缘体的<em>能带类型 / VBM / CBM 位置</em>现在一律拿不到分。这<strong>不是某个版本的问题，而是 bench 打分口径的问题</strong>——正是下一节要找杨博敲定的。</p>
+<p>还有一个<strong>两个版本都一样</strong>的"天花板"：所有绝缘体的<em>能带类型 / VBM / CBM 位置</em>现在一律拿不到分。这<strong>不是某个版本的问题，而是 bench 打分口径的问题</strong>——正是下一节要找杨博敲定的。</p>
 
 <details>
-<summary>展开：M3 完整每题分数 + 两批 batch ID</summary>
+<summary>展开：M3 完整每题分数 + v4.3 更广的 30 材料磁性集</summary>
 <table style="margin-top:10px;">
 <thead><tr><th>材料</th><th class="num">T1 v4.3</th><th class="num">T1 v5.1</th><th class="num">T2 v4.3</th><th class="num">T2 v5.1</th></tr></thead>
 <tbody>
@@ -269,8 +290,10 @@
 <tr><td>Ni</td><td class="num">1.000</td><td class="num">1.000</td><td class="num">0.128</td><td class="num">0.043</td></tr>
 </tbody>
 </table>
-<p style="font-size:13px;color:#7f8c8d;">Fe₂O₃ 的 T2：QE 其实全算完了（能带、DOS 文件都生成、还剩 ~8 小时预算），但 agent 卡在自检循环里<strong>没走到"交卷"</strong>，最后超时——既丢了分也白跑约 10 小时算力。属于"完成度兜底"的 bug，已在 P1 修复项里。<br>
-v4.3 batch <code>d383f692…</code>（2026-06-02，手写循环）；v5.1 batch <code>7daa9711…</code>（2026-06-01，SDK 结构化工具路径）。分数直取 <code>report.json</code>。</p>
+<p style="font-size:13px;color:#7f8c8d;">
+Fe₂O₃ 的 T2：QE 其实全算完了（能带、DOS 文件都生成、还剩 ~8 小时预算），但 agent 卡在自检循环里<strong>没走到"交卷"</strong>，最后超时——既丢分也白跑 ~10 小时算力。属于"完成度兜底"的 bug，已在 §6 的 P1 修复项里。<br>
+<strong>v4.3 更广覆盖</strong>：除这 6 道外，v4.3 还在 <strong>30 材料</strong>的磁性集上跑过（含更难的氧化物，总分 <strong>0.591</strong>，batch <code>d9bf61d4…</code>），并有一批针对金属/磁序新修复的重跑正在进行中。<br>
+口径：v4.3 batch <code>d383f692…</code>（六材料）/ v5.1 batch <code>7daa9711…</code>，同模型 deepseek-v4-pro，分数直取 <code>report.json</code>。</p>
 </details>
 
 <!-- ───────────────────────────── §5 ───────────────────────────── -->
@@ -302,25 +325,32 @@ v4.3 batch <code>d383f692…</code>（2026-06-02，手写循环）；v5.1 batch 
 </div>
 
 <!-- ───────────────────────────── §6 ───────────────────────────── -->
-<h2 id="s6">6 · 短期改进规划（未来 1–2 周）</h2>
-<p>优先级从"直接把 v5.1 拉回持平/领先"的修复排起：</p>
+<h2 id="s6">6 · 双线短期路线图（未来 1–2 周）</h2>
+<p>两条轨道各自推进，外加一块共用的 bench 侧改进：</p>
 
+<p class="track-h track-51">v5.1 轨道（新架构 de-risk）</p>
 <div class="fix"><span class="pri">P0</span><strong>能带文件提交校验</strong>：要求交上去的能带文件点数 ≈ k-路径长度，否则打回重做。<span class="score-good">预期收回 Cr 类 ~+0.84/题。</span></div>
 <div class="fix"><span class="pri">P0</span><strong>自旋极化能带后处理覆盖双通道</strong>：写/解析时校验行数，自旋向上向下都要齐。<span class="score-good">预期收回 MnO 类 ~+0.33/题。</span></div>
-<div class="fix"><span class="pri p1">P1</span><strong>完成度兜底</strong>：产物齐全且预算还够时，强制走"验收 → 交卷"，并对 SDK 流中断自动重试。<span class="score-good">救回 Fe₂O₃，省 ~10 小时算力。</span></div>
-<div class="fix"><span class="pri p2">P2</span><strong>把物理纪律写进 SDK 工具代码</strong>：三条经验（起步 ecut 别拉太满、k 网格按晶轴各向异性、墙钟够用即收）目前只在老 prompt 里；DeepSeek 切到 SDK 后读不到，要"固化进代码"而不是靠提示词。</div>
-<div class="fix"><span class="pri next">下一步</span><strong>v5.1 重跑标准集 27 题</strong>：现在 v5.1 只在 M3（磁性 6 题）上比过 v4.3，需要在标准集上和 v4.2 做一次<strong>同口径干净对比</strong>，才能下"v5.1 是否全面追平/超越"的结论。</div>
-<div class="fix"><span class="pri bench">bench 侧</span><strong>和杨博敲定打分口径</strong>：加 VBM/CBM 的 k 点标签映射、复核第 5 节那 4 条口径。<span class="t-shared" style="color:#1b4f72;">利好两个版本。</span></div>
+<div class="fix"><span class="pri p1">P1</span><strong>完成度兜底</strong>：产物齐全且预算还够时，强制走"验收 → 交卷"，并对流中断自动重试。<span class="score-good">救回 Fe₂O₃，省 ~10 小时算力。</span></div>
+<div class="fix"><span class="pri p2">P2</span><strong>把物理纪律写进 SDK 工具代码</strong>：三条经验（起步 ecut 别拉太满、k 网格按晶轴各向异性、墙钟够用即收）目前只在老 prompt 里，DeepSeek 切到 SDK 后读不到——要固化进代码。</div>
+<div class="fix"><span class="pri next">下一步</span><strong>v5.1 重跑标准集 27 题</strong>：现在 v5.1 只在 M3 上比过，需要在通用标准集上和 v4.2 做一次<strong>同口径对比</strong>，才能看清新架构的全面水平。</div>
 
-<p style="margin-top:24px;"><strong>一句话收尾</strong>：v4.2 已经把"能不能做对"证明了（0.918）；v5.1 把"能不能做得更稳、更可扩展"的底盘搭好了，现在卡在几个<strong>明确、可修</strong>的工程 bug 上。修完这几个、补上标准集对比、和杨博敲定打分口径，v5.1 就能从"打平"走向稳定领先。</p>
+<p class="track-h track-43">v4.3 轨道（磁性生产线）</p>
+<div class="fix" style="border-left-color:#9c640c;background:#fdf9f2;border-color:#f0d9b5;"><span class="pri" style="background:#9c640c;">进行中</span><strong>完成更广的磁性扫描 + 金属/磁序修复</strong>：把 30 材料磁性集补齐，并把金属能带（如 Ni）、反铁磁排序的新修复落到全量重跑里。</div>
+<div class="fix" style="border-left-color:#9c640c;background:#fdf9f2;border-color:#f0d9b5;"><span class="pri" style="background:#9c640c;">收尾</span><strong>清 T1 边角</strong>：Cd 类已修（0.445 → 0.948），继续把零星失分的结构弛豫案例收掉。</div>
+
+<p class="track-h track-sh">两条线共用（bench 侧 · 和杨博）</p>
+<div class="fix"><span class="pri bench">bench 侧</span><strong>加 VBM/CBM 的 k-label 映射 + 复核打分口径</strong>：第 5 节那 4 条。<span class="t-shared" style="color:#1b4f72;">利好两个版本。</span></div>
+
+<p style="margin-top:24px;"><strong>一句话收尾</strong>：v4.2 已经把"能不能做对"证明了（0.918）；在它之上，<strong>v4.3</strong> 把磁性材料这块硬骨头啃成了能打的生产线，<strong>v5.1</strong> 把"更安全、更可维护、可扩展"的新底盘搭了起来、并已在 v4.3 主场展现出扎实的物理底子。两条线各有进展，下一步是把上面这些明确、可修的工程项收掉，并和杨博敲定打分口径。</p>
 
 <footer>
-生成于 2026-06-03 · 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
+生成于 2026-06-03 · v2 更新 2026-06-04（加入 v4.3）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
 配套详报（更细）：
 <a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构</a> ·
 <a href="solver-v42-standard27-2026-05-25.html">v4.2 标准集 27 题</a> ·
 <a href="agent-v5-1-architecture-2026-05-29.html">v5.1 架构</a> ·
-<a href="m3-solver-v4-3-vs-v5-1-t2-regression-2026-06-03.html">M3 回归归因</a> ·
+<a href="m3-solver-v4-3-vs-v5-1-t2-regression-2026-06-03.html">M3 对照 / 回归归因（含 v4.3 细节）</a> ·
 <a href="bench-side-asks-for-dft-2026-05-25.html">给 DFT 合作者的提问清单</a>
 &nbsp;|&nbsp; <a href="index.html">← 返回报告索引</a>
 </footer>
