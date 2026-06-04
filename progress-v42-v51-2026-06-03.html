@@ -105,6 +105,11 @@
   .farrow { align-self:center; color:#7f8c8d; font-weight:700; font-size:18px; }
   .fwrap { background:#f4f7fb; border:1px dashed #aed0ef; border-radius:8px; padding:6px 12px 2px; margin:8px 0; }
   .fcap { color:#7f8c8d; font-size:12px; font-style:italic; margin:2px 0 14px; }
+  .svg-wrap { text-align: center; margin: 20px 0 6px; padding: 16px; background: #fafbfc;
+              border-radius: 8px; border: 1px solid #ecf0f1; }
+  .svg-wrap svg { max-width: 100%; height: auto; }
+  .diagram-caption { text-align: center; color: #7f8c8d; font-style: italic;
+                     font-size: 13.5px; margin: 6px 0 8px; }
 
   footer { margin-top:44px; color:#7f8c8d; font-size:13px; border-top:1px solid #d5dbdb;
            padding-top:14px; }
@@ -155,18 +160,81 @@
 <h2 id="s2">2 · v4.2：通用成熟基线，标准集 27 题 0.918</h2>
 <p>v4.2 是<strong>两条轨道共同的起点</strong>，也是目前最成熟的通用版本。它把一道题拆成"<strong>规划 → 执行 → 验收</strong>"三段流水线，每段由一个大模型角色负责；验收不过就自动重试 / 重新规划。</p>
 
-<div class="flow">
-  <div class="fbox">题目<small>+ 两道开场功课</small></div>
-  <div class="farrow">→</div>
-  <div class="fbox">Planner<small>把题拆成步骤</small></div>
-  <div class="farrow">→</div>
-  <div class="fbox">Executor<small>写输入 · 跑 QE · 读输出</small></div>
-  <div class="farrow">→</div>
-  <div class="fbox">Verifier<small>逐步验收</small></div>
-  <div class="farrow">→</div>
-  <div class="fbox">结果<small>交卷打分</small></div>
+<div class="svg-wrap">
+<svg viewBox="0 0 880 540" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'PingFang SC', sans-serif" font-size="12">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#34495e"/>
+    </marker>
+  </defs>
+
+  <!-- Task prompt input -->
+  <rect x="320" y="10" width="240" height="36" rx="6" fill="#ecf0f1" stroke="#7f8c8d"/>
+  <text x="440" y="33" text-anchor="middle" fill="#2c3e50">bench 把题目（task prompt）丢过来</text>
+  <line x1="440" y1="46" x2="440" y2="68" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Phase 1 -->
+  <rect x="120" y="68" width="640" height="100" rx="8" fill="#fff8e1" stroke="#f1c40f" stroke-width="1.5"/>
+  <text x="140" y="88" font-weight="700" fill="#7d6608">开场两道功课（不靠 LLM 做，直接代码 / 子 agent 决定）</text>
+  <rect x="140" y="100" width="280" height="50" rx="6" fill="#fff" stroke="#f1c40f"/>
+  <text x="280" y="118" text-anchor="middle" font-weight="600" fill="#34495e">① 判金属 / 绝缘体</text>
+  <text x="280" y="136" text-anchor="middle" fill="#2c3e50" font-size="11">→ 定 occupations / smearing / ecutrho 系数</text>
+  <rect x="460" y="100" width="280" height="50" rx="6" fill="#fff" stroke="#f1c40f"/>
+  <text x="600" y="118" text-anchor="middle" font-weight="600" fill="#34495e">② 结构先 vc-relax 一次</text>
+  <text x="600" y="136" text-anchor="middle" fill="#2c3e50" font-size="11">（仅 T2 任务：给主流程一个松弛过的几何）</text>
+
+  <line x1="440" y1="168" x2="440" y2="195" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Phase 2 outer box -->
+  <rect x="40" y="195" width="800" height="290" rx="8" fill="#eaf2f8" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="60" y="215" font-weight="700" fill="#21618c">三个 LLM 角色接力（这一段是主循环）</text>
+
+  <!-- Planner -->
+  <rect x="320" y="225" width="240" height="50" rx="6" fill="#fff" stroke="#5dade2"/>
+  <text x="440" y="245" text-anchor="middle" font-weight="600" fill="#34495e">planner</text>
+  <text x="440" y="263" text-anchor="middle" fill="#2c3e50" font-size="11">读题，写一份分步计划（哪几步 / 谁依赖谁）</text>
+
+  <line x1="440" y1="275" x2="440" y2="298" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step dispatch -->
+  <rect x="280" y="298" width="320" height="32" rx="6" fill="#fff" stroke="#5dade2"/>
+  <text x="440" y="318" text-anchor="middle" fill="#2c3e50">按依赖关系取下一步 → 给它一个独立子目录</text>
+
+  <line x1="440" y1="330" x2="440" y2="350" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Executor -->
+  <rect x="280" y="350" width="320" height="56" rx="6" fill="#fff" stroke="#5dade2"/>
+  <text x="440" y="368" text-anchor="middle" font-weight="600" fill="#34495e">executor（每步换一个新 LLM session）</text>
+  <text x="440" y="385" text-anchor="middle" fill="#2c3e50" font-size="11">写 QE 输入 / 跑 pw.x / 看输出</text>
+  <text x="440" y="400" text-anchor="middle" fill="#c0392b" font-size="11">⚠ 每次跑 pw.x 之前，自动 lint 输入文件 + 拦截网络命令</text>
+
+  <line x1="440" y1="406" x2="440" y2="428" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Verifier -->
+  <rect x="280" y="428" width="320" height="50" rx="6" fill="#fff" stroke="#5dade2"/>
+  <text x="440" y="448" text-anchor="middle" font-weight="600" fill="#34495e">verifier</text>
+  <text x="440" y="466" text-anchor="middle" fill="#2c3e50" font-size="11">按物理验收清单查文件 → 通过 / 不通过 + 原因</text>
+
+  <!-- retry / replan loop arrows -->
+  <path d="M 600 453 Q 730 453 730 378 Q 730 295 600 295" fill="none" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="743" y="385" fill="#c0392b" font-size="11">不通过：</text>
+  <text x="743" y="400" fill="#c0392b" font-size="11">同一步 retry</text>
+  <text x="743" y="415" fill="#c0392b" font-size="11">最多 2 次</text>
+
+  <path d="M 280 453 Q 120 453 120 250 Q 120 230 320 230" fill="none" stroke="#9b59b6" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <text x="50" y="340" fill="#8e44ad" font-size="11">retry 用尽：</text>
+  <text x="50" y="355" fill="#8e44ad" font-size="11">让 planner</text>
+  <text x="50" y="370" fill="#8e44ad" font-size="11">重写计划</text>
+  <text x="50" y="385" fill="#8e44ad" font-size="11">（最多 5 次）</text>
+
+  <!-- Outputs -->
+  <line x1="440" y1="485" x2="440" y2="505" stroke="#34495e" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="280" y="505" width="320" height="32" rx="6" fill="#ecf0f1" stroke="#7f8c8d"/>
+  <text x="440" y="525" text-anchor="middle" fill="#2c3e50">交 result.json + 全过程审计记录</text>
+</svg>
 </div>
-<p class="fcap">验收失败 → 自动重试 / 重新规划。两道"开场功课"（判金属还是绝缘体、先把结构预弛豫一下）由纯代码完成，不劳烦模型。执行环节由模型操作 shell 命令，外加一层"输入自动纠错"（auto-lint）兜底。</p>
+<div class="diagram-caption">图 1 · v4.2（也是 v4.3）的整体流程：两道前置功课 + 三个 LLM 角色接力 + retry / replan 反馈环。</div>
+<p class="fcap">通俗读法：开场两道功课（判金属/绝缘体、先预弛豫）由纯代码做；之后 planner 拆步、executor 执行、verifier 验收，不通过就自动重试 / 重新规划；执行环节外还有一层"输入自动纠错"兜底。</p>
 
 <div class="concept">
 <span class="lbl">核心思想</span><h4>把 DFT 知识写成"模型绕不过的代码硬约束"</h4>
@@ -217,18 +285,71 @@
 <p class="track-h track-51">v5.1 · 全新 SDK 结构化工具底盘</p>
 <p>另一条路不再让模型自由拼 shell 命令，而是换成官方 <strong>agent SDK 的结构化工具</strong>：模型按一组<strong>带类型的"按钮"</strong>操作（写 QE 输入 / 跑 pw.x / 读输出 …），更安全、更可控、更容易加新能力、更好维护。<strong>v5.1 = 这套新底盘 + 把 v4.2 的"材料知识层"搬回来当开场功课。</strong></p>
 
-<div class="fwrap">
-<div class="flow">
-  <div class="fbox know">v4.2 知识层<small>preflight：材料知识 + 判金属/绝缘体 → 好的物理默认值</small></div>
-  <div class="farrow">→</div>
-  <div class="fbox">结构化工具<br>执行循环<small>写输入 · 跑 pw.x · 开窗读输出</small></div>
-  <div class="farrow">→</div>
-  <div class="fbox">提交前<br>物理验收 gate<small>不过就打回重做</small></div>
-  <div class="farrow">→</div>
-  <div class="fbox">结果</div>
+<div class="svg-wrap">
+<svg viewBox="0 0 880 470" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+  <!-- inputs -->
+  <rect x="18" y="20" width="150" height="44" rx="6" fill="#f5eef8" stroke="#8e44ad"/>
+  <text x="93" y="38" text-anchor="middle" fill="#6c3483">task_prompt.txt</text>
+  <text x="93" y="55" text-anchor="middle" fill="#6c3483" font-size="11">材料 / 初始晶胞 / 要交什么</text>
+  <rect x="18" y="86" width="150" height="58" rx="6" fill="#fef9e7" stroke="#d4ac0d"/>
+  <text x="93" y="106" text-anchor="middle" fill="#7d6608" font-size="11">preflight 知识层</text>
+  <text x="93" y="122" text-anchor="middle" fill="#7d6608" font-size="10">skills + config_advisor</text>
+  <text x="93" y="136" text-anchor="middle" fill="#7d6608" font-size="10">+ 经验库检索</text>
+  <!-- assemble -->
+  <rect x="210" y="48" width="150" height="66" rx="8" fill="#d6eaf8" stroke="#2980b9" stroke-width="2"/>
+  <text x="285" y="74" text-anchor="middle" fill="#1b4f72" font-weight="bold" font-size="12">assemble_user_prompt</text>
+  <text x="285" y="94" text-anchor="middle" fill="#1b4f72" font-size="10">preflight ▸ 经验 ▸ 原题</text>
+  <line x1="168" y1="42" x2="208" y2="64" stroke="#8e44ad" marker-end="url(#ah)"/>
+  <line x1="168" y1="112" x2="208" y2="92" stroke="#d4ac0d" marker-end="url(#ah)"/>
+  <!-- executor loop -->
+  <rect x="405" y="20" width="455" height="250" rx="10" fill="#fafbfc" stroke="#2980b9" stroke-dasharray="5 3"/>
+  <text x="632" y="40" text-anchor="middle" fill="#1b4f72" font-weight="bold">Driver · claude_agent_sdk.query() 主循环</text>
+  <text x="632" y="56" text-anchor="middle" fill="#7f8c8d" font-size="10">system prompt = executor.md；每轮模型调一个工具，直到 submit / max_turns</text>
+  <line x1="360" y1="81" x2="403" y2="100" stroke="#2980b9" marker-end="url(#ah)"/>
+  <text x="383" y="80" font-size="9" fill="#2980b9">user_prompt</text>
+  <!-- 7 tools -->
+  <rect x="420" y="74" width="250" height="120" rx="8" fill="#eef6fc" stroke="#5dade2"/>
+  <text x="545" y="94" text-anchor="middle" fill="#1b4f72" font-weight="bold" font-size="12">7 个结构化工具</text>
+  <text x="545" y="114" text-anchor="middle" font-size="11" fill="#2c3e50">write_qe_input · run_pw</text>
+  <text x="545" y="132" text-anchor="middle" font-size="11" fill="#2c3e50">read_qe_output（开窗）</text>
+  <text x="545" y="150" text-anchor="middle" font-size="11" fill="#2c3e50">parse_structure · verify_run</text>
+  <text x="545" y="168" text-anchor="middle" font-size="11" fill="#2c3e50">bash（逃生舱）· submit</text>
+  <text x="545" y="186" text-anchor="middle" font-size="10" fill="#7f8c8d">每个 calc 登记 calc_id</text>
+  <!-- ledger -->
+  <rect x="690" y="74" width="155" height="55" rx="8" fill="#fdebd0" stroke="#ca6f1e"/>
+  <text x="767" y="96" text-anchor="middle" fill="#9c640c" font-weight="bold" font-size="12">卡死 ledger</text>
+  <text x="767" y="114" text-anchor="middle" font-size="10" fill="#9c640c">S1–S7 → 注入提醒</text>
+  <path d="M690 101 L672 110" fill="none" stroke="#ca6f1e" stroke-dasharray="3 2" marker-end="url(#aho)"/>
+  <!-- subagent -->
+  <rect x="690" y="139" width="155" height="55" rx="8" fill="#d5f5e3" stroke="#229954"/>
+  <text x="767" y="161" text-anchor="middle" fill="#196f3d" font-weight="bold" font-size="12">收敛子 agent</text>
+  <text x="767" y="179" text-anchor="middle" font-size="10" fill="#196f3d">SCF 挂 → 甩 · ≤3 次</text>
+  <path d="M670 150 L688 158" fill="none" stroke="#229954" marker-end="url(#ahg)"/>
+  <!-- loop arrow -->
+  <path d="M545 194 Q545 230 600 230 Q660 230 660 200" fill="none" stroke="#2980b9" marker-end="url(#ah)"/>
+  <text x="600" y="248" text-anchor="middle" font-size="10" fill="#7f8c8d">工具结果回灌 → 下一轮（PostToolUse hook 记 ledger）</text>
+  <!-- gate -->
+  <rect x="300" y="330" width="280" height="58" rx="8" fill="#fadbd8" stroke="#c0392b"/>
+  <text x="440" y="354" text-anchor="middle" fill="#922b21" font-weight="bold">verifier 验收门 + 重放</text>
+  <text x="440" y="373" text-anchor="middle" font-size="11" fill="#922b21">_gate_check：力/应力/空间群… hard_fail → 重放 ≤2 次</text>
+  <line x1="632" y1="270" x2="510" y2="328" stroke="#2980b9" marker-end="url(#ah)"/>
+  <text x="592" y="305" font-size="9" fill="#2980b9">submit 后</text>
+  <path d="M300 360 Q210 360 210 210 Q210 130 360 95" fill="none" stroke="#c0392b" stroke-dasharray="4 3" marker-end="url(#ahr)"/>
+  <text x="150" y="250" font-size="10" fill="#c0392b">不过 → 带反馈重放</text>
+  <!-- result -->
+  <rect x="300" y="410" width="280" height="44" rx="8" fill="#d5f5e3" stroke="#229954"/>
+  <text x="440" y="437" text-anchor="middle" fill="#196f3d" font-weight="bold">result.json + 记录经验（已脱敏）</text>
+  <line x1="440" y1="388" x2="440" y2="408" stroke="#229954" marker-end="url(#ahg)"/>
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#2980b9"/></marker>
+    <marker id="ahg" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#229954"/></marker>
+    <marker id="aho" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#ca6f1e"/></marker>
+    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#c0392b"/></marker>
+  </defs>
+</svg>
 </div>
-</div>
-<p class="fcap">执行循环旁挂着两个"安全件"：卡死自动<strong>断路器</strong>、SCF 不收敛时交给一个<strong>专门的修复子 agent</strong>。这次还把 DeepSeek 也切到了这条 SDK 路径，并修了 4 个评审 bug（把 v5 里两处"物理验收被架空"的地方接回了线）。单元测试 167 → 336 全过。</p>
+<div class="diagram-caption">图 2 · v5.1 一道题的完整流转。紫 = 输入，黄 = 知识层，蓝 = 执行循环，橙 = 卡死断路，绿 = 子 agent / 结果，红 = 验收门。</div>
+<p class="fcap">通俗读法：知识层先给好物理默认值 → 模型在结构化工具循环里写输入 / 跑 pw.x / 开窗读输出 → 提交前物理验收门把关，不过就带反馈重放；旁挂卡死断路器 + SCF 修复子 agent。这次还把 DeepSeek 切到这条 SDK 路径，修了 4 个评审 bug，单测 167 → 336 全过。</p>
 
 <div class="note" style="background:#eef3f8; border-left-color:#3498db; font-size:13.5px;">
 <strong>怎么理解两条线</strong>：v4.2 / v4.3 是"<strong>手写循环</strong>"架构——成熟、单题质量高，但靠不断叠加修复代码维护；v5.1 是"<strong>结构化工具</strong>"架构——工程上更安全、更可维护、更易扩展，这轮在最新广集上<strong>鲁棒性已经反超</strong>（12 道零失败）。<strong>现阶段两条线各有所长、不急于判定谁取代谁</strong>：v4.3 是当前磁性生产主力，v5.1 在 de-risk。
