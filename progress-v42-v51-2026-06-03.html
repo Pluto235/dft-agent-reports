@@ -55,6 +55,7 @@
   .win { font-weight: 700; }
   .col-43 { background:#fdf6ec !important; }
   .col-51 { background:#eef4fb !important; }
+  .col-v1 { background:#f0f1f2 !important; }
 
   .tag { display:inline-block; font-weight:700; padding:1px 8px; border-radius:10px;
          font-size:11px; vertical-align:middle; }
@@ -119,12 +120,13 @@
 <body>
 
 <h1>DFT-Agent 进度汇报：v4.2 基线 · v4.3 与 v5.1 两条并行线</h1>
-<p class="dateline"><strong>进度汇报 · v3 · 2026-06-04</strong> &nbsp;v3 更新：M3 改用更广的 <strong>12 材料</strong>磁性集 + 修过的 solver，<strong>以最新批次为准</strong>（旧 6 材料对照已作废）。主线仍为"两条并行轨道、各自推进、暂不判输赢"。本文自带上下文，DFT / 工程细节从简。</p>
+<p class="dateline"><strong>进度汇报 · v4 · 2026-06-04</strong> &nbsp;v4 更新：加入 <strong>v1 baseline 对照组</strong>（裸 LLM ReAct，反映模型自身能力）；M3 仍以最新 12 材料广集为准。主线仍为"两条并行轨道、各自推进、暂不判输赢"。本文自带上下文，DFT / 工程细节从简。</p>
 
 <div class="tldr">
 <strong>一句话总览</strong>
 我们从成熟的通用版 <strong>v4.2</strong>（标准集 27 题 <strong>0.918</strong>）出发，现在<strong>并行推进两条轨道</strong>，最新一轮在更广的 12 材料磁性集上对照：
 <ul style="margin:10px 0 0;">
+<li>⚪ <strong>对照组 · v1 baseline</strong>（裸 LLM ReAct loop，反映模型自身能力）：标准集只有 <strong>0.72</strong>、磁性 7 道只有 <strong>0.31</strong>——我们的脚手架主要在难题上加分。</li>
 <li>✅ <strong>v4.2 通用基线已证明"能做对"</strong>：标准集 27 题 0.918 / 全过 / 中位数 0.991。</li>
 <li>🟠 <strong>v4.3（磁性生产线）</strong> = 把 v4.2 针对磁性材料手动特化的成熟版本；<strong>单题质量高</strong>（完成的题均分 0.807），但更大更难的氧化物体系<strong>容易超时</strong>（12 道里 4 道没跑完）。</li>
 <li>🔵 <strong>v5.1（新 SDK 架构）</strong> = 全新结构化工具底盘；修过的 solver 这轮<strong>更稳</strong>——12 道<strong>全部跑完、总分 0.648 领先</strong>，并修好了 MnO（自旋通道）；弱点 Cr 仍偏低。</li>
@@ -136,6 +138,7 @@
 <strong>给谁看</strong>：进度汇报（技术管理者视角，DFT 与 agent 细节从简）。<br>
 <strong>数据源</strong>：<code>/srv/shared/science/</code>（runs / bench / solver 共享区）；分数均直取 bench <code>report.json</code>。<br>
 <strong>口径</strong>：v4.2 标准集 batch <code>10351c77</code>（通用 27 题）。M3 以<strong>最新</strong>同模型 <code>deepseek-v4-pro</code>、<strong>12 材料磁性广集</strong>为准 —— v4.3 <code>043f10c8…</code> / v5.1 <code>8fd445fc…</code>（修过的 solver）。<strong>注意：v4.2 的 0.918 来自通用标准集，M3 是更难的磁性集——不是同一张卷子，分数不可直接横比。</strong><br>
+<strong>baseline 对照组</strong>：v1 纯 ReAct loop（deepseek-v4-pro，同模型）——标准集为 v1-stable 全量 run（覆盖 26/27），M3 为 v1 磁性 run 的重合 7 道（canonical baseline 未跑磁性集）。<br>
 <strong>配套详报</strong>（更细，非必读）：见文末链接。
 </div>
 
@@ -256,19 +259,32 @@
 <p>27 题<strong>全部通过</strong>（其中 3 题靠 bench 自动重试救回），成本仅 <strong>$1.73</strong>（约 $0.06/题）。最大的进步在 T2（能带+DOS）这类难题；唯一的小回退在 T1，因为 Cd 这一道落到了"长 c 轴"的局部最优、单题失分 0.445——<strong>这个问题后来在 v4.3 里修掉了</strong>（见 §3）。</p>
 <p class="note" style="font-size:13.5px;"><strong>诚实脚注</strong>：0.918 是 best-of（含 bench 自动重试）口径；若只算<strong>单次跑</strong>是 <strong>0.832</strong>。两个数都真实——前者是"系统整体能力"，后者是"单跑鲁棒性"。</p>
 
+<h3>对照组：纯 ReAct baseline 能拿多少分</h3>
+<p>为看清"我们的脚手架到底加了多少分"，对照一个 <strong>v1 baseline</strong>——<strong>单纯的 ReAct 循环</strong>：一个 LLM 自己想、自己跑、自己看，<strong>没有规划 / 验收 / 知识层脚手架</strong>，分数 ≈ <strong>模型自身的裸能力</strong>。同模型、同 27 题：</p>
+<table>
+<caption>对照组 · 裸 LLM baseline vs v4.2（标准 27 题，deepseek-v4-pro，best-of）</caption>
+<thead><tr><th>维度</th><th class="num col-v1">v1 baseline（裸 ReAct）</th><th class="num">v4.2</th><th class="num">脚手架增益</th></tr></thead>
+<tbody>
+<tr><td>总平均分</td><td class="num col-v1">0.72</td><td class="num score-good">0.918</td><td class="num score-good">+0.20</td></tr>
+<tr><td>T1 结构弛豫</td><td class="num col-v1">0.89</td><td class="num">0.91</td><td class="num">+0.02</td></tr>
+<tr><td>T2 能带 + DOS</td><td class="num col-v1">0.67</td><td class="num score-good">0.92</td><td class="num score-good">+0.25</td></tr>
+</tbody>
+</table>
+<p><strong>关键洞察</strong>：简单题（T1 结构弛豫）裸模型已接近满分，脚手架几乎不加分；<strong>难题（T2 能带 / DOS）才是脚手架的价值所在</strong>（+0.25）。越难的题、脚手架越关键——这正是做 v4.2 / v4.3 / v5.1 的理由。<small style="color:#7f8c8d;">（baseline 标准集为 v1-stable 全量 run，覆盖 26/27。）</small></p>
+
 <!-- ───────────────────────────── §3 ───────────────────────────── -->
 <h2 id="s3">3 · 两条路线分叉：v4.3（磁性特化）与 v5.1（SDK 新底盘）</h2>
 <p>从 v4.2 出发，我们现在<strong>并行走两条路</strong>：一条继续打磨成熟的"手写循环"架构、专门攻磁性材料这块硬骨头（<strong>v4.3</strong>）；另一条换成全新的、工程更优的结构化工具底盘（<strong>v5.1</strong>）。先用一张表看清三者的关系：</p>
 
 <table>
-<caption>表 2 · 三个版本一览（v4.2 的卷子与 v4.3/v5.1 不同，分数勿直接横比；M3 为最新 12 材料广集）</caption>
-<thead><tr><th>&nbsp;</th><th>v4.2</th><th class="col-43">v4.3</th><th class="col-51">v5.1</th></tr></thead>
+<caption>表 2 · 四版本一览（最左为 baseline 对照组；v4.2 的卷子与 v4.3/v5.1 不同，分数勿直接横比；M3 为最新 12 材料广集）</caption>
+<thead><tr><th>&nbsp;</th><th class="col-v1">v1 baseline<small>（对照组）</small></th><th>v4.2</th><th class="col-43">v4.3</th><th class="col-51">v5.1</th></tr></thead>
 <tbody>
-<tr><td><strong>是什么</strong></td><td>通用成熟基线</td><td class="col-43">v4.2 的磁性特化版</td><td class="col-51">全新 SDK 架构</td></tr>
-<tr><td><strong>架构</strong></td><td>规划→执行→验收（手写循环）</td><td class="col-43">同 v4.2（直接 fork）</td><td class="col-51">结构化工具底盘 + v4.2 知识层</td></tr>
-<tr><td><strong>工具层</strong></td><td>裸 shell + 输入自动纠错</td><td class="col-43">同 v4.2</td><td class="col-51">结构化工具（带类型的"按钮"）</td></tr>
-<tr><td><strong>主场 / 状态</strong></td><td>通用 · 生产</td><td class="col-43">磁性材料 · 生产</td><td class="col-51">磁性材料 · 打磨中</td></tr>
-<tr><td><strong>最新 M3 成绩</strong></td><td>—<small>（跑的是通用集 0.918）</small></td><td class="col-43">0.538<small>（8/12 完成）</small></td><td class="col-51 score-good">0.648<small>（12/12）</small></td></tr>
+<tr><td><strong>是什么</strong></td><td class="col-v1">裸 LLM ReAct（对照）</td><td>通用成熟基线</td><td class="col-43">v4.2 的磁性特化版</td><td class="col-51">全新 SDK 架构</td></tr>
+<tr><td><strong>架构</strong></td><td class="col-v1">单个 LLM：想→做→看 循环</td><td>规划→执行→验收（手写循环）</td><td class="col-43">同 v4.2（直接 fork）</td><td class="col-51">结构化工具底盘 + v4.2 知识层</td></tr>
+<tr><td><strong>工具层</strong></td><td class="col-v1">裸 bash / 读写文件（无脚手架）</td><td>裸 shell + 输入自动纠错</td><td class="col-43">同 v4.2</td><td class="col-51">结构化工具（带类型的"按钮"）</td></tr>
+<tr><td><strong>定位 / 状态</strong></td><td class="col-v1">对照 · 反映模型自身能力</td><td>通用 · 生产</td><td class="col-43">磁性材料 · 生产</td><td class="col-51">磁性材料 · 打磨中</td></tr>
+<tr><td><strong>代表成绩</strong></td><td class="col-v1">标准 0.72 · M3(7道) 0.31</td><td>标准集 0.918</td><td class="col-43">M3 0.538</td><td class="col-51 score-good">M3 0.648</td></tr>
 </tbody>
 </table>
 
@@ -381,6 +397,17 @@
 <strong>两条线各自的进展</strong>：v5.1 用修过的 solver <strong>把鲁棒性拉上来了</strong>——这轮 12 道零失败、总分反超，并修掉了 MnO 这类自旋 bug；v4.3 则在<strong>单题质量</strong>上仍然领先（完成的题均分更高），短板是更大的磁性体系容易超时。<strong>谁赢取决于卷子和口径，现阶段不急于判定——两条线都在往前走。</strong>
 </div>
 
+<h3>对照组：纯 ReAct baseline 在磁性材料上</h3>
+<p>canonical baseline 没跑过这版磁性集；在 baseline 覆盖的<strong>同 7 道</strong>磁性材料上（偏难的一组）三者阶梯清楚：</p>
+<table>
+<caption>对照组 · M3 重合 7 道（同模型；注意是 7 道偏难子集，与上方 12 道不同卷、分数不可直接横比）</caption>
+<thead><tr><th>&nbsp;</th><th class="num col-v1">v1 baseline</th><th class="num col-43">v4.3</th><th class="num col-51">v5.1</th></tr></thead>
+<tbody>
+<tr><td>同 7 道磁性材料均分</td><td class="num col-v1">0.31</td><td class="num col-43">0.43</td><td class="num col-51 score-good">0.51</td></tr>
+</tbody>
+</table>
+<p>裸模型在磁性材料上只有 <strong>0.31</strong>，脚手架把它抬到 <strong>0.43–0.51</strong>——磁性这种难骨头上脚手架价值更大；v5.1 在这组上也领先 v4.3，和 12 道的结论一致。</p>
+
 <p>还有一个<strong>两个版本都一样</strong>的"天花板"：真有带隙的绝缘体，其<em>能带类型 / VBM / CBM 位置</em>现在一律拿不到分。这不是某个版本的问题，而是 bench 打分口径的问题——正是下一节要找杨博敲定的。</p>
 
 <details>
@@ -455,7 +482,7 @@ v4.3 的 4 道失败：Cr_bcc / Fe₃O₄ / LaMnO₃ 墙钟超时（没产出结
 <p style="margin-top:24px;"><strong>一句话收尾</strong>：v4.2 已经把"能不能做对"证明了（0.918）；在它之上，<strong>v4.3</strong> 把磁性材料这块硬骨头啃成了单题质量很高的生产线（短板是大体系会超时），<strong>v5.1</strong> 把"更安全、更可维护、可扩展"的新底盘搭了起来、这轮还把鲁棒性做到了零失败反超。两条线各有所长、都在往前走，下一步是把上面这些明确、可修的工程项收掉，并和杨博敲定打分口径。</p>
 
 <footer>
-生成于 2026-06-03 · v3 更新 2026-06-04（M3 改用 12 材料广集 + 修过的 solver）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
+生成于 2026-06-03 · v4 更新 2026-06-04（加入 v1 baseline 对照组）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
 配套详报（更细）：
 <a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构</a> ·
 <a href="solver-v42-standard27-2026-05-25.html">v4.2 标准集 27 题</a> ·
