@@ -120,7 +120,7 @@
 <body>
 
 <h1>DFT-Agent 进度汇报：v4.2 基线 · v4.3 与 v5.1 两条并行线</h1>
-<p class="dateline"><strong>进度汇报 · v6 · 2026-06-05</strong> &nbsp;v6 更新：v5.1 换上<strong>最新批次</strong>（M3 总分 0.648 → 0.683，Cr_bcc / Fe₂O₃ 又修上来、Ni_fcc 一处回退）。主线仍为"两条并行轨道、各自推进、暂不判输赢"。本文自带上下文，DFT / 工程细节从简。</p>
+<p class="dateline"><strong>进度汇报 · v7 · 2026-06-05</strong> &nbsp;v7 更新：§5 新增 3 条待杨博确认的问题（磁矩容差 / Li₃PO₄ 的 null k-label / NiO·CoO 设计意图），§6 加知识库中期项。主线仍为"两条并行轨道、各自推进、暂不判输赢"。本文自带上下文，DFT / 工程细节从简。</p>
 
 <div class="tldr">
 <strong>一句话总览</strong>
@@ -149,7 +149,7 @@
 <li><a href="#s2">v4.2：通用成熟基线，标准集 27 题 0.918</a></li>
 <li><a href="#s3">两条路线分叉：v4.3（磁性特化）与 v5.1（SDK 新底盘）</a></li>
 <li><a href="#s4">磁性材料 M3 对决：v4.3 vs v5.1（最新 12 材料广集）</a></li>
-<li><a href="#s5">需要和 DFT 专家杨博确认的问题（核查后收敛到 2 条）</a></li>
+<li><a href="#s5">需要和 DFT 专家杨博确认的问题（核实后 4 条）</a></li>
 <li><a href="#s6">双线短期路线图（未来 1–2 周）</a></li>
 </ol>
 </nav>
@@ -435,24 +435,32 @@ v4.3 的 4 道失败：Cr_bcc / Fe₃O₄ / LaMnO₃ 墙钟超时（没产出结
 </details>
 
 <!-- ───────────────────────────── §5 ───────────────────────────── -->
-<h2 id="s5">5 · 需要和 DFT 专家杨博确认的问题（核查后收敛到 2 条）</h2>
-<p>05-25 那版列了 4 条；这次重新核过<strong>当前 bench 代码 + 实测最新分数</strong>，其中 <strong>2 条已经修掉</strong>（见本节末），真正还<strong>开放、需要杨博拍板</strong>的收敛到下面 2 条。</p>
+<h2 id="s5">5 · 需要和 DFT 专家杨博确认的问题（核实后 4 条）</h2>
+<p>上一轮把旧清单核查后<strong>收敛到 2 条</strong>（另 2 条已修，见本节末）。这一轮又<strong>核实补充了 3 条</strong>新发现的待确认问题——都对着当前 bench 代码 / GT 数据核过、并纠正了原清单的一处误记。现共 <strong>4 条</strong>。</p>
 
 <div class="qbox">
-<span class="qn">问题 1</span><strong>极值落在非高对称 k 点时，VBM / CBM 的 k-label 仍拿不到分</strong>
-<p>好消息：现在 <code>gap_type</code>、以及"极值在高对称点"的 k-label <strong>都能拿分了</strong>。<strong>残留</strong>：当价带顶 / 导带底落在<strong>非高对称 k 点</strong>（偏离能带路径上的命名点）时，匹配仍失败、丢满分。当前 scorer 实测（最新磁性集）：</p>
-<ul>
-<li><strong>MnO</strong>：vbm_k = 0 / cbm_k = 1.0 → 丢 0.10</li>
-<li><strong>NiO</strong>：vbm_k = 0 / cbm_k = 0 → 丢 0.20</li>
-<li>对照 <strong>MnF₂</strong>：vbm_k / cbm_k 都 = 1.0（极值在高对称点，能拿分）→ 说明问题只在"极值离高对称点"时</li>
-</ul>
-<p class="why">▸ <strong>给杨博的问题</strong>：对"极值不在高对称点"的绝缘体，k-label 怎么判才公平？放宽 0.05 的匹配容差，还是允许按到最近命名点的方向给部分分？<small style="color:#7f8c8d;">（标准集里 <strong>MgSiO₃ 确属同类</strong>——它的标准答案价带顶就落在 <code>(0,0,0.3)</code> 这个非命名点；而 BN_hex / CaTiO₃ / 锂辉石 的标准答案在命名点 H / Z / Y₂，不属此类。注：这几道 05-25 的旧 run 因输出格式已变、喂不进新提取器，无法干净重打验证。）</small></p>
+<span class="qn">问题 1</span><strong>VBM / CBM 的 k-label 打分有两类坑</strong>
+<p><strong>(a) 极值落在非高对称 k 点</strong>：现在 <code>gap_type</code> 和"极值在高对称点"的 k-label 都能拿分了（MnF₂ 实测 vbm/cbm 全 1.0）；但极值落在<strong>非命名点</strong>时匹配仍失败、丢满分——实测 MnO（vbm=0 / cbm=1.0，丢 0.10）、NiO（vbm+cbm=0，丢 0.20）；MgSiO₃ 的标准答案价带顶就在 <code>(0,0,0.3)</code> 非命名点。<small style="color:#7f8c8d;">（BN_hex / CaTiO₃ / 锂辉石 的 GT 在命名点 H/Z/Y₂，不属此类。）</small></p>
+<p><strong>(b) GT 本身就是 null（无解局）</strong>：<strong>Li₃PO₄</strong> 的 GT <code>vbm_k</code> / <code>cbm_k</code> = null。打分器对 null 的处理是：agent 输出任何值 → 0，输出 null <strong>也 → 0</strong>（null-vs-null 没给满分）。所以这 0.2 权重<strong>怎么都拿不到</strong>。<small style="color:#7f8c8d;">（全集里只有 Li₃PO₄ 是 k-label 全 null；原清单里的 LiCoPO₄ 其实 GT 是 "S" / 坐标、可正常打分，不在此列。）</small></p>
+<p class="why">▸ <strong>给杨博的问题</strong>：(a) 非命名点的极值，放宽 0.05 容差、还是按到最近命名点的方向给部分分？(b) GT 为 null 时，null-vs-null 该给满分、还是把该字段权重置零？现在是无解局。</p>
 </div>
 
 <div class="qbox">
 <span class="qn">问题 2</span><strong>绝缘体的 dos_e_fermi 参考系 + DOS 曲线打分</strong>
-<p>绝缘体的 <code>dos_e_fermi</code> 现在仍是把<strong>价带顶绝对能量</strong>按 ±0.1 eV 绝对容差比——BN_hex 有稳定 0.36 eV 的系统偏移（不是抖动）直接判 0；实测最新磁性集 MnO / MnF₂ 的 <code>dos_e_fermi</code> 也都 = 0。另外 DOS 曲线用面积重叠 F1 打分，对"形状对、协议略偏"太宽容（实测 dos_curve 普遍只 0.2–0.4）。</p>
+<p>绝缘体的 <code>dos_e_fermi</code> 现在仍是把<strong>价带顶绝对能量</strong>按 ±0.1 eV 绝对容差比——BN_hex 有稳定 0.36 eV 的系统偏移（不是抖动）直接判 0；实测最新磁性集 MnO / MnF₂ 的 <code>dos_e_fermi</code> 也都 = 0。另外 DOS 曲线用面积重叠 F1 打分，对"形状对、协议略偏"太宽容（实测 dos_curve 普遍只 0.2–0.5）。</p>
 <p class="why">▸ <strong>给杨博的问题</strong>：① 绝缘体的费米能 / 价带顶该用什么参考系比（绝对 vs 相对、或跳过绝对 VBM）？② DOS 曲线该不该换更严的形状度量（KL 散度 / 归一化互相关）？</p>
+</div>
+
+<div class="qbox">
+<span class="qn">问题 3</span><strong>磁矩字段的容差：绝对 0.5 µB 合理吗？</strong>
+<p>T1 的 <code>total_magnetization</code> 和 <code>absolute_magnetization</code> 现在用<strong>绝对容差 0.5 µB</strong>（误差 ≤0.5 满分，0.5→1.0 线性递减，&gt;1.0 为 0），而且两者<strong>合计占 T1 权重 0.35</strong>（单项最大头）。绝对 0.5 对<strong>大磁矩</strong>材料偏松（NiO ~6 µB → 仅 ~8% 相对误差），对<strong>小磁矩</strong>材料极松（~1 µB → 50% 相对）。</p>
+<p class="why">▸ <strong>给杨博的问题</strong>：0.5 µB 绝对容差合理吗？换成<strong>相对容差</strong>（随磁矩大小缩放）是否更公平、更有区分度？</p>
+</div>
+
+<div class="qbox">
+<span class="qn">问题 4</span><strong>NiO / CoO 这类强关联体系：PBE-金属 vs Mott-绝缘体（设计意图需说清）</strong>
+<p>bench 的 GT 是 <strong>PBE + nspin=2、不加 +U</strong>，所以 NiO（GT 带隙 0.001 eV = metal）、CoO（0.003 eV）在 GT 里<strong>是金属</strong>；但物理上它们是 Mott 绝缘体（带隙 ~4 eV）。这<strong>不是 bug</strong>——bench 测的是"<strong>能否复现 PBE+nspin=2 的计算</strong>"，不是"能否给物理正确答案"，两者在这类体系上是矛盾的。</p>
+<p class="why">▸ <strong>给杨博的问题</strong>：确认 bench 的口径就是"复现 PBE 计算"（NiO = metal 的 GT 是 by design 正确）？若是，建议在文档里写明，并界定它对 solver 的指导意义——solver 在这类体系上拿不到"物理对错"的信号。</p>
 </div>
 
 <div class="note" style="background:#eef7ee; border-left-color:#1d8348; font-size:13.5px;">
@@ -474,12 +482,15 @@ v4.3 的 4 道失败：Cr_bcc / Fe₃O₄ / LaMnO₃ 墙钟超时（没产出结
 <div class="fix" style="border-left-color:#9c640c;background:#fdf9f2;border-color:#f0d9b5;"><span class="pri" style="background:#9c640c;">收尾</span><strong>清 T1 边角</strong>：Cd 类已修（0.445 → 0.948），继续把零星失分的结构弛豫案例收掉。</div>
 
 <p class="track-h track-sh">两条线共用（bench 侧 · 和杨博）</p>
-<div class="fix"><span class="pri bench">bench 侧</span><strong>复核第 5 节剩下的 2 条打分口径</strong>：离路径极值的 k-label、绝缘体 dos_e_fermi 参考系。<span class="t-shared" style="color:#1b4f72;">利好两个版本。</span></div>
+<div class="fix"><span class="pri bench">bench 侧</span><strong>复核第 5 节那几条打分口径</strong>：k-label（含 Li₃PO₄ 的 null 无解局）、dos_e_fermi 参考系、磁矩容差、NiO/CoO 的设计意图。<span class="t-shared" style="color:#1b4f72;">利好两个版本。</span></div>
+
+<p class="track-h track-sh">中期 · 知识架构</p>
+<div class="fix" style="border-left-color:#8e44ad;background:#f8f4fb;border-color:#d7bde2;"><span class="pri p2">中期</span><strong>加知识库 / RAG（第 8 个 MCP 工具 <code>search_docs</code>）</strong>：现已有"经验库"（按材料检索过去成功 run 的参数 ecut/kpts 等、注入"过去相似 run"提示块），但没有文档检索工具（7 个工具无第 8 个）。加 <code>search_docs</code> 让模型按需提取领域知识——对当前 bench 任务影响不大，但对长远的复杂<strong>非 bench 任务</strong>有用。<small style="color:#7f8c8d;">（知识内容可请杨博把关。）</small></div>
 
 <p style="margin-top:24px;"><strong>一句话收尾</strong>：v4.2 已经把"能不能做对"证明了（0.918）；在它之上，<strong>v4.3</strong> 把磁性材料这块硬骨头啃成了单题质量很高的生产线（短板是大体系会超时），<strong>v5.1</strong> 把"更安全、更可维护、可扩展"的新底盘搭了起来、这轮还把鲁棒性做到了零失败反超。两条线各有所长、都在往前走，下一步是把上面这些明确、可修的工程项收掉，并和杨博敲定打分口径。</p>
 
 <footer>
-生成于 2026-06-03 · v6 更新 2026-06-05（v5.1 换最新批次，M3 总分 0.683）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
+生成于 2026-06-03 · v7 更新 2026-06-05（§5 增至 4 条待确认问题 + 知识库路线图）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
 配套详报（更细）：
 <a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构</a> ·
 <a href="solver-v42-standard27-2026-05-25.html">v4.2 标准集 27 题</a> ·
