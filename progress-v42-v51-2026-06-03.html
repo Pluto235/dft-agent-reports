@@ -120,7 +120,7 @@
 <body>
 
 <h1>DFT-Agent 进度汇报：v4.2 基线 · v4.3 与 v5.1 两条并行线</h1>
-<p class="dateline"><strong>进度汇报 · v7 · 2026-06-05</strong> &nbsp;v7 更新：§5 新增 3 条待杨博确认的问题（磁矩容差 / Li₃PO₄ 的 null k-label / NiO·CoO 设计意图），§6 加知识库中期项。主线仍为"两条并行轨道、各自推进、暂不判输赢"。本文自带上下文，DFT / 工程细节从简。</p>
+<p class="dateline"><strong>进度汇报 · v8 · 2026-06-06</strong> &nbsp;v8 更新：修正 Ni_fcc 的机理描述（FM 金属能带的<strong>自旋通道</strong>问题，非采样抖动）；标注 v5.1 正在做确定性"自旋通道挑选"（开发中）+ 点名已并入 0.683 的磁性恢复层。主线仍为"两条并行轨道、各自推进、暂不判输赢"。本文自带上下文，DFT / 工程细节从简。</p>
 
 <div class="tldr">
 <strong>一句话总览</strong>
@@ -129,7 +129,7 @@
 <li>⚪ <strong>对照组 · v1 baseline</strong>（裸 LLM ReAct loop，反映模型自身能力）：标准集只有 <strong>0.72</strong>、磁性 7 道只有 <strong>0.31</strong>——我们的脚手架主要在难题上加分。</li>
 <li>✅ <strong>v4.2 通用基线已证明"能做对"</strong>：标准集 27 题 0.918 / 全过 / 中位数 0.991。</li>
 <li>🟠 <strong>v4.3（磁性生产线）</strong> = 把 v4.2 针对磁性材料手动特化的成熟版本；<strong>单题质量高</strong>（完成的题均分 0.807），但更大更难的氧化物体系<strong>容易超时</strong>（12 道里 4 道没跑完）。</li>
-<li>🔵 <strong>v5.1（新 SDK 架构）</strong> = 全新结构化工具底盘；修过的 solver 这轮<strong>更稳</strong>——12 道<strong>全部跑完、总分 0.683 领先</strong>（又比上轮高一点），Cr_bcc 文件抓错和 Fe₂O₃ 弛豫都修上来了；新冒出 Ni_fcc 金属一处回退（下一步修）。</li>
+<li>🔵 <strong>v5.1（新 SDK 架构）</strong> = 全新结构化工具底盘；修过的 solver 这轮<strong>更稳</strong>——12 道<strong>全部跑完、总分 0.683 领先</strong>（又比上轮高一点），Cr_bcc 文件抓错和 Fe₂O₃ 弛豫都修上来了；新冒出 Ni_fcc 金属一处回退（能带自旋通道问题，正做确定性兜底）。</li>
 </ul>
 <strong>两条线各有所长（v5.1 更稳更全 / v4.3 单题更高），都在迭代，暂不判定谁取代谁。</strong>
 </div>
@@ -299,7 +299,7 @@
 <p class="fcap">一句话：v4.3 = 把成熟的 v4.2 针对"磁性材料"这块硬骨头手动打磨过的<strong>生产版本</strong>；相对 v4.2 多了约 5500 行磁性 / 金属 / 墙钟相关的修复代码。</p>
 
 <p class="track-h track-51">v5.1 · 全新 SDK 结构化工具底盘</p>
-<p>另一条路不再让模型自由拼 shell 命令，而是换成官方 <strong>agent SDK 的结构化工具</strong>：模型按一组<strong>带类型的"按钮"</strong>操作（写 QE 输入 / 跑 pw.x / 读输出 …），更安全、更可控、更容易加新能力、更好维护。<strong>v5.1 = 这套新底盘 + 把 v4.2 的"材料知识层"搬回来当开场功课。</strong></p>
+<p>另一条路不再让模型自由拼 shell 命令，而是换成官方 <strong>agent SDK 的结构化工具</strong>：模型按一组<strong>带类型的"按钮"</strong>操作（写 QE 输入 / 跑 pw.x / 读输出 …），更安全、更可控、更容易加新能力、更好维护。<strong>v5.1 = 这套新底盘 + 把 v4.2 的"材料知识层"搬回来当开场功课。</strong>最新一版还把 v4.3 的<strong>磁性处理层</strong>搬了回来（反铁磁原子标记归一、nspin=2 总态密度求和、起步磁矩自动播种——已并入上面 0.683 这批结果），并在补 v5.1 自己的<strong>金属能带保证</strong>（自旋通道挑选，开发中，见 §6）。</p>
 
 <div class="svg-wrap">
 <svg viewBox="0 0 880 470" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
@@ -390,11 +390,11 @@
 <ul>
 <li><strong>v5.1 这轮更稳、总分领先</strong>：12 道<strong>全部跑完</strong>，总分 <strong>0.683</strong>（比上一轮 0.648 又高了一点）。修过的 solver 又修掉两处：<strong>Cr_bcc 的文件抓错</strong>（0.13 → 0.53）和 <strong>Fe₂O₃ 的结构弛豫</strong>（0.43 → 1.0）；几个氧化物也很强（Fe₃O₄ 0.96、MnO 0.75）。</li>
 <li><strong>v4.3 单题质量更高、但更难的体系会超时</strong>：两家都完成的 8 道里 v4.3 反而略高（0.807 vs 0.734）——它<strong>跑完时答得更准</strong>；但 12 道里有 <strong>4 道没跑完</strong>（3 道大氧化物墙钟超时 + 1 道 QE 步骤未收尾），失败按 0 拉低了总分。</li>
-<li><strong>新冒出一处回退</strong>：<strong>Ni_fcc 这道金属从 0.79 掉到 0.077</strong>——窄 d 带金属被误判成有小带隙（这是两版都有的老毛病，这轮 v5.1 踩到了），下一步要修。</li>
+<li><strong>新冒出一处回退</strong>：<strong>Ni_fcc 这道金属从 0.79 掉到 0.077</strong>——FM 金属若提交的是<strong>多数自旋</strong>能带，费米面附近会留个假"缝"被判成半导体（两版的老毛病，本质是"抽中哪个自旋通道"，这轮 v5.1 踩到了）；正在做确定性的自旋通道挑选兜底（见 §6 · 开发中）。</li>
 </ul>
 
 <div class="good">
-<strong>两条线各自的进展</strong>：v5.1 用修过的 solver <strong>持续往上走</strong>——这轮 12 道零失败、总分 0.683 反超，又修掉 Cr_bcc 文件抓错、Fe₂O₃ 弛豫两处（代价是 Ni_fcc 金属冒了个回退，下一步修）；v4.3 则在<strong>单题质量</strong>上仍然领先（完成的题均分更高），短板是更大的磁性体系容易超时。<strong>谁赢取决于卷子和口径，现阶段不急于判定——两条线都在往前走。</strong>
+<strong>两条线各自的进展</strong>：v5.1 用修过的 solver <strong>持续往上走</strong>——这轮 12 道零失败、总分 0.683 反超，又修掉 Cr_bcc 文件抓错、Fe₂O₃ 弛豫两处（代价是 Ni_fcc 金属冒了个回退，正做确定性自旋通道兜底）；v4.3 则在<strong>单题质量</strong>上仍然领先（完成的题均分更高），短板是更大的磁性体系容易超时。<strong>谁赢取决于卷子和口径，现阶段不急于判定——两条线都在往前走。</strong>
 </div>
 
 <h3>对照组：纯 ReAct baseline 在磁性材料上</h3>
@@ -472,7 +472,7 @@ v4.3 的 4 道失败：Cr_bcc / Fe₃O₄ / LaMnO₃ 墙钟超时（没产出结
 <p>两条轨道各自推进，外加一块共用的 bench 侧改进：</p>
 
 <p class="track-h track-51">v5.1 轨道（新架构 de-risk）</p>
-<div class="fix"><span class="pri">P0</span><strong>Ni_fcc 窄 d 带金属被误判成有带隙</strong>：这轮从 0.79 掉到 0.077——Ni 的窄 d 带正压在费米面，稍有采样 / 展宽偏差就"看出"一个假带隙。要让金属判定在这类窄带金属上更稳。</div>
+<div class="fix"><span class="pri">P0</span><strong>FM 金属的能带自旋通道：Ni_fcc 被误判成半导体（0.077）</strong>：bench 按提交的 bands.dat 在费米面切 gap_type，而 bands.x 默认只导出<strong>多数自旋</strong>——FM 金属的多数 d 带被交换劈裂压到费米面下，只剩 s 带穿越，留个 &gt;10 meV 的假"缝"被判成半导体（band_gap / gap_type / vbm / cbm 全清零）；真正的费米面在<strong>少数自旋</strong> d 带里。本质是"提交了哪个自旋通道"的彩票（deepseek 两次跑分 0.077 / 0.92 全看这个），不是采样抖动。<strong>正在做确定性的"自旋通道挑选"</strong>——多数通道有假缝，就用 bands.x 重抽少数通道替换 bands.dat（取代 v4.3 的整条 k 路加密——搬到 v5.1 的 GPU 环境后太慢）。<span style="color:#9c640c;">开发中：原密度 NSCF 重跑目前在 GPU 上仍会超时，尚未落地。</span></div>
 <div class="fix"><span class="pri done">已修</span><strong>MnO 自旋通道 + Cr_bcc 文件抓错</strong>：这轮 solver 把 MnO（0.17 → 0.75）和 Cr_bcc（0.13 → 0.53）都修上来了。<span style="color:#7f8c8d;">（留作进度参照）</span></div>
 <div class="fix"><span class="pri p2">P2</span><strong>把物理纪律写进 SDK 工具代码</strong>：三条经验（起步 ecut 别拉太满、k 网格按晶轴各向异性、墙钟够用即收）目前只在老 prompt 里，DeepSeek 切到 SDK 后读不到——要固化进代码。</div>
 <div class="fix"><span class="pri next">下一步</span><strong>v5.1 重跑通用标准集 27 题</strong>：现在 v5.1 只在磁性集比过，需要在通用标准集上和 v4.2 做一次<strong>同口径对比</strong>，才能看清新架构的全面水平。</div>
@@ -490,7 +490,7 @@ v4.3 的 4 道失败：Cr_bcc / Fe₃O₄ / LaMnO₃ 墙钟超时（没产出结
 <p style="margin-top:24px;"><strong>一句话收尾</strong>：v4.2 已经把"能不能做对"证明了（0.918）；在它之上，<strong>v4.3</strong> 把磁性材料这块硬骨头啃成了单题质量很高的生产线（短板是大体系会超时），<strong>v5.1</strong> 把"更安全、更可维护、可扩展"的新底盘搭了起来、这轮还把鲁棒性做到了零失败反超。两条线各有所长、都在往前走，下一步是把上面这些明确、可修的工程项收掉，并和杨博敲定打分口径。</p>
 
 <footer>
-生成于 2026-06-03 · v7 更新 2026-06-05（§5 增至 4 条待确认问题 + 知识库路线图）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
+生成于 2026-06-03 · v8 更新 2026-06-06（修正 Ni_fcc 自旋通道机理 + 标注 v5.1 自旋挑选开发中）· 数据源 <code style="background:none;color:#7f8c8d;padding:0;">/srv/shared/science/</code> · 同模型 deepseek-v4-pro · 分数直取 report.json · self-contained，无外部依赖。<br>
 配套详报（更细）：
 <a href="agent-v4-2-architecture-for-dft-review-2026-05-18.html">v4.2 架构</a> ·
 <a href="solver-v42-standard27-2026-05-25.html">v4.2 标准集 27 题</a> ·
