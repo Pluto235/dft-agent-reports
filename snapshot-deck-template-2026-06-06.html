@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DFT-AGENT 收尾快照 · TEMPLATE · 2026-06-06</title>
+<!--
+  TEMPLATE / DRAFT — 终端风收尾快照 deck. 数据为占位+现有 runs_local 重取(冻结-HEAD 优先,每格标 build).
+  主表走 scaffold:不放可横比头条总分;待补格留空待 P1 跑批回填.
+  数据再生:python3 /tmp/extract_snapshot.py  (扫 /srv/.../web/runs_local → /tmp/snapshot_data.json)
+  设计草案:/home/shijie/work/specs/2026-06-06-final-snapshot-bench-design.md
+  未发布:不动 reports/index.html.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070a07; --bg2:#0b0f0b; --panel:#0e130e;
+  --grn:#5cff8f; --grn-soft:#9fe6b0; --grn-dim:#3a7d52; --grn-deep:#1d3a28;
+  --amber:#ffc04d; --amber-dim:#8a6a1f;
+  --red:#ff6b5e; --cyan:#62d4d4; --grey:#5d6e5d; --ink:#b6d6bd;
+  --line:#1c2a1c; --glow:0 0 6px rgba(92,255,143,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:16px; line-height:1.5; overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+/* ---- CRT atmosphere ---- */
+.crt::before{ /* scanlines */
+  content:""; position:fixed; inset:0; z-index:60; pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.22) 2px 3px);
+  mix-blend-mode:multiply; opacity:.55;
+}
+.crt::after{ /* vignette + grain */
+  content:""; position:fixed; inset:0; z-index:61; pointer-events:none;
+  background:
+    radial-gradient(120% 120% at 50% 50%, rgba(0,0,0,0) 58%, rgba(0,0,0,.55) 100%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/></svg>");
+}
+@keyframes flick{0%,97%{opacity:1}98%{opacity:.93}99%{opacity:.98}100%{opacity:1}}
+.deck{animation:flick 7s infinite}
+
+/* ---- slides ---- */
+.deck{position:fixed; inset:0}
+.slide{
+  position:absolute; inset:0; display:none;
+  padding:44px clamp(28px,5vw,90px) 70px;
+  flex-direction:column; opacity:0;
+}
+.slide.on{display:flex; opacity:1; animation:boot .5s ease both}
+@keyframes boot{from{opacity:0; transform:translateY(8px) scale(.997)}to{opacity:1;transform:none}}
+.slide.on .rise{animation:rise .5s ease both}
+.slide.on .rise:nth-child(1){animation-delay:.04s}
+.slide.on .rise:nth-child(2){animation-delay:.10s}
+.slide.on .rise:nth-child(3){animation-delay:.16s}
+.slide.on .rise:nth-child(4){animation-delay:.22s}
+.slide.on .rise:nth-child(5){animation-delay:.28s}
+.slide.on .rise:nth-child(6){animation-delay:.34s}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* ---- prompt + header ---- */
+.prompt{color:var(--grn-dim); font-size:13px; letter-spacing:.5px; margin-bottom:18px}
+.prompt b{color:var(--grn); font-weight:500}
+.prompt .path{color:var(--cyan)}
+h1.title{
+  font-family:"VT323",monospace; font-weight:400; line-height:.92;
+  font-size:clamp(46px,8vw,104px); color:var(--grn); text-shadow:var(--glow);
+  letter-spacing:1px;
+}
+h2{
+  font-family:"VT323",monospace; font-weight:400; color:var(--grn);
+  font-size:clamp(30px,4.4vw,52px); line-height:1; text-shadow:var(--glow);
+  margin-bottom:6px; letter-spacing:.5px;
+}
+h2 .hash{color:var(--grn-dim)}
+.sub{color:var(--grn-soft); font-size:15px}
+.lead{color:var(--ink); max-width:74ch; font-size:15.5px}
+.lead b{color:var(--grn-soft); font-weight:500}
+.dim{color:var(--grey)}
+.amber{color:var(--amber)} .red{color:var(--red)} .grn{color:var(--grn)} .cyan{color:var(--cyan)}
+b{font-weight:600}
+.box{
+  border:1px solid var(--line); background:var(--panel);
+  padding:16px 20px; position:relative;
+}
+.box::before{content:"┌";position:absolute;top:-1px;left:-1px;color:var(--grn-dim);font-size:13px;line-height:1}
+.box::after{content:"┘";position:absolute;bottom:-7px;right:-1px;color:var(--grn-dim);font-size:13px;line-height:1}
+.cap{color:var(--grn-dim);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
+.cur{display:inline-block;width:9px;height:1.05em;background:var(--grn);vertical-align:-2px;margin-left:3px;box-shadow:var(--glow);animation:blink 1.05s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+ul.tk{list-style:none} ul.tk li{padding-left:20px;position:relative;margin:5px 0}
+ul.tk li::before{content:"▸";position:absolute;left:0;color:var(--grn-dim)}
+
+/* ---- tables ---- */
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+th{color:var(--grn-dim);font-weight:500;text-transform:uppercase;font-size:11.5px;letter-spacing:.8px;background:#0c110c}
+td.v{font-variant-numeric:tabular-nums;text-align:center;white-space:nowrap}
+.mat{color:var(--grn-soft)}
+tr:hover td{background:rgba(92,255,143,.03)}
+.tag{font-size:10px;opacity:.7;margin-left:3px}
+.fz{color:var(--grn)} .st{color:var(--amber)} .none{color:var(--grey)}
+
+/* status matrix */
+.matrix{display:grid;grid-template-columns:120px repeat(3,1fr);gap:7px;font-size:13px}
+.matrix .hd{color:var(--grn-dim);font-size:12px;text-transform:uppercase;letter-spacing:1px;padding:4px 2px;align-self:end}
+.matrix .rh{color:var(--grn-soft);align-self:center;font-size:13px}
+.cellbox{border:1px solid var(--line);padding:8px 10px;background:var(--panel);min-height:54px}
+.cellbox.full{border-color:var(--grn-deep)} .cellbox.full .bar i{background:var(--grn)}
+.cellbox.part{border-color:var(--amber-dim)} .cellbox.part .bar i{background:var(--amber)}
+.cellbox.empty{border-color:#2a1414;background:#0c0908} .cellbox.empty .bar i{background:var(--red)}
+.bar{display:flex;gap:2px;margin:5px 0 4px}
+.bar span{flex:1;height:8px;background:#16201a;border:1px solid #1c2a1c}
+.bar span.f{background:currentColor}
+.cnt{font-variant-numeric:tabular-nums;font-size:12px}
+.bld{font-size:10.5px;letter-spacing:.5px}
+
+/* gap slide tiers */
+.tier{border:1px solid var(--line);border-left-width:3px;padding:12px 16px;margin:10px 0;background:var(--panel)}
+.tier.p1{border-left-color:var(--red)} .tier.p2{border-left-color:var(--amber)} .tier.p3{border-left-color:var(--cyan)}
+.tier h4{font-family:"IBM Plex Mono";font-weight:600;font-size:14px;margin-bottom:4px;display:flex;justify-content:space-between}
+.pill{font-size:11px;border:1px solid var(--line);padding:1px 8px;border-radius:2px;color:var(--grn-soft)}
+.kbd{border:1px solid var(--grn-dim);border-radius:3px;padding:0 6px;color:var(--grn-soft);font-size:12px}
+
+/* status bar */
+.statusbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;height:30px;
+  display:flex;align-items:center;gap:0;background:#0b120b;border-top:1px solid var(--line);
+  font-size:12px;color:var(--grn-dim);
+}
+.statusbar .seg{padding:0 14px;height:100%;display:flex;align-items:center;border-right:1px solid var(--line)}
+.statusbar .mode{background:var(--grn-deep);color:var(--grn)}
+.statusbar .spacer{flex:1;border:none}
+.statusbar .seg.r{border-right:none;border-left:1px solid var(--line)}
+.legend{font-size:11px;color:var(--grey)}
+.legend b{color:var(--grn)} .legend .a{color:var(--amber)} .legend .x{color:var(--red)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grow{flex:1;min-height:0;overflow:auto;margin-top:14px}
+.grow::-webkit-scrollbar{width:8px}.grow::-webkit-scrollbar-thumb{background:var(--grn-deep)}
+small{font-size:12px;color:var(--grey)}
+.hl{background:rgba(255,192,77,.10);padding:0 3px}
+</style>
+</head>
+<body class="crt">
+<div class="deck" id="deck">
+
+<!-- ╔═ 1 · COVER ═╗ -->
+<section class="slide">
+  <div class="prompt rise">shijie@dft-bench:<span class="path">~/srv/shared/science</span>$ <b>./present</b> snapshot.deck <span class="dim">--frozen --no-verdict</span></div>
+  <div class="rise" style="margin-top:6vh">
+    <div class="dim" style="font-size:13px;letter-spacing:3px">DFT-AGENT BENCH ▸ 收尾快照 ▸ TEMPLATE</div>
+    <h1 class="title" style="margin-top:10px">三版同卷<br>快照 &amp; 交接</h1>
+  </div>
+  <div class="rise" style="margin-top:26px;max-width:78ch">
+    <div class="lead"><b>v4.2 · v4.3 · v5.1</b> 在 <b>M1/M2/M3 × T1/T2</b> 上的一张图。<span class="dim">不判输赢——记录三条线各自的位置、所长、已知坑，给合作者收尾。</span></div>
+  </div>
+  <div class="rise three" style="margin-top:30px;max-width:920px">
+    <div class="box"><div class="cap">v4.2 · 通用基线</div>冻结 <b class="grn">f3a0770</b><br><small>手写循环 · 标准集成熟</small></div>
+    <div class="box"><div class="cap">v4.3 · 磁性特化</div>冻结 <b class="grn">5ee960d</b><br><small>v4.2 fork · 单题质量高</small></div>
+    <div class="box"><div class="cap">v5.1 · SDK 新底盘</div>冻结 <b class="grn">ee050a2</b><br><small>结构化工具 · 鲁棒性反超</small></div>
+  </div>
+  <div class="rise" style="margin-top:auto">
+    <small>口径 · 同模型 deepseek-v4-pro · 分数直取 report.json · 失败=0 · 数据 = runs_local 冻结-HEAD 优先(每格标 build) · 2026-06-06<span class="cur"></span></small>
+  </div>
+</section>
+
+<!-- ═ 2 · BACKGROUND ═ -->
+<section class="slide">
+  <div class="prompt rise">$ <b>man</b> dft-agent <span class="dim"># 30 秒背景</span></div>
+  <h2 class="rise"><span class="hash">## </span>我们在做什么</h2>
+  <div class="rise lead" style="margin-top:14px">让大模型 <b>自动跑 DFT 计算</b>：给一道题（某材料 + 要算什么），agent 自己写 Quantum ESPRESSO 输入 → 跑 pw.x → 读输出 → 自检 → 交卷。有一个独立 bench <b>自动打分 0–1</b>，对照标准答案算每个物理量对不对。所以"强不强"是可量化、可对比的分数。</div>
+  <div class="rise two" style="margin-top:20px">
+    <div class="box"><div class="cap">任务类型</div>
+      <ul class="tk">
+        <li><b class="grn">T1</b> = vc_relax · 结构弛豫</li>
+        <li><b class="grn">T2</b> = bands_dos · 能带 + 态密度</li>
+      </ul></div>
+    <div class="box"><div class="cap">里程碑(难度阶梯)</div>
+      <ul class="tk">
+        <li><b class="grn">M1</b> 元素 / 简单二元（~60/型）</li>
+        <li><b class="grn">M2</b> 复杂氧化物（28/型）</li>
+        <li><b class="grn">M3</b> 磁性材料（15/型，自旋极化）</li>
+      </ul></div>
+  </div>
+  <div class="rise box" style="margin-top:18px">
+    <div class="cap">这份 deck 的边界</div>
+    <span class="lead">快照 = 三版在 <b>同一张 ~43 题共同卷</b>上的成绩。当前 <b class="amber">实验未跑全</b>，主表是 scaffold：已有数据已填、<b class="amber">待补</b>格留空——最后一页专门列"下一步补哪些实验"。</span>
+  </div>
+</section>
+
+<!-- ═ 3 · POSITIONING ═ -->
+<section class="slide">
+  <div class="prompt rise">$ <b>diff</b> --versions v4.2 v4.3 v5.1</div>
+  <h2 class="rise"><span class="hash">## </span>三条线的关系</h2>
+  <div class="rise grow">
+  <table>
+    <tr><th style="width:130px"></th><th>v4.2 · 通用基线</th><th>v4.3 · 磁性特化</th><th>v5.1 · SDK 新底盘</th></tr>
+    <tr><td class="dim">是什么</td><td>通用成熟基线（两线起点）</td><td>v4.2 直接 fork，磁性/金属特化</td><td>全新结构化工具底盘 + v4.2 知识层</td></tr>
+    <tr><td class="dim">架构</td><td>规划→执行→验收（手写循环）</td><td>同 v4.2</td><td>SDK 主循环 + 7 结构化工具 + 卡死 ledger</td></tr>
+    <tr><td class="dim">工具层</td><td>裸 shell + 输入自动纠错</td><td>同 v4.2 + 磁序探针 / 金属能带保证</td><td>带类型的"按钮"（write/run/read/verify…）</td></tr>
+    <tr><td class="dim">定位</td><td class="grn">通用 · 生产</td><td class="grn">磁性材料 · 生产主力</td><td class="cyan">磁性 · 打磨中（鲁棒性已反超）</td></tr>
+    <tr><td class="dim">冻结点</td><td class="v"><b class="grn">f3a0770</b></td><td class="v"><b class="grn">5ee960d</b></td><td class="v"><b class="grn">ee050a2</b></td></tr>
+    <tr><td class="dim">金属能带兜底</td><td class="v">有</td><td class="v grn">有(FIX-45)</td><td class="v amber">开发中·未提交</td></tr>
+  </table>
+  </div>
+  <div class="rise box" style="margin-top:14px">
+    <div class="cap">⚠ 已往口径（不同卷子，<u>不可直接横比</u>，故本 deck 不放为头条）</div>
+    <span class="lead dim">v4.2 标准27 <b>0.918</b>(best-of) · v4.3 M3-12磁性 <b>0.538</b>(8/12) · v5.1 M3-12磁性 <b>0.683</b>(12/12)。三个数来自三张<b class="amber">不同的卷子</b>——这正是要补"同卷"的原因。</span>
+  </div>
+</section>
+
+<!-- ═ 4 · ★ SCAFFOLD STATUS MATRIX ═ -->
+<section class="slide">
+  <div class="prompt rise">$ <b>status</b> --grid common-set/43 <span class="dim"># 主表 · 已测 vs 待补</span></div>
+  <h2 class="rise"><span class="hash">## </span>★ 同卷主表 · scaffold</h2>
+  <div class="rise sub" style="margin-bottom:14px">每格 = 该里程碑×类型里，共同卷任务的 <b>覆盖度 [已测/共]</b> + build 状态。<span class="grn">绿=已测@冻结</span> · <span class="amber">黄=有数据但旧 build</span> · <span class="red">红=待补</span>。<u>不出可横比总分</u>。</div>
+  <div class="rise matrix grow" style="flex:none">
+    <div></div><div class="hd">v4.2 · f3a0770</div><div class="hd">v4.3 · 5ee960d</div><div class="hd">v5.1 · ee050a2</div>
+
+    <div class="rh">M1_T1 弛豫</div>
+    <div class="cellbox full"><div class="cnt grn">4/4</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span></div><div class="bld fz">✓ ce80(≡冻结)</div></div>
+    <div class="cellbox empty"><div class="cnt red">0/4</div><div class="bar"><span></span><span></span><span></span><span></span></div><div class="bld none">✗ 待补</div></div>
+    <div class="cellbox part"><div class="cnt amber">4/4</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span></div><div class="bld st">~ ac19(旧)</div></div>
+
+    <div class="rh">M1_T2 能带</div>
+    <div class="cellbox full"><div class="cnt grn">14/14</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span></div><div class="bld fz">✓ ce80(≡冻结)</div></div>
+    <div class="cellbox empty"><div class="cnt red">0/14</div><div class="bar"><span></span><span></span><span></span><span></span><span></span></div><div class="bld none">✗ 待补</div></div>
+    <div class="cellbox part"><div class="cnt amber">13/14</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span><span></span></div><div class="bld st">~ ac19 · 缺 NaCl</div></div>
+
+    <div class="rh">M2_T1 弛豫</div>
+    <div class="cellbox full"><div class="cnt grn">2/2</div><div class="bar"><span class="f"></span><span class="f"></span></div><div class="bld fz">✓ ce80(≡冻结)</div></div>
+    <div class="cellbox empty"><div class="cnt red">0/2</div><div class="bar"><span></span><span></span></div><div class="bld none">✗ 待补</div></div>
+    <div class="cellbox part"><div class="cnt amber">2/2</div><div class="bar"><span class="f"></span><span class="f"></span></div><div class="bld st">~ ac19(旧)</div></div>
+
+    <div class="rh">M2_T2 能带</div>
+    <div class="cellbox full"><div class="cnt grn">7/7</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span></div><div class="bld fz">✓ ce80(≡冻结)</div></div>
+    <div class="cellbox empty"><div class="cnt red">0/7</div><div class="bar"><span></span><span></span><span></span><span></span></div><div class="bld none">✗ 待补</div></div>
+    <div class="cellbox part"><div class="cnt amber">6/7</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span></span></div><div class="bld st">~ ac19 · 缺 MgSiO3</div></div>
+
+    <div class="rh">M3_T1 弛豫</div>
+    <div class="cellbox part"><div class="cnt amber">7/8</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span></span></div><div class="bld st">~ 缺 Fe3O4</div></div>
+    <div class="cellbox part"><div class="cnt amber">8/8</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span></div><div class="bld st">~ 混 build</div></div>
+    <div class="cellbox part"><div class="cnt amber">5/8</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span></span></div><div class="bld st">~ 缺 NiO/Fe3O4/Cr2O3</div></div>
+
+    <div class="rh">M3_T2 能带</div>
+    <div class="cellbox part"><div class="cnt amber">6/8</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span></span></div><div class="bld st">~ 缺 Fe_bcc/Fe3O4</div></div>
+    <div class="cellbox part"><div class="cnt amber">7/8</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span></span></div><div class="bld st">~ 缺 Fe3O4 · 混 build</div></div>
+    <div class="cellbox full"><div class="cnt grn">8/8</div><div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span></div><div class="bld fz">✓ ee05(冻结)</div></div>
+  </div>
+  <div class="rise" style="margin-top:12px"><small>一眼看出缺口：<b class="red">v4.3 整列标准核 0 覆盖</b>（M1/M2 从没跑过）是最大空白；v5.1 标准核有数据但来自<b class="amber">旧 build ac19</b>。详见末页 gap。</small></div>
+</section>
+
+<!-- ═ 5 · M3 DETAIL ═ -->
+<section class="slide">
+  <div class="prompt rise">$ <b>cat</b> m3_magnetic/8mats.tsv <span class="dim"># 现有最丰富的数据</span></div>
+  <h2 class="rise"><span class="hash">## </span>M3 磁性 · 逐材料（已有）</h2>
+  <div class="rise grow">
+  <table>
+    <tr><th>材料</th><th>序/性质</th><th class="v">v4.2</th><th class="v">v4.3</th><th class="v">v5.1</th><th>读法</th></tr>
+    <tr><td class="mat">Fe_bcc</td><td class="dim">FM 金属</td><td class="v">.25</td><td class="v grn">.85</td><td class="v">.85<span class="tag st">6efa</span></td><td><small>金属·需 best-of-3</small></td></tr>
+    <tr><td class="mat">Ni_fcc</td><td class="dim">FM 金属 ★</td><td class="v red">.16</td><td class="v grn">.88</td><td class="v grn">.83<span class="tag fz">ee05</span></td><td><small class="hl">自旋通道高方差(同 build 见 .08↔.92) · best-of-3</small></td></tr>
+    <tr><td class="mat">Cr_bcc</td><td class="dim">AFM 金属</td><td class="v red">.13</td><td class="v grn">.97</td><td class="v">.56<span class="tag fz">ee05</span></td><td><small>v5.1 文件抓错已修(.13→.56)</small></td></tr>
+    <tr><td class="mat">MnO</td><td class="dim">AFM 氧化物</td><td class="v red">.13</td><td class="v">.35</td><td class="v grn">.76<span class="tag fz">ee05</span></td><td><small class="grn">v5.1 反超(smearing 修)</small></td></tr>
+    <tr><td class="mat">NiO</td><td class="dim">AFM 氧化物</td><td class="v">.69</td><td class="v">.67</td><td class="v">.64<span class="tag fz">ee05</span></td><td><small>三版接近 · k-label 口径丢分</small></td></tr>
+    <tr><td class="mat">Fe2O3</td><td class="dim">赤铁矿 T2</td><td class="v red">.00</td><td class="v red">.10</td><td class="v red">.14</td><td><small class="amber">三版皆低 → 疑 bench dos 口径</small></td></tr>
+    <tr><td class="mat">Fe3O4</td><td class="dim">磁铁矿 T2</td><td class="v none">待补</td><td class="v none">待补</td><td class="v grn">.96<span class="tag fz">ee05</span></td><td><small class="grn">v5.1 强 · v4.3 曾超时</small></td></tr>
+    <tr><td class="mat">Cr2O3</td><td class="dim">AFM 氧化物 T2</td><td class="v red">.00</td><td class="v red">.11</td><td class="v">.23<span class="tag fz">ee05</span></td><td><small>大体系 · v4.3 易超时</small></td></tr>
+  </table>
+  </div>
+  <div class="rise" style="margin-top:10px"><small>注：上表每材料示 T1 或代表性 T2（完整 T1/T2 在 master CSV）。<b class="amber">三处现象非版本差</b>：Fe2O3-T2/Cr2O3-T2 三版皆低、NiO k-label 丢分 → 见末页 bench 口径。<span class="tag fz">绿角标=冻结 build</span> <span class="tag st">黄=旧 build</span>。</small></div>
+</section>
+
+<!-- ═ 6 · STANDARD DETAIL ═ -->
+<section class="slide">
+  <div class="prompt rise">$ <b>cat</b> standard_core/27.tsv <span class="dim"># M1/M2 通用集</span></div>
+  <h2 class="rise"><span class="hash">## </span>标准核 M1/M2（27 题）</h2>
+  <div class="rise three" style="margin-top:14px">
+    <div class="box"><div class="cap">v4.2 · f3a0770</div>
+      <div style="font-size:30px;font-family:VT323;color:var(--grn);text-shadow:var(--glow)">27/27 ✓</div>
+      <small>全覆盖 @ ce80(≡冻结)。多数 0.9–1.0。<br>弱点：<span class="amber">Cd .45 · BN_hex .52 · SiO2石英 .56</span></small>
+    </div>
+    <div class="box"><div class="cap">v4.3 · 5ee960d</div>
+      <div style="font-size:30px;font-family:VT323;color:var(--red)">0/27 ✗</div>
+      <small><b class="red">从没跑过标准集</b>——v4.3 是磁性 fork，标准核是它最大的空白。全部待补。</small>
+    </div>
+    <div class="box"><div class="cap">v5.1 · ee050a2</div>
+      <div style="font-size:30px;font-family:VT323;color:var(--amber)">25/27 ~</div>
+      <small>有数据但 @ <span class="amber">旧 build ac19</span>（落后 7 提交）。与 v4.2 多数同档。<br>弱点：<span class="amber">Rb .22</span> · 缺 NaCl/MgSiO3</small>
+    </div>
+  </div>
+  <div class="rise box" style="margin-top:18px">
+    <div class="cap">读法</div>
+    <span class="lead">标准核上：<b>简单题裸模型已接近满分，脚手架几乎不加分</b>（与历史结论一致）。这里的价值是把 v4.3/v5.1 拉到 <b>和 v4.2 同卷</b>，让"磁性强不强"不再是唯一证据。<br><span class="dim">但请注意 v5.1 这列来自旧 build——要么接受 footnote，要么 P1 在 ee050a2 上重跑（见 gap）。</span></span>
+  </div>
+</section>
+
+<!-- ═ 7 · CAVEATS / 口径 ═ -->
+<section class="slide">
+  <div class="prompt rise">$ <b>cat</b> CAVEATS.md <span class="dim"># 诚实口径(读数前必看)</span></div>
+  <h2 class="rise"><span class="hash">## </span>口径与已知坑</h2>
+  <div class="rise two grow" style="margin-top:12px">
+    <div>
+      <div class="box" style="margin-bottom:12px"><div class="cap red">混 build（本快照的主要限制）</div>
+        <small>v5.1 标准核来自 <b>ac19</b>(落后7提交)、部分 M3 来自 <b>6efa</b>(磁性修复前)——表头写"@ee050a2"但若干格是旧 build。<b>每格已标 build</b>；最干净做法 = P1 在冻结点重跑 v5.1。</small>
+      </div>
+      <div class="box"><div class="cap amber">v5.1 的 0.683 ≠ 冻结点</div>
+        <small>那是 6efa15e 的成绩；ee050a2 多了磁性恢复 fbd53da，全集未完整测过。<b>别把 0.683 当 ee050a2 成绩引用。</b></small>
+      </div>
+    </div>
+    <div class="box"><div class="cap cyan">bench 打分口径 4 条 · 待杨博（非 solver 锅）</div>
+      <ul class="tk" style="font-size:13.5px">
+        <li><b>k-label 非命名点</b>：VBM/CBM 落在非高对称点 → 丢满分（MnO/NiO 实测）</li>
+        <li><b>绝缘体 dos_e_fermi 参考系</b>：绝对能量 ±0.1eV 比 → 系统偏移直接判 0（疑致 Fe2O3/Cr2O3-T2 三版皆低）</li>
+        <li><b>磁矩绝对 0.5µB 容差</b>：对大磁矩偏松、小磁矩极松，占 T1 权重 0.35</li>
+        <li><b>null GT</b>：Li₃PO₄ k-label 全 null，null-vs-null 不给分 → 0.2 权重拿不到</li>
+      </ul>
+      <small class="dim" style="display:block;margin-top:8px">→ 报告给所有者 + 杨博确认，<b>不自行改 bench</b>。</small>
+    </div>
+  </div>
+  <div class="rise" style="margin-top:10px"><small>另：Ni_fcc 高方差(自旋通道抽签) → 金属格 best-of-3 缓解。跨 user run 目录有 1 个不可读(权限)，收数已跳过。</small></div>
+</section>
+
+<!-- ═ 8 · HANDOFF ═ -->
+<section class="slide">
+  <div class="prompt rise">$ <b>cat</b> HANDOFF.md <span class="dim"># 交接清单</span></div>
+  <h2 class="rise"><span class="hash">## </span>交接 · 现状与未竟</h2>
+  <div class="rise two grow" style="margin-top:12px">
+    <div class="box"><div class="cap">各版本一句话</div>
+      <ul class="tk">
+        <li><b class="grn">v4.2</b> 通用成熟，标准核稳；M3 不是它的主场</li>
+        <li><b class="grn">v4.3</b> 磁性<b>单题质量最高</b>，短板=大氧化物易<span class="amber">超时</span>(4/12 没跑完)</li>
+        <li><b class="cyan">v5.1</b> 工程更优、<b>鲁棒性反超</b>(12/12)；Ni_fcc 金属兜底开发中</li>
+      </ul>
+    </div>
+    <div class="box"><div class="cap">未竟事项 / 风险</div>
+      <ul class="tk">
+        <li><span class="amber">v5.1 工作树有未提交</span> metal_bands_guarantee.py(自旋通道兜底) — 冻结于 ee050a2，<b>不参测</b></li>
+        <li><b>deploy 一致性</b>：config.toml solver_path 已指 /srv 权威源(已核)</li>
+        <li><b>批跑工装</b>：run_subset42_batch.py 仍硬编码迁移前 ~/ 路径 → 用薄 harness 驱动绕过</li>
+        <li>两条线<b>暂不判输赢</b>：各有所长，都在迭代</li>
+      </ul>
+    </div>
+  </div>
+  <div class="rise box" style="margin-top:14px"><div class="cap">改动边界</div>
+    <span class="lead">本轮 <b>只动实验工装</b>(manifest/驱动/收数/报告)，<b class="grn">不改任何 solver 代码</b>；bench 侧问题只报告、不自行修改。</span></div>
+</section>
+
+<!-- ═ 9 · ★ GAP / NEXT EXPERIMENTS ═ -->
+<section class="slide">
+  <div class="prompt rise">$ <b>./plan</b> next-experiments <span class="dim"># ← 这页专门给你</span></div>
+  <h2 class="rise"><span class="hash">## </span>★ 下一步补哪些实验</h2>
+  <div class="rise sub" style="margin-bottom:8px">冻结 HEAD · deepseek-v4-pro · wall cap 2h · 失败=0 · 金属格 best-of-3。共同卷 43 题（27 标准 + 16 磁性）。</div>
+  <div class="rise grow" style="margin-top:4px">
+    <div class="tier p1"><h4>🔴 P1 · 真空格（无任何数据）<span class="pill">~36 run · 必跑</span></h4>
+      <small>
+      • <b class="red">v4.3 标准核 27 题</b>（M1/M2 全列空白）— 单块最大，不可压缩<br>
+      • M3 真空格：v4.2 ×3（Fe_bcc-T2 · Fe3O4-T1/T2）· v4.3 ×1（Fe3O4-T2）· v5.1 ×5（NaCl-T2 · MgSiO3-T2 · NiO-T1 · Fe3O4-T1 · Cr2O3-T1）
+      </small>
+    </div>
+    <div class="tier p2"><h4>🟡 P2 · 金属格 best-of-3 补强<span class="pill">~30 run · 口径</span></h4>
+      <small>Fe_bcc / Ni_fcc / Cr_bcc × T1·T2 × 3 版，凑满 3 次取 max（扣已有）。专治 Ni_fcc 自旋通道抽签(.08↔.92)。<br><span class="dim">省算力旋钮：改 best-of-2，或只对 v5.1 金属(v4.2/v4.3 已有稳定兜底)。</span></small>
+    </div>
+    <div class="tier p3"><h4>🟦 P3 · 可选 · provenance 清理<span class="pill">~25 run · 看是否接受 footnote</span></h4>
+      <small>v5.1 标准核 25 题现为旧 build <span class="amber">ac19</span>。若"混 build footnote"对收尾不可接受 → 在冻结 ee050a2 重跑这 25 题，主表变纯单 build。否则跳过、靠每格 build 角标交代。</small>
+    </div>
+    <div class="two" style="margin-top:6px">
+      <div class="box"><div class="cap">最小可出表</div><small><b>P1 ≈ 36 run</b> → 共同卷"已测"全绿（v5.1 标准核带旧-build 角标）。约 1 天墙钟@并发2–4。</small></div>
+      <div class="box"><div class="cap">完整版</div><small><b>P1+P2+P3 ≈ 91 run</b> → 纯单 build + 金属稳。墙钟更长，磁性大体系仍可能超时(按0)。</small></div>
+    </div>
+  </div>
+  <div class="rise" style="margin-top:10px"><small>决策点给你：<span class="kbd">①</span> 接受混-build footnote 还是跑 P3？ <span class="kbd">②</span> 金属 best-of-3 全做还是只 v5.1？ <span class="kbd">③</span> Fe3O4/Cr2O3 大体系设多长 wall cap？<span class="cur"></span></small></div>
+</section>
+
+</div><!-- /deck -->
+
+<div class="statusbar">
+  <div class="seg mode" id="mode">SNAPSHOT</div>
+  <div class="seg" id="fname">snapshot.deck</div>
+  <div class="seg legend">cell: <b>✓已测@冻结</b> · <span class="a">~旧build</span> · <span class="x">✗待补</span></div>
+  <div class="seg spacer"></div>
+  <div class="seg r"><span class="dim">←/→ space</span></div>
+  <div class="seg r" id="counter">01 / 09</div>
+</div>
+
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+const names=['cover','background.md','positioning','★ scaffold','m3_detail','standard','CAVEATS.md','HANDOFF.md','★ next-exp'];
+let i=0;
+function show(n){
+  i=Math.max(0,Math.min(slides.length-1,n));
+  slides.forEach((s,k)=>s.classList.toggle('on',k===i));
+  document.getElementById('counter').textContent=String(i+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');
+  document.getElementById('fname').textContent=names[i];
+  document.getElementById('mode').textContent = (i===slides.length-1?'ACTION':(i===3?'★ MAIN':'SNAPSHOT'));
+}
+addEventListener('keydown',e=>{
+  if(['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){e.preventDefault();show(i+1)}
+  else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();show(i-1)}
+  else if(e.key==='Home'){show(0)} else if(e.key==='End'){show(slides.length-1)}
+  else if(/^[1-9]$/.test(e.key)){show(+e.key-1)}
+});
+addEventListener('click',e=>{ if(e.target.closest('a'))return; show(i + (e.clientX > innerWidth*0.4 ? 1 : -1)); });
+show(0);
+</script>
+</body>
+</html>
