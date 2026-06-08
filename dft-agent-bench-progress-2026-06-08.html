@@ -2690,6 +2690,36 @@
 .rmrow .dot2 { width:9px; height:9px; border-radius:50%; background:var(--accent); margin-top:5px; flex-shrink:0; } .rmrow b { color:var(--ink); }
 .indust { display:flex; flex-direction:column; gap:9px; }
 .ind { background:linear-gradient(135deg,rgba(74,111,165,0.07),rgba(31,138,138,0.05)); border:1px solid var(--line); border-radius:9px; padding:10px 14px; font-size:12.5px; color:var(--ink); line-height:1.45; } .ind b { font-weight:800; color:var(--accent); }
+
+/* ---- worked examples + appendix ---- */
+.sec-chip.case { background:rgba(200,136,31,0.16); color:#8A6310; } .sec-chip.case .sq { background:var(--amber); }
+.sec-chip.apx { background:#E7ECF3; color:var(--ink-2); } .sec-chip.apx .sq { background:var(--ink-3); }
+.ex { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:minmax(0,1fr); gap:26px; flex:1; min-height:0; }
+.scoretbl { background:#fff; border:1px solid var(--line); border-radius:11px; overflow:hidden; }
+.scoretbl .str { display:grid; grid-template-columns:1.3fr 1fr 1fr 56px 46px; }
+.scoretbl .str > div { padding:8px 12px; border-bottom:1px solid #EEF2F7; font-size:12.5px; font-family:"JetBrains Mono",monospace; font-variant-numeric:tabular-nums; color:var(--ink); }
+.scoretbl .str:last-child > div { border-bottom:0; }
+.scoretbl .str.hd > div { background:#F1F4F9; font-weight:800; font-size:10.5px; letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-3); font-family:"Inter","Noto Sans SC",sans-serif; }
+.scoretbl .str .fld { font-family:"Inter","Noto Sans SC",sans-serif; font-weight:600; color:var(--ink); }
+.scoretbl .str .w { text-align:center; color:var(--ink-2); }
+.scoretbl .str .w.key { color:var(--amber); font-weight:800; }
+.scoretbl .str .ok { text-align:center; color:var(--green); font-weight:800; }
+.scoretbl .str.total > div { background:rgba(93,139,93,0.09); font-weight:800; color:var(--ink); }
+.strain { display:grid; grid-template-columns:32px repeat(4,1fr); gap:7px; align-items:center; }
+.strain .amp-h { font-size:10px; color:var(--ink-3); text-align:center; font-family:"JetBrains Mono",monospace; }
+.strain .mh { font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--ink); font-weight:700; text-align:center; }
+.strain .dot { height:30px; border-radius:6px; background:linear-gradient(135deg,#9F7FB9,#7E5C9E); display:flex; align-items:center; justify-content:center; color:#fff; font-size:9.5px; font-family:"JetBrains Mono",monospace; font-weight:700; box-shadow:inset 0 1px 0 rgba(255,255,255,0.15); }
+.apx-grid { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:16px; flex:1; min-height:0; }
+.apxcard { background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px 19px; display:flex; flex-direction:column; justify-content:center; border-left:4px solid var(--accent); box-shadow:0 1px 0 rgba(26,31,44,0.03); }
+.apxcard.a1 { border-left-color:var(--web); } .apxcard.a2 { border-left-color:var(--accent); } .apxcard.a3 { border-left-color:var(--purple); } .apxcard.a4 { border-left-color:var(--amber); }
+.apxcard .ah2 { display:flex; align-items:center; gap:9px; margin-bottom:7px; }
+.apxcard .ah2 .tid { font-family:"JetBrains Mono",monospace; font-weight:800; font-size:14.5px; color:var(--ink); }
+.apxcard .ah2 .badges { margin-left:auto; display:flex; gap:5px; }
+.apxcard .ah2 .b { font-size:10px; font-weight:800; padding:2px 8px; border-radius:5px; }
+.apxcard .role2 { font-size:14px; font-weight:800; color:var(--ink); margin-bottom:6px; }
+.apxcard .gt { font-size:12.5px; color:var(--ink-2); line-height:1.55; } .apxcard .gt b { color:var(--ink); font-weight:700; } .apxcard .gt .mono { font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--accent); }
+.apxcard .hard { margin-top:12px; padding-top:10px; font-size:11.5px; color:var(--ink-2); border-top:1px dashed var(--line); line-height:1.45; } .apxcard .hard b { color:#8A6310; font-weight:700; }
+
 </style>
 </head>
 <body>
@@ -2747,7 +2777,7 @@
       <div class="cover-foot"><span class="k">复旦 × 合作方</span><span>·</span><span>即将公开 HF Dataset + arXiv 论文</span><span>·</span><span class="mono">QE v7.5 · GPU backend · 数据 @ 2026-06-08</span></div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">本报告分四部分：DFT 简介 → Bench 评测体系 → Web 平台 → Solver 求解器</div><div class="pg">Slide 1 / 17</div></div>
+  <div class="footer-bar"><div class="muted">本报告分四部分：DFT 简介 → Bench 评测体系 → Web 平台 → Solver 求解器</div><div class="pg">Slide 1 / 20</div></div>
 </section>
 
 <!-- ============ S2 DFT primer ============ -->
@@ -2791,7 +2821,7 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">听众无需 DFT 背景：核心只有一句 —— agent 读自然语言任务，自己把它变成跑得通、可验证的第一性原理计算</div><div class="pg">Slide 2 / 17</div></div>
+  <div class="footer-bar"><div class="muted">听众无需 DFT 背景：核心只有一句 —— agent 读自然语言任务，自己把它变成跑得通、可验证的第一性原理计算</div><div class="pg">Slide 2 / 20</div></div>
 </section>
 
 <!-- ============ S3 three pillars ============ -->
@@ -2838,7 +2868,7 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">三支柱解耦协作：bench 定义「考什么 / 怎么评」，solver 是「考生」，web 是「考场 + 记分板」</div><div class="pg">Slide 3 / 17</div></div>
+  <div class="footer-bar"><div class="muted">三支柱解耦协作：bench 定义「考什么 / 怎么评」，solver 是「考生」，web 是「考场 + 记分板」</div><div class="pg">Slide 3 / 20</div></div>
 </section>
 
 <!-- ============ S4 BENCH matrix ============ -->
@@ -2887,7 +2917,7 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">数字按严格口径实测对齐 2026-06-07 · M1_T1/M2_T1/M3_T1 = 58/28/15，T3 ship 56 mat，T4 ship 46 mat</div><div class="pg">Slide 4 / 17</div></div>
+  <div class="footer-bar"><div class="muted">数字按严格口径实测对齐 2026-06-07 · M1_T1/M2_T1/M3_T1 = 58/28/15，T3 ship 56 mat，T4 ship 46 mat</div><div class="pg">Slide 4 / 20</div></div>
 </section>
 
 <!-- ============ S5 material dimension ============ -->
@@ -2928,7 +2958,7 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">材料维度与任务维度解耦 —— 可沿任一轴切片报告 agent 能力，定位强项与短板</div><div class="pg">Slide 5 / 17</div></div>
+  <div class="footer-bar"><div class="muted">材料维度与任务维度解耦 —— 可沿任一轴切片报告 agent 能力，定位强项与短板</div><div class="pg">Slide 5 / 20</div></div>
 </section>
 
 <!-- ============ S6 task dimension ============ -->
@@ -2950,7 +2980,7 @@
       <div class="icard" style="border-left-color:var(--green);"><div class="id"><b>防 overclaim 设计：</b>T3 不让 agent 自己做 BM3 拟合、T4 不让 agent 自己算 VRH —— agent 只交原始 (V,E) / stress-strain 数据，<b>harness 侧统一拟合打分</b>，保证信号干净。</div></div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">GT 自跑 wall time 参考：T1 ~5 min · T2 ~30 min · T3 ~1 h · T4 ~5 h（每材料，QE v7.5 GPU backend）</div><div class="pg">Slide 6 / 17</div></div>
+  <div class="footer-bar"><div class="muted">GT 自跑 wall time 参考：T1 ~5 min · T2 ~30 min · T3 ~1 h · T4 ~5 h（每材料，QE v7.5 GPU backend）</div><div class="pg">Slide 6 / 20</div></div>
 </section>
 
 <!-- ============ S7 GT + evaluator ============ -->
@@ -2987,15 +3017,110 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">复现路径全公开：bench dataset + harness + GT 生产代码三件套同步开源（即将 HF Dataset + GitHub + arXiv）</div><div class="pg">Slide 7 / 17</div></div>
+  <div class="footer-bar"><div class="muted">复现路径全公开：bench dataset + harness + GT 生产代码三件套同步开源（即将 HF Dataset + GitHub + arXiv）</div><div class="pg">Slide 7 / 20</div></div>
+</section>
+
+<!-- ============ EX1 · Si T1 ============ -->
+<section class="slide" data-screen-label="08 案例1 Si-T1">
+  <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">案例 · 端到端</div></div>
+  <div class="slide-body">
+    <div class="slide-head">
+      <div class="slide-eyebrow"><span class="sec-chip case"><span class="sq"></span>案例</span>Slide 8 — 案例 1 · Si vc-relax（最简单，端到端走一遍）</div>
+      <h1 class="slide-title">最简单的一道题：算 Si 的<span class="em">平衡晶格 + 空间群</span> —— agent 自定全部参数，<span class="em">一次 QE 跑通</span>，提交后机器逐字段打分。</h1>
+    </div>
+    <div class="ex">
+      <div style="display:flex; flex-direction:column;">
+        <div style="font-size:12px; letter-spacing:0.13em; text-transform:uppercase; color:#8A6310; font-weight:700; margin-bottom:10px;">一道题的生命周期 · <span style="color:var(--ink-3); font-family:'JetBrains Mono',monospace; text-transform:none;">M1_T1_Si_vc_relax</span></div>
+        <div class="arch-flow">
+          <div class="arch-box" style="border-left-color:var(--ink-3);"><div class="ab-k">① 题面（agent 所见）<span class="t">GT 不可见</span></div><div class="ab-d">"For Si (diamond, Fd-3m, 2 atoms)，做 vc-relax 求平衡结构；自选收敛参数；提交 vc-relax 输出。" —— 只给材料 + 任务。</div></div>
+          <div class="arch-ar">↓</div>
+          <div class="arch-box loop"><div class="ab-k">② Agent 自决参数</div><div class="ab-d"><span class="mono">ecutwfc 50 Ry · k-mesh 8×8×8 · smearing</span> 全由 agent 选；写 pw.x vc-relax 输入。</div></div>
+          <div class="arch-ar">↓</div>
+          <div class="arch-box" style="border-left-color:var(--web);"><div class="ab-k">③ 执行<span class="t">单一 binary</span></div><div class="ab-d">跑 <span class="mono">1 次 pw.x</span> vc-relax（GT 参考耗时 ~13 min / 769 s · QE 7.5 GPU）。</div></div>
+          <div class="arch-ar">↓</div>
+          <div class="arch-box gate"><div class="ab-k">④ 提交 → harness 提取 → 打分</div><div class="ab-d"><span class="mono">vc_relax_out</span> → harness 解析 final CELL_PARAMETERS + pymatgen 定空间群 → 逐字段比 GT。</div></div>
+        </div>
+      </div>
+      <div class="cardcol" style="justify-content:space-between;">
+        <div class="scoretbl">
+          <div class="str hd"><div class="fld">字段</div><div>GT</div><div>提交*</div><div class="w">权重</div><div class="ok">判定</div></div>
+          <div class="str"><div class="fld">a (Å)</div><div>3.866</div><div>3.87</div><div class="w">0.20</div><div class="ok">✓</div></div>
+          <div class="str"><div class="fld">α / β / γ (°)</div><div>60.0</div><div>60.0</div><div class="w">0.15</div><div class="ok">✓</div></div>
+          <div class="str"><div class="fld">space group</div><div>227</div><div>227</div><div class="w key">0.25</div><div class="ok">✓</div></div>
+          <div class="str total"><div class="fld">total_score</div><div></div><div>1.00</div><div class="w">—</div><div class="ok">PASS</div></div>
+        </div>
+        <div class="feature">
+          <div class="fh"><span class="star">★</span><span class="ttl">空间群 = <span class="mono">0.25</span> 权重（单字段最大）</span></div>
+          <div class="fb"><div class="lead">空间群在这道题占 <b>25%</b> —— 也正是 solver <span class="mono">v4.3 的 qe_input_lint 护栏</span>死守的：阈值一松 → 弛豫晶胞微漂 → pymatgen 把 cubic 误判 trigonal → <b>确定性丢 0.25</b>。（详见 Solver 章节）</div></div>
+        </div>
+        <div style="font-size:10.5px; color:var(--ink-3); line-height:1.4;">* 「提交」列为一次通过 run 的代表值 · tol：晶格 ≤1% 相对 / 角度 ≤1° 绝对 / 空间群 exact</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar"><div class="muted">T1 是矩阵的 anchor —— 单步、已基本被 LLM solved；难度从这里沿 T 轴（pipeline 长度）与 M 轴（材料复杂度）抬升</div><div class="pg">Slide 8 / 20</div></div>
+</section>
+
+<!-- ============ EX2 · Si T4 ============ -->
+<section class="slide" data-screen-label="09 案例2 Si-T4">
+  <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">案例 · 复杂任务</div></div>
+  <div class="slide-body">
+    <div class="slide-head">
+      <div class="slide-eyebrow"><span class="sec-chip case"><span class="sq"></span>案例</span>Slide 9 — 案例 2 · Si elastic（复杂任务 · 24-strain 长流水线）</div>
+      <h1 class="slide-title">同一个 Si，最难的一道题：<span class="em">弹性张量 Cij</span> —— agent 要<span class="em">调度 24 次 QE</span>、管控失败重试，且<span class="em">只交原始数据</span>、harness 统一拟合。</h1>
+    </div>
+    <div class="ex">
+      <div class="cardcol" style="justify-content:space-between;">
+        <div style="font-size:12px; letter-spacing:0.13em; text-transform:uppercase; color:#8A6310; font-weight:700;">为什么"复杂" · <span style="color:var(--ink-3); font-family:'JetBrains Mono',monospace; text-transform:none;">M1_T4_Si_elastic</span></div>
+        <div class="strain">
+          <div class="amp-h"></div><div class="amp-h">−0.5%</div><div class="amp-h">−0.2%</div><div class="amp-h">+0.2%</div><div class="amp-h">+0.5%</div>
+          <div class="mh">ε₁</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div>
+          <div class="mh">ε₂</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div>
+          <div class="mh">ε₃</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div>
+          <div class="mh">ε₄</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div>
+          <div class="mh">ε₅</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div>
+          <div class="mh">ε₆</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div><div class="dot">QE</div>
+        </div>
+        <div class="chain" style="margin:2px 0;"><span class="ch">T1 = <b>1 次 QE</b></span><span class="a">→</span><span class="ch fix"><b>T4 = 6 mode × 4 amp = 24 次 QE 串行</b></span></div>
+        <div class="note" style="font-size:12px; color:var(--ink-2); line-height:1.5;">每个应变构型 fixed-cell relax + 算 stress → agent 必须<b>管控调度 / 失败重试 / 收敛阈值</b> → 解析 stress-strain → <b>只提交原始 CSV，不自己拟合</b>。这对 agent 的循环能力与错误恢复是阶梯式压力测试。</div>
+      </div>
+      <div class="cardcol" style="justify-content:space-between;">
+        <div class="vizcard" style="flex:1;">
+          <div class="vt"><div class="vn">GT · 弹性张量 Cij（real GT）</div><div class="vm">near-cubic Si</div></div>
+          <div class="vbody" style="gap:14px;">
+            <div class="cij" style="flex:1.1;">
+              <div class="cc" style="background:#2E6B4F">179</div><div class="cc" style="background:#A6C9B3">39</div><div class="cc" style="background:#9CC3AD">48</div><div class="cc z">0</div><div class="cc z">0</div><div class="cc z">·</div>
+              <div class="cc" style="background:#A6C9B3">39</div><div class="cc" style="background:#2E6B4F">188</div><div class="cc" style="background:#A6C9B3">39</div><div class="cc z">0</div><div class="cc z">0</div><div class="cc z">0</div>
+              <div class="cc" style="background:#9CC3AD">48</div><div class="cc" style="background:#A6C9B3">39</div><div class="cc" style="background:#2E6B4F">179</div><div class="cc z">0</div><div class="cc z">0</div><div class="cc z">·</div>
+              <div class="cc z">0</div><div class="cc z">0</div><div class="cc z">0</div><div class="cc" style="background:#5C9676">57</div><div class="cc z">·</div><div class="cc z">0</div>
+              <div class="cc z">0</div><div class="cc z">0</div><div class="cc z">0</div><div class="cc z">·</div><div class="cc" style="background:#4F8C6B">66</div><div class="cc z">0</div>
+              <div class="cc z">·</div><div class="cc z">0</div><div class="cc z">·</div><div class="cc z">0</div><div class="cc z">0</div><div class="cc" style="background:#5C9676">57</div>
+            </div>
+            <div style="flex:0.62; display:flex; flex-direction:column; justify-content:center; gap:7px;">
+              <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-2);">VRH 平均</div>
+              <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink); line-height:1.5;">K_VRH = <b>88.8</b><br>G_VRH = <b>62.6</b> <span style="font-size:10px;">GPa</span></div>
+              <div style="font-size:10px; color:var(--green); font-weight:700;">✓ Born 稳定</div>
+              <div style="font-size:9.5px; color:var(--ink-3); line-height:1.35;">「·」= 微小 off-diagonal（原胞取向）</div>
+            </div>
+          </div>
+        </div>
+        <div class="scoretbl">
+          <div class="str hd" style="grid-template-columns:1.5fr 1fr 70px 44px;"><div class="fld">评分字段</div><div>GT</div><div class="w">权重</div><div class="ok">判定</div></div>
+          <div class="str" style="grid-template-columns:1.5fr 1fr 70px 44px;"><div class="fld">Cij 张量</div><div>6×6</div><div class="w key">0.50</div><div class="ok">✓</div></div>
+          <div class="str" style="grid-template-columns:1.5fr 1fr 70px 44px;"><div class="fld">K_VRH / G_VRH</div><div>88.8 / 62.6</div><div class="w">0.30</div><div class="ok">✓</div></div>
+          <div class="str" style="grid-template-columns:1.5fr 1fr 70px 44px;"><div class="fld">stress-strain 曲线</div><div>CSV</div><div class="w">0.20</div><div class="ok">✓</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar"><div class="muted">防 overclaim：agent 只交 stress-strain，<span class="mono">harness 用 lstsq 拟 6×6 Cij + VRH 平均</span> 自己算 —— 信号干净，不让 agent 自报分</div><div class="pg">Slide 9 / 20</div></div>
 </section>
 
 <!-- ============ S8 WEB architecture ============ -->
-<section class="slide" data-screen-label="08 Web 平台架构">
+<section class="slide" data-screen-label="10 Web 平台架构">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">② 平台 Web</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip web"><span class="sq"></span>WEB</span>Slide 8 — Web 平台架构</div>
+      <div class="slide-eyebrow"><span class="sec-chip web"><span class="sq"></span>WEB</span>Slide 10 — Web 平台架构</div>
       <h1 class="slide-title">一个<span class="em">真能跑题</span>的 web 平台：React 前端 + FastAPI 后端单端口部署，<span class="em">真起 QE / Claude API</span>，Live transcript 真从磁盘读，Score 真来自 evaluator。</h1>
     </div>
     <div class="archb" style="grid-template-columns:1.05fr 1fr;">
@@ -3023,15 +3148,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">canonical 部署 <span class="mono">/srv/shared/science/web/</span> · supervised mode 长期在线（health 200）· 单端口 :8765 同源 mount 前端</div><div class="pg">Slide 8 / 17</div></div>
+  <div class="footer-bar"><div class="muted">canonical 部署 <span class="mono">/srv/shared/science/web/</span> · supervised mode 长期在线（health 200）· 单端口 :8765 同源 mount 前端</div><div class="pg">Slide 10 / 20</div></div>
 </section>
 
 <!-- ============ S9 catalogue + convergence ============ -->
-<section class="slide" data-screen-label="09 Catalogue">
+<section class="slide" data-screen-label="11 Catalogue">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">② 平台 Web</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip web"><span class="sq"></span>WEB</span>Slide 9 — Catalogue + 收敛证据</div>
+      <div class="slide-eyebrow"><span class="sec-chip web"><span class="sq"></span>WEB</span>Slide 11 — Catalogue + 收敛证据</div>
       <h1 class="slide-title">Catalogue 浏览全部 <span class="em">304 题</span>，按 M / T 维度筛选；每题展开<span class="em">收敛证据</span> —— 让你看到 GT 的信号源头。</h1>
     </div>
     <div class="two" style="grid-template-columns:1.05fr 1fr;">
@@ -3078,15 +3203,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">客户端筛选 / 排序全在前端；304 题 JSON 由后端静态读 · 截图位见 <span class="mono">assets/</span>（团队可换真 UI 截图）</div><div class="pg">Slide 9 / 17</div></div>
+  <div class="footer-bar"><div class="muted">客户端筛选 / 排序全在前端；304 题 JSON 由后端静态读 · 截图位见 <span class="mono">assets/</span>（团队可换真 UI 截图）</div><div class="pg">Slide 11 / 20</div></div>
 </section>
 
 <!-- ============ S10 viz showcase ============ -->
-<section class="slide" data-screen-label="10 结果可视化">
+<section class="slide" data-screen-label="12 结果可视化">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">② 平台 Web</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip web"><span class="sq"></span>WEB</span>Slide 10 — DFT 结果可视化（同一个 Si · 四种物理）</div>
+      <div class="slide-eyebrow"><span class="sec-chip web"><span class="sq"></span>WEB</span>Slide 12 — DFT 结果可视化（同一个 Si · 四种物理）</div>
       <h1 class="slide-title">同一个 <span class="em">Si</span>，四种任务四种可视化 —— 收敛曲线 / 能带 + DOS / 状态方程 / 弹性张量，<span class="em">web 端手写 SVG 渲染</span>，信号一眼可读。</h1>
     </div>
     <div class="vizgrid">
@@ -3157,15 +3282,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">「同一材料，四种物理，四套 pipeline」—— 矩阵设计的完整一行 · 图为 web 真实可视化组件的示意复刻（数值取 Si 典型值）</div><div class="pg">Slide 10 / 17</div></div>
+  <div class="footer-bar"><div class="muted">「同一材料，四种物理，四套 pipeline」—— 矩阵设计的完整一行 · 图为 web 真实可视化组件的示意复刻（数值取 Si 典型值）</div><div class="pg">Slide 12 / 20</div></div>
 </section>
 
 <!-- ============ S11 leaderboard ============ -->
-<section class="slide" data-screen-label="11 Leaderboard">
+<section class="slide" data-screen-label="13 Leaderboard">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">② 平台 Web</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip web"><span class="sq"></span>WEB</span>Slide 11 — Multi-model Leaderboard</div>
+      <div class="slide-eyebrow"><span class="sec-chip web"><span class="sq"></span>WEB</span>Slide 13 — Multi-model Leaderboard</div>
       <h1 class="slide-title">Leaderboard —— <span class="em">agent × model 热图</span>，5 指标横评主流 LLM 的 DFT 能力，直观看<span class="em">哪家强在哪个面</span>。</h1>
     </div>
     <div class="lbwrap">
@@ -3197,15 +3322,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">数据 @ 2026-06-08 leaderboard 实测；多模型 × 完整矩阵持续跑批中，名次待全量补齐再锁</div><div class="pg">Slide 11 / 17</div></div>
+  <div class="footer-bar"><div class="muted">数据 @ 2026-06-08 leaderboard 实测；多模型 × 完整矩阵持续跑批中，名次待全量补齐再锁</div><div class="pg">Slide 13 / 20</div></div>
 </section>
 
 <!-- ============ S12 SOLVER evolution ============ -->
-<section class="slide" data-screen-label="12 Solver 演进">
+<section class="slide" data-screen-label="14 Solver 演进">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">③ 求解器 Solver</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 12 — Solver 演进 · v1 → v5.1</div>
+      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 14 — Solver 演进 · v1 → v5.1</div>
       <h1 class="slide-title">求解器从一个手搓 baseline 出发，沿<span class="em">两条架构路线</span>演进 —— <span class="em">v4.x 精简确定性护栏</span> 与 <span class="em">v5.x 多层编排 + 记忆</span> —— 同模型下持续抬升分数。</h1>
     </div>
     <div class="evo">
@@ -3240,15 +3365,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">分数为各版本在 <span class="mono">deepseek-v4-pro</span> 上的 leaderboard 均分 · 各版本 task 数 / 子集不同，非等额对照（详见 Slide 15）</div><div class="pg">Slide 12 / 17</div></div>
+  <div class="footer-bar"><div class="muted">分数为各版本在 <span class="mono">deepseek-v4-pro</span> 上的 leaderboard 均分 · 各版本 task 数 / 子集不同，非等额对照（详见 Slide 17）</div><div class="pg">Slide 14 / 20</div></div>
 </section>
 
 <!-- ============ S13 v4.3 ============ -->
-<section class="slide" data-screen-label="13 架构A v4.3">
+<section class="slide" data-screen-label="15 架构A v4.3">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">③ 求解器 Solver</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 13 — 架构 A · <span style="color:var(--v4)">v4.3 精简确定性护栏</span></div>
+      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 15 — 架构 A · <span style="color:var(--v4)">v4.3 精简确定性护栏</span></div>
       <h1 class="slide-title"><span class="em">零额外依赖、2 个工具、运行时自发现题型</span>；把已知的物理 / 数值坑用<span class="em">确定性护栏</span>钉死 —— 稳、便宜、模型无关。</h1>
     </div>
     <div class="archb">
@@ -3292,15 +3417,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">设计哲学：<b style="color:var(--ink-2)">最少依赖 + 确定性护栏</b> · 适合稳定量产、模型无关、受限 / 离线环境</div><div class="pg">Slide 13 / 17</div></div>
+  <div class="footer-bar"><div class="muted">设计哲学：<b style="color:var(--ink-2)">最少依赖 + 确定性护栏</b> · 适合稳定量产、模型无关、受限 / 离线环境</div><div class="pg">Slide 15 / 20</div></div>
 </section>
 
 <!-- ============ S14 v5.1 ============ -->
-<section class="slide" data-screen-label="14 架构B v5.1">
+<section class="slide" data-screen-label="16 架构B v5.1">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">③ 求解器 Solver</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 14 — 架构 B · <span style="color:var(--v5)">v5.1 多层编排 + 记忆</span></div>
+      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 16 — 架构 B · <span style="color:var(--v5)">v5.1 多层编排 + 记忆</span></div>
       <h1 class="slide-title">建在 <span class="em">claude-agent-sdk</span> 上的<span class="em">双模式</span>求解器，用<span class="em">结构化工具 + 子代理 + 进度账本 + 验证闸 + 跨任务记忆</span>去啃开放难题。</h1>
     </div>
     <div class="archb" style="grid-template-columns:0.82fr 1.18fr;">
@@ -3335,15 +3460,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">设计哲学：<b style="color:var(--ink-2)">结构化编排 + 学习记忆</b> · 5 个 bench 契约不变量（输出路径 / 退出码 / 无网络 / 禁后台 pw.x / 收敛阈值）逐字保持</div><div class="pg">Slide 14 / 17</div></div>
+  <div class="footer-bar"><div class="muted">设计哲学：<b style="color:var(--ink-2)">结构化编排 + 学习记忆</b> · 5 个 bench 契约不变量（输出路径 / 退出码 / 无网络 / 禁后台 pw.x / 收敛阈值）逐字保持</div><div class="pg">Slide 16 / 20</div></div>
 </section>
 
 <!-- ============ S15 solver results ============ -->
-<section class="slide" data-screen-label="15 对比与结果">
+<section class="slide" data-screen-label="17 对比与结果">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">③ 求解器 Solver</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 15 — 对比与结果</div>
+      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 17 — 对比与结果</div>
       <h1 class="slide-title">同一批题、同一个模型（deepseek-v4-pro）下，分数随版本<span class="em">稳步抬升</span>；v4.3 与 v5.1 代表<span class="em">两种部署权衡</span> —— 全量等额矩阵仍在跑。</h1>
     </div>
     <div class="s6b">
@@ -3382,15 +3507,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">参照：v1-stable 在 deepseek-v4-pro 上 142 题全量 = 0.84（最稳的全覆盖 baseline）· 强模型（opus / sonnet）整体更高</div><div class="pg">Slide 15 / 17</div></div>
+  <div class="footer-bar"><div class="muted">参照：v1-stable 在 deepseek-v4-pro 上 142 题全量 = 0.84（最稳的全覆盖 baseline）· 强模型（opus / sonnet）整体更高</div><div class="pg">Slide 17 / 20</div></div>
 </section>
 
 <!-- ============ S16 solver value + roadmap ============ -->
-<section class="slide" data-screen-label="16 价值与路线">
+<section class="slide" data-screen-label="18 价值与路线">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">③ 求解器 Solver</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 16 — Solver 实现了什么 · 设计理念 · 路线</div>
+      <div class="slide-eyebrow"><span class="sec-chip solver"><span class="sq"></span>SOLVER</span>Slide 18 — Solver 实现了什么 · 设计理念 · 路线</div>
       <h1 class="slide-title">两套架构 = <span class="em">两种设计哲学</span>，可按场景裁剪 —— 要稳要省要可控选 <span class="em">v4.3</span>，要啃硬题追上限选 <span class="em">v5.1</span>。</h1>
     </div>
     <div class="s7b">
@@ -3438,15 +3563,15 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">solver 严守 bench 契约、不碰 bench 仓 —— 「考生」与「考卷」边界清晰，保证评测公正</div><div class="pg">Slide 16 / 17</div></div>
+  <div class="footer-bar"><div class="muted">solver 严守 bench 契约、不碰 bench 仓 —— 「考生」与「考卷」边界清晰，保证评测公正</div><div class="pg">Slide 18 / 20</div></div>
 </section>
 
 <!-- ============ S17 summary ============ -->
-<section class="slide" data-screen-label="17 总结">
+<section class="slide" data-screen-label="19 总结">
   <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">总结 · Roadmap</div></div>
   <div class="slide-body">
     <div class="slide-head">
-      <div class="slide-eyebrow">Slide 17 — 总结 + Roadmap</div>
+      <div class="slide-eyebrow">Slide 19 — 总结 + Roadmap</div>
       <h1 class="slide-title">领域-native 的 <span class="em">M×T 矩阵</span> + 真 QE backend + 多源 GT，加上<span class="em">在线平台</span>与<span class="em">两套求解器架构</span> —— 把材料计算从「专家工序」变「可调度工作流」。</h1>
     </div>
     <div class="sum">
@@ -3472,7 +3597,45 @@
       </div>
     </div>
   </div>
-  <div class="footer-bar"><div class="muted">Bench · Web · Solver 三件套上线 · 多模型 leaderboard 在跑 · 六月起进入公开 release 通道</div><div class="pg">Slide 17 / 17</div></div>
+  <div class="footer-bar"><div class="muted">Bench · Web · Solver 三件套上线 · 多模型 leaderboard 在跑 · 六月起进入公开 release 通道</div><div class="pg">Slide 19 / 20</div></div>
+</section>
+
+<!-- ============ APPENDIX · 4 tasks ============ -->
+<section class="slide" data-screen-label="20 附录 4 任务">
+  <div class="top-bar"><div class="brand"><span class="dot"></span>DFT-Agent Bench · 进度报告 · 2026-06-08</div><div class="meta">附录 · Appendix</div></div>
+  <div class="slide-body">
+    <div class="slide-head">
+      <div class="slide-eyebrow"><span class="sec-chip apx"><span class="sq"></span>附录</span>Slide 20 — 附录 · 4 个代表性任务（可选讲）</div>
+      <h1 class="slide-title">跨 M×T 矩阵的<span class="em">四道代表题</span> —— 电子结构 / 复杂氧化物 / 磁性金属 / 状态方程，GT 均为真实值，可按需展开。</h1>
+    </div>
+    <div class="apx-grid">
+      <div class="apxcard a1">
+        <div class="ah2"><span class="tid">M1_T2_Si_bands_dos</span><span class="badges"><span class="b" style="background:var(--bench-soft);color:var(--bench)">M1</span><span class="b" style="background:var(--web-soft);color:var(--web)">T2</span></span></div>
+        <div class="role2">电子结构 · 能带 + DOS（半导体"指纹"）</div>
+        <div class="gt">GT：band gap <b class="mono">0.62 eV</b>，<b>indirect</b>（VBM <span class="mono">Γ</span> → CBM <span class="mono">≈X (0.4,0,0.4)</span>）· E_F <span class="mono">5.98 eV</span> · 评分 = gap + gap_type + k-label + DOS 曲线 F1</div>
+        <div class="hard"><b>难点</b>：scf → nscf-bands → bands.x → dos.x 四步链，须懂 step 依赖、kpath / nbnd 设对</div>
+      </div>
+      <div class="apxcard a2">
+        <div class="ah2"><span class="tid">M2_T2_SiO2_α-quartz</span><span class="badges"><span class="b" style="background:var(--bench-soft);color:var(--bench)">M2</span><span class="b" style="background:var(--web-soft);color:var(--web)">T2</span></span></div>
+        <div class="role2">复杂多元绝缘体 · 宽带隙</div>
+        <div class="gt">GT：band gap <b class="mono">5.54 eV</b>，<b>indirect</b>（α-quartz，三元/三方 P3₂21）· 多元素 pseudopotential</div>
+        <div class="hard"><b>难点</b>：多元素赝势选型 + 复杂晶胞收敛策略；宽带隙要求 k-mesh / ecutwfc 都足</div>
+      </div>
+      <div class="apxcard a3">
+        <div class="ah2"><span class="tid">M3_T1_Fe_bcc</span><span class="badges"><span class="b" style="background:var(--bench-soft);color:var(--bench)">M3</span><span class="b" style="background:var(--web-soft);color:var(--web)">T1</span></span></div>
+        <div class="role2">磁性金属 · bcc 铁（强关联起点）</div>
+        <div class="gt">GT：bcc <span class="mono">Im-3m (sg 229)</span> · 总磁矩 <b class="mono">4.39 μB/cell</b>（~2.2 μB/atom）· 晶格 + 空间群 + 磁矩同评</div>
+        <div class="hard"><b>难点</b>：必须开 <span class="mono" style="color:#8A6310">nspin=2</span> 并判 FM 初态 + 设初始磁矩，否则收敛到<b>错误的非磁基态</b></div>
+      </div>
+      <div class="apxcard a4">
+        <div class="ah2"><span class="tid">M1_T3_MgO_eos</span><span class="badges"><span class="b" style="background:var(--bench-soft);color:var(--bench)">M1</span><span class="b" style="background:var(--web-soft);color:var(--web)">T3</span></span></div>
+        <div class="role2">状态方程 · rocksalt 氧化物 MgO</div>
+        <div class="gt">GT：<b class="mono">B0 = 149 GPa</b>，B0′ <span class="mono">4.09</span>（Birch-Murnaghan 三阶）· agent 交 7 点 (V,E)，harness 自拟</div>
+        <div class="hard"><b>难点</b>：7 个体积点 × fixed-cell relax 的<b>批量调度</b>，缺一点 BM3 拟不准</div>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bar"><div class="muted">四道题分别落在矩阵的 M1·T2 / M2·T2 / M3·T1 / M1·T3 四格 —— GT 全部来自真 QE 自跑 + 多源交叉验证</div><div class="pg">Slide 20 / 20</div></div>
 </section>
 
 </deck-stage>
