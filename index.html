@@ -32,6 +32,12 @@ a:hover { text-decoration: underline; }
     <small>2026-06-08 · <strong>项目总进度 deck（17 页 · 四段式）</strong>，给跨界技术听众（含 1 页 DFT primer）· deck-stage 框架，键盘 ←/→ 翻页 · <strong>① Bench</strong>：领域-native 的 <strong>M×T 二维分级矩阵</strong>（304 题完整 GT = M1 212 + M2 62 + M3 30，tag <code>v1.7-bench-final-304q</code>）· 材料 M1–M3（简单稳定→磁性强关联）/ 任务 T1–T4（vc-relax→24-strain Cij，步数 1→24）· <strong>4 源 GT 交叉验证</strong>（MP / Sol27LC / JARVIS-DFT / ACWF）+ 自跑 GT pipeline + evaluator 流程（agent submit→harness re-fit→多源比对→score，阈值 ≤1%）· <strong>② Web</strong>：React 18 + FastAPI 单端口平台（catalogue / compose / run+result + leaderboard）· Catalogue + 收敛证据 · <strong>DFT 结果可视化</strong>（收敛扫描 / 能带+DOS / EOS-BM3 / Cij heatmap，全原生 SVG）· multi-model leaderboard（agent×model 热图 · 5 指标）· <strong>③ Solver</strong>：v1→v5.1 双架构演进 — <strong>v4.3 精简确定性护栏</strong>（<code>qe_input_lint</code> 自动收紧收敛阈值）vs <strong>v5.1 SDK 多层编排+记忆</strong>（7 结构化工具 / SCF 子 agent / Magentic-One progress ledger / verifier gate / Voyager 经验库）· 同模型 <code>deepseek-v4-pro</code> 平均分 0.59→0.87 · <strong>可视化全部原生 SVG/CSS 复刻</strong> · solver 全量等额矩阵 + opus-4.8 全量留占位（running）· self-contained</small>
   </li>
   <li>
+    <b><a href="v43-vs-v51-samebench-2026-06-08.html">
+      v4.3 vs v5.1 · 同卷对比报告 · M1/M2/M3 × T1/T2（最终结果）
+    </a></b>
+    <small>2026-06-08 · <strong>把 v4.3 与 v5.1 拉到同一张卷子上的最终对照</strong>（共同卷 43 题 = 27 标准 M1/M2 + 16 磁性 M3；同模型 <code>deepseek-v4-pro</code>；失败计 0；金属格 best-of-3 取最优）· <strong>一句话：同卷之后两条线很接近</strong>——v5.1 总体 <strong>0.861</strong> 略高于 v4.3 <strong>0.830</strong>（41–42/43 完成），差距集中在少数难磁性格 · 含分层均分表 + M3 逐材料 + 全 43 题逐分附录 + "把 DFT 经验写成代码硬约束" 方法论收口（脚手架增益集中在难题）· 可滚动 report · self-contained</small>
+  </li>
+  <li>
     <b><a href="snapshot-deck-academic-2026-06-06.html">
       三版同卷收尾快照 · v4.2 / v4.3 / v5.1 · M1/M2/M3 × T1/T2（学术风 deck · 模板/草案）
     </a></b>
