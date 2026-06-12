@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T3/T4 bench 评审 — 打分收紧 · prompt 处方化 · Web 可视化 — 2026-06-12</title>
+<style>
+:root {
+  --fg: #2c3e50;
+  --muted: #7f8c8d;
+  --accent: #3498db;
+  --bench: #c0392b;
+  --solver: #d35400;
+  --fix: #27ae60;
+  --code-bg: #f6f8fa;
+  --note-bg: #fff8e1;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+               'Microsoft YaHei', sans-serif;
+  max-width: 880px; margin: 40px auto; padding: 0 24px;
+  color: var(--fg); line-height: 1.65;
+}
+h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 27px;
+     color: #34495e; border-bottom: 3px solid var(--accent); padding-bottom: 10px; }
+h2 { font-family: Georgia, serif; font-size: 21px;
+     color: #34495e; margin-top: 42px; padding-top: 8px;
+     border-top: 1px dashed #d0d7de; }
+h3 { font-size: 16px; color: #34495e; margin-top: 26px; }
+a { color: #2980b9; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 13px;
+       background: var(--code-bg); padding: 1px 5px; border-radius: 3px; color: #24292f; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px;
+      overflow-x: auto; font-size: 12.5px; line-height: 1.5; border-left: 3px solid #d0d7de; }
+pre code { background: transparent; padding: 0; }
+.tldr { background: #ecf6fc; border-left: 4px solid var(--accent);
+        padding: 14px 18px; border-radius: 4px; margin: 18px 0; font-size: 14.5px; }
+.tldr table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.tldr td, .tldr th { padding: 6px 8px; text-align: left; border-bottom: 1px solid #d0e4f0; font-size: 13.5px; vertical-align: top; }
+.tldr th { color: #34495e; }
+.callout { padding: 12px 16px; border-radius: 4px; margin: 14px 0;
+           border-left: 4px solid #ccc; background: #fafafa; font-size: 14px; }
+.callout.bench  { border-left-color: var(--bench);  background: #fdedec; }
+.callout.solver { border-left-color: var(--solver); background: #fdebd0; }
+.callout.fix    { border-left-color: var(--fix);    background: #eafaf1; }
+.callout.note   { border-left-color: #f1c40f;       background: var(--note-bg); }
+.callout .tag { display: inline-block; font-size: 11.5px; font-weight: 700;
+                padding: 2px 7px; border-radius: 3px; margin-right: 8px;
+                vertical-align: middle; letter-spacing: 0.4px; }
+.tag { display: inline-block; font-size: 11px; font-weight: 700;
+       padding: 2px 7px; border-radius: 3px; margin-left: 4px; vertical-align: middle; letter-spacing: 0.4px; }
+.tag-bench  { background: var(--bench);  color: #fff; }
+.tag-merge  { background: #16a085; color: #fff; }
+.tag-decide { background: #8e44ad; color: #fff; }
+.tag-done   { background: var(--fix); color: #fff; }
+.tag-out    { background: var(--muted); color: #fff; }
+.ask { background: #f4ecf7; border-left: 4px solid #8e44ad; padding: 10px 14px;
+       border-radius: 4px; margin: 12px 0; font-size: 13.8px; }
+.ask b { color: #6c3483; }
+.diff-add  { color: #0a7d3b; }
+.diff-del  { color: #b41a1a; }
+.diff-ctx  { color: #6e7781; }
+table.runs { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13px; }
+table.runs th, table.runs td { padding: 6px 9px; border-bottom: 1px solid #e1e4e8; text-align: left; vertical-align: top; }
+table.runs th { background: #f6f8fa; font-weight: 600; }
+table.runs .pass { color: var(--fix); font-weight: 600; }
+table.runs .fail { color: var(--bench); font-weight: 600; }
+table.runs .partial { color: var(--solver); font-weight: 600; }
+.toc { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px;
+       padding: 14px 18px; font-size: 14px; margin: 22px 0; }
+.toc h3 { margin: 0 0 8px 0; font-size: 14px; color: var(--muted);
+          text-transform: uppercase; letter-spacing: 0.5px; }
+.toc ol { margin: 0; padding-left: 24px; }
+.toc li { margin: 3px 0; }
+.src { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.src a { color: var(--muted); text-decoration: underline; }
+footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid #e1e4e8;
+         color: var(--muted); font-size: 12.5px; }
+.kv { color: var(--muted); font-size: 13px; }
+/* ---- web viz mock: scalar strip ---- */
+.strip { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 0;
+         font-size: 12px; color: #555; padding: 7px 11px; background: #f5f7fa;
+         border-radius: 3px; border: 1px solid #e7eaf0; }
+.strip .lbl { color: #999; }
+.strip b { color: #222; }
+.mono { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; }
+.ok { color: #1c8c3c; font-weight: 600; }
+.viz-cap { font-size: 12px; color: var(--muted); margin: 4px 0 10px; }
+/* ---- Cij heatmap grids ---- */
+.cijwrap { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; margin: 8px 0 4px; }
+.cijwrap > div > .gt { font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+table.cij { border-collapse: collapse; font-size: 10.5px;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace; }
+table.cij th { background: #f6f8fa; color: #888; font-weight: 600; padding: 2px 5px; }
+table.cij td { padding: 3px 6px; text-align: center; min-width: 40px;
+               border: 1px solid rgba(0,0,0,0.06); color: #222; }
+.c-hi  { background: rgba(46,184,92,0.82); color: #fff !important; }
+.c-mid { background: rgba(46,184,92,0.30); }
+.c-q   { background: rgba(46,184,92,0.12); }
+.c-lo  { background: rgba(120,120,120,0.10); color: #888 !important; }
+.c-neg { background: rgba(220,80,80,0.14); }
+.d-up  { background: rgba(210,90,70,0.55); color: #fff !important; }
+.d-upf { background: rgba(210,90,70,0.22); }
+.d-dn  { background: rgba(60,110,200,0.50); color: #fff !important; }
+.d-dnf { background: rgba(60,110,200,0.20); }
+.d-abs { color: #999 !important; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>T3 / T4 bench 评审 — 给杨博</h1>
+<p class="kv">2026-06-12 · 会议讨论稿 · 范围 <strong>T3 (EOS)</strong> + <strong>T4 (elastic stiffness)</strong><br>
+   代码权威仓 <code>/srv/shared/science/bench</code>（打分收紧已 merge <code>main</code> · <code>12ff208</code>，144 passed）·
+   Web <code>/srv/shared/science/web</code>（可视化 commit <code>31ac3fb</code>）· self-contained · no external assets</p>
+
+<div class="callout note" style="border-left-width:6px;">
+<span class="tag" style="background:#f1c40f; color:#5a4500;">读前必看</span>
+观察到的现象：<strong>只用最简单的 v1 baseline，T3/T4 也拿很高分</strong>，不合常理。排查结论
+<u>不是 bug / 不是数据泄漏 / 不是作弊</u>，而是三件事叠加 ——
+<strong>(a)</strong> 任务设计已经把难点解掉（直接给 T1 弛豫后的平衡结构，agent 只在它上面做体积 / 应变扫描）；
+<strong>(b)</strong> 观测量本身高度可复现（同一套 QE+赝势+泛函+结构 → EOS 曲线 / C<sub>ij</sub> 天然 ~0.1% 一致）；
+<strong>(c)</strong> 旧打分太松（<code>relative</code> 把 <code>tolerance</code> 当"满分线"，±10% 还接近满分）。
+本报告讲我已做的三项收紧（§1）+ 一个请你定尺度的 prompt 问题（§2）+ 两块 Web 可视化（§3），
+最后列 <strong>10 条待你拍板（§4）</strong>。
+</div>
+
+<div class="tldr">
+<strong>TL;DR — 四块内容</strong>
+<table>
+<tr><th style="width:6%">#</th><th style="width:26%">内容</th><th style="width:16%">状态</th><th>一句话</th></tr>
+<tr><td><strong>1</strong></td><td>T3/T4 打分模式收紧</td>
+    <td><span class="tag tag-done">已做·已 merge</span></td>
+    <td>新分级曲线（<code>tolerance</code> 改"零分线"，0.3·tol 满分）+ C<sub>ij</sub> 改旋转不变特征值比较 + audit 读真 pw.out + 失败 gate 归零。</td></tr>
+<tr><td><strong>2</strong></td><td>prompt 写得太死</td>
+    <td><span class="tag tag-decide">请定尺度</span></td>
+    <td>整套 recipe（BM3 公式 / scipy 方法 / 应变模式 / VRH 公式）全抄给 agent → 测"照说明书执行"而非"懂不懂方法"。这是 v1 都高分的根因。原文见 §2。</td></tr>
+<tr><td><strong>3</strong></td><td>Web 两块可视化</td>
+    <td><span class="tag tag-done">已做·已 commit</span></td>
+    <td>T3 画 EOS 曲线（agent vs GT 7 点 ΔE + BM3 线）；T4 画 Agent | GT | Δ% 三个 6×6 C<sub>ij</sub> 热力表。</td></tr>
+<tr><td><strong>4</strong></td><td>其余待确认问题</td>
+    <td><span class="tag tag-decide">请决策 ×10</span></td>
+    <td>处方化程度、预解结构的低区分度、GT 单源、各字段容差签字、b0′ 松容差、C<sub>ij</sub> 丢取向、12 道占位题、Born 真算、stale 测试、audit 硬下限。</td></tr>
+</table>
+</div>
+
+<div class="toc">
+<h3>目录</h3>
+<ol>
+  <li><a href="#s1">T3/T4 打分模式的修改（已做）</a></li>
+  <li><a href="#s2">Prompt 写得太死 — 一个例子，请审核</a></li>
+  <li><a href="#s3">Web 两块改动（已 commit）</a></li>
+  <li><a href="#s4">Bench 侧仍需确认的问题（重点 T3/T4）</a></li>
+</ol>
+</div>
+
+<!-- ============ §1 ============ -->
+<h2 id="s1">1 · T3/T4 打分模式的修改 <span class="tag tag-bench">BENCH</span> <span class="tag tag-done">已做·已 merge</span></h2>
+
+<h3>1.1 新的"分级收紧曲线" <code>graded_relative</code></h3>
+<p>和 DFT 专家定的口径：<strong>3% 满分 / 3–10% 线性递减 / ≥10% 零分</strong>。落地成对每个字段自动缩放的通用曲线 ——
+<strong>把每个字段现有的 <code>tolerance</code> 重新定义为"零分线"</strong>（旧 <code>relative</code> 把它当"满分线"，所以新规则整体严约 3.3×）：</p>
+<pre><code><span class="diff-ctx"># /srv/shared/science/bench/harness/lib/scoring.py</span>
+_FULL_MARK_RATIO = 0.3
+
+def _graded_score(err, tol, partial):
+    if tol &lt;= 0:
+        return 1.0 if err &lt;= 0 else 0.0
+    full = _FULL_MARK_RATIO * tol      <span class="diff-ctx"># 满分线 = 0.3·tol</span>
+    if err &lt;= full:
+        return 1.0
+    if not partial or err &gt;= tol:       <span class="diff-ctx"># 零分线 = tol（硬归零，无旧版 [tol,2tol] 尾巴）</span>
+        return 0.0
+    return max(0.0, min(1.0, 1.0 - (err - full) / (tol - full)))   <span class="diff-ctx"># 中间线性</span></code></pre>
+<p><code>0.3</code> 正好复现专家对 10% 字段的"3% 满分 / 10% 零分"，同时让每个字段按自己的 <code>tolerance</code> 自动缩放。
+同一条曲线被 <code>graded_relative</code> / <code>matrix_frobenius_relative</code> / <code>eos_curve_rmse</code> / <code>stress_curve_rmse</code> 共用。</p>
+
+<h3>1.2 各字段实际生效的口径</h3>
+<table class="runs">
+<tr><th>任务</th><th>字段</th><th>规则</th><th>tolerance</th><th>满分线</th><th>零分线</th><th>权重</th></tr>
+<tr><td rowspan="4"><strong>T3</strong></td><td><code>v0_ang3_cell</code></td><td>graded_relative</td><td>0.01</td><td>≤0.3%</td><td>≥1%</td><td>0.30</td></tr>
+<tr><td><code>b0_gpa</code></td><td>graded_relative</td><td>0.10</td><td>≤3%</td><td>≥10%</td><td>0.35</td></tr>
+<tr><td><code>b0_prime</code></td><td><strong>absolute</strong>（未收 / 放松）</td><td>0.75</td><td>|Δ|≤0.75</td><td>—</td><td>0.10</td></tr>
+<tr><td><code>eos_curve</code></td><td>eos_curve_rmse</td><td>5.0 meV/atom</td><td>≤1.5</td><td>≥5.0</td><td>0.25</td></tr>
+<tr><td rowspan="4"><strong>T4</strong></td><td><code>elastic_tensor_cij_gpa</code></td><td><strong>matrix_eigenvalue_relative</strong></td><td>0.08</td><td>≤2.4%</td><td>≥8%</td><td>0.50</td></tr>
+<tr><td><code>bulk_modulus_vrh_gpa</code></td><td>graded_relative</td><td>0.10</td><td>≤3%</td><td>≥10%</td><td>0.15</td></tr>
+<tr><td><code>shear_modulus_vrh_gpa</code></td><td>graded_relative</td><td>0.08</td><td>≤2.4%</td><td>≥8%</td><td>0.15</td></tr>
+<tr><td><code>stress_strain_curve</code></td><td>stress_curve_rmse</td><td>1.0 GPa</td><td>≤0.3</td><td>≥1.0</td><td>0.20</td></tr>
+</table>
+<p>收紧动作（按当时和你约定的 ①②③）：<strong>①</strong> 0.3 曲线全部 graded 字段套用；
+<strong>②</strong> shear G 与 C<sub>ij</sub> 容差 <code>0.15 → 0.08</code>；
+<strong>③</strong> <code>b0_prime</code> 保留 <code>absolute</code> + tol 0.75（B0′ 本就难收敛 / 敏感，不强求）、曲线字段跟着 0.3 收。</p>
+
+<h3>1.3 C<sub>ij</sub>：从原始 Frobenius 改成"特征值比较"（旋转不变）</h3>
+<div class="callout bench">
+<span class="tag tag-bench">问题</span>
+旧 <code>matrix_frobenius_relative</code> 逐元素比 6×6 Voigt 矩阵，对<strong>取向 / Voigt 约定差异</strong>敏感，
+而这<u>不是 solver 质量</u>问题。实测 Si 一例：原始 Frobenius rel = <strong>14%</strong>，但旋转不变量基本一致
+→ 44 个里 <strong>21 个被误杀</strong>（false-negative）。
+</div>
+<p><strong>改法</strong>（<code>matrix_eigenvalue_relative</code>）：① 对称化 <code>(C+Cᵀ)/2</code>；② 取本征值（Kelvin moduli，<strong>旋转不变量</strong>）；
+③ 排序后比相对差 <code>rel = ‖sort(eig_ext) − sort(eig_gt)‖ / ‖eig_gt‖</code>；④ 套 <code>_graded_score</code>，tol = 0.08。
+同一个 Si 例子，eigenvalue rel = <strong>0.16%</strong>，正确判过。<strong>物理含义见 <a href="#q-f">§4-F</a>，需你确认。</strong></p>
+
+<h3>1.4 Audit 漏洞 + 闸门（反作弊）</h3>
+<p><strong>漏洞</strong>：旧 audit 只 grep 汇总 CSV、不读真实输出 → 伪造一个 CSV 就能骗过。
+<strong>改后</strong>（<code>harness/lib/audit.py</code>）：真去 workdir <code>rglob *.out</code>、用首部 <code>"Program PWSCF"</code> 过滤出真 pw.out，再：</p>
+<ul>
+  <li><code>job_done</code>：统计带 <code>JOB DONE.</code> 的 pw.out 数 —— <strong>T3 要 ≥7、T4 要 ≥24</strong>；</li>
+  <li><code>qe_wallclock_ok</code>：累加每文件 <code>WALL</code> 时间和 solver 实际 wall 比，太短判假。</li>
+</ul>
+<div class="callout fix">
+<span class="tag tag-done" style="background:#16a085">闸门 · 2026-06-12 决议 A</span>
+gating flags = <code>qe_invoked / job_done / qe_wallclock_ok / no_network_access</code>。任一不过 →
+该 run 判 <strong>INVALID</strong>，官方 <code>total_score</code> 强制归 0，但保留 <code>total_score_raw</code> + per-field 原值供分析。
+Leaderboard 读 <code>total_score</code>，自动把作弊 / 没跑完的 run 当 0。
+</div>
+
+<!-- ============ §2 ============ -->
+<h2 id="s2">2 · Prompt 写得太死 — 一个例子，请审核 <span class="tag tag-bench">BENCH</span> <span class="tag tag-decide">请定尺度</span></h2>
+
+<div class="callout note">
+<span class="tag" style="background:#f1c40f; color:#5a4500;">核心顾虑</span>
+现在的 prompt 几乎是把<strong>完整 recipe 抄给 agent</strong> —— 体积网格、BM3 解析式、scipy 方法、初值、单位系数、
+应变模式 / 幅度、VRH 公式全给了。这等于在测"agent 能不能<u>照着完整说明书</u>把流程在 QE 里跑通"，
+而不是"agent <u>懂不懂</u>怎么算 EOS / 弹性"。<strong>这正是 v1 baseline 都能拿高分的根因之一。</strong>
+</div>
+
+<p>下面是 T3 的<strong>完整</strong> prompt 模板（<code>schema/prompts/eos.txt</code>），原文贴出供你判断处方化程度：</p>
+<pre><code>For {formula} ({structure_type}, space group {space_group}, {atoms_per_primitive_cell}
+atoms per primitive cell), compute the equation of state (EOS) by Birch–Murnaghan
+3rd-order (BM3) fit. The initial structure is the equilibrium configuration from a
+prior vc-relax; use it as your V0 reference.
+
+Workflow:
+1. Generate 7 volume points by scaling the equilibrium cell volume by
+   ratio ∈ {0.94, 0.96, 0.98, 1.00, 1.02, 1.04, 1.06} (uniform isotropic scaling
+   of CELL_PARAMETERS).
+2. For each volume, run a fixed-cell ionic relaxation with calculation='relax'
+   (ions move, cell fixed). Use forc_conv_thr ≤ 1e-4 Ry/Bohr and
+   etot_conv_thr ≤ 1e-5 Ry.
+3. Take the converged total energy from each volume's pw.out ...
+4. Fit the 7 (V, E) pairs to the BM3 equation of state:
+     E(V) = E0 + (9·V0·B0/16) · [ (η-1)³·B0' + (η-1)²·(6 - 4η) ],  η = (V0/V)^(2/3)
+   using scipy.optimize.curve_fit (Levenberg–Marquardt, no bounds).
+   Initial guess: V0 = V_min(E), B0 = 0.6 eV/Å³, B0' = 4.0, E0 = E_min.
+5. Convert B0 to GPa via × 160.21766208.
+6. Report the three fit parameters as numbers (no units in the value).
+
+Pick adequate ecutwfc, k-mesh, and SMP settings for production-quality energies.
+Use the same numerical settings across all 7 volumes ...
+
+Your task_outputs MUST include this key (path relative to your workdir):
+- eos_points_csv: a CSV with header ratio,volume_ang3,energy_ry,pressure_kbar
+  and 7 rows, values parsed from each pw.out.
+[+ initial_structure_block / pseudopotential_block / advisory_notes / execution hint]</code></pre>
+
+<p>注意：连 <strong>BM3 解析式、scipy 的 LM 方法、初值、单位换算系数</strong>都给了。agent 唯一要"自己决定"的只剩
+<code>ecutwfc / k-mesh / SMP</code> —— 而这几项又被"7 点保持一致"进一步约束。
+T4 的 <code>elastic_stiffness.txt</code> 更甚：6 个 Voigt 应变模式、4 个幅度、应变张量构造、lstsq 拟合、对称化、
+Voigt / Reuss / Hill 三套平均公式<strong>全部明写</strong>。</p>
+
+<div class="ask">
+<b>需要你定尺度：</b>
+<ul style="margin:6px 0 0 0">
+  <li><strong>保持处方化</strong> = 测"执行可靠性"（能不能不出错地把固定流程跑完）；</li>
+  <li><strong>放松成只给目标</strong>（"算 BM3 EOS，报 V0/B0/B0'"）= 测"方法学判断"（知不知道该取几点、用什么拟合、怎么保证一致性）；</li>
+  <li>也可分档：M1 给 recipe、M2/M3 只给目标。</li>
+</ul>
+</div>
+<p class="src">来源：<code>bench/schema/prompts/{eos,elastic_stiffness}.txt</code></p>
+
+<!-- ============ §3 ============ -->
+<h2 id="s3">3 · Web 两块改动（已 commit <code>31ac3fb</code>）<span class="tag tag-merge">WEB</span> <span class="tag tag-done">已做</span></h2>
+<p>为了让评审能直接"看见" T3/T4 的 agent-vs-GT 差异，在 result 页加了两块可视化。文件：
+<code>eos-plot.jsx</code>、<code>elastic-compare.jsx</code>、后端 <code>services/eos_data.py</code> + <code>/api/runs/{id}/eos_curve</code> 端点，
+挂在 <code>result-history.jsx</code>（标量网格跳过数组字段，改由专用面板渲染）。</p>
+
+<h3>3.1 T3 — 画出状态方程曲线（EOS curve）</h3>
+<p>result 页 “Equation of State (EOS)” 折叠块，点开懒加载 <code>/api/runs/{id}/eos_curve</code>。下图用 <strong>CaO 的真实 GT 数据</strong>渲染：</p>
+<div class="strip">
+  <span><b>EOS compare</b></span>
+  <span><span class="lbl">eos_curve score:</span> <b class="ok mono">1.00</b></span>
+  <span><span class="lbl">V₀:</span> <span class="mono">28.207 / 28.207</span> Å³ <span class="mono" style="color:#999">(Δ +0.00%)</span></span>
+  <span><span class="lbl">B₀:</span> <span class="mono">105.40 / 105.40</span> GPa <span class="mono" style="color:#999">(Δ −0.01%)</span></span>
+  <span><span class="lbl">B₀':</span> <span class="mono">4.349 / 4.349</span></span>
+  <span><span class="lbl">eos RMSE:</span> <b class="ok mono">0.00 meV/atom</b> <span style="color:#aaa">(tol 5.0)</span></span>
+</div>
+<svg viewBox="0 0 380 232" style="width:100%; max-width:380px; height:auto; font-family:sans-serif; border:1px solid #eee; background:#fff;">
+  <rect x="50" y="20" width="310" height="170" fill="#fff" stroke="#ccc"/>
+  <!-- y gridlines -->
+  <line x1="50" y1="190" x2="360" y2="190" stroke="#eee"/><text x="44" y="193" font-size="9" text-anchor="end" fill="#999">0</text>
+  <line x1="50" y1="147.5" x2="360" y2="147.5" stroke="#eee"/><text x="44" y="150" font-size="9" text-anchor="end" fill="#999">5</text>
+  <line x1="50" y1="105" x2="360" y2="105" stroke="#eee"/><text x="44" y="108" font-size="9" text-anchor="end" fill="#999">10</text>
+  <line x1="50" y1="62.5" x2="360" y2="62.5" stroke="#eee"/><text x="44" y="65" font-size="9" text-anchor="end" fill="#999">15</text>
+  <text transform="translate(15,105) rotate(-90)" font-size="10" text-anchor="middle" fill="#666">ΔE (meV/atom)</text>
+  <!-- x ticks -->
+  <text x="72"  y="204" font-size="9" text-anchor="middle" fill="#999">0.94</text>
+  <text x="161" y="204" font-size="9" text-anchor="middle" fill="#999">0.98</text>
+  <text x="205" y="204" font-size="9" text-anchor="middle" fill="#999">1.00</text>
+  <text x="249" y="204" font-size="9" text-anchor="middle" fill="#999">1.02</text>
+  <text x="338" y="204" font-size="9" text-anchor="middle" fill="#999">1.06</text>
+  <text x="205" y="224" font-size="10" text-anchor="middle" fill="#666">volume ratio V/V₀</text>
+  <!-- GT BM3 line (dashed green) through 7 pts -->
+  <polyline points="72.1,28.7 116.4,120.4 160.7,172.7 205,190 249.3,175.6 293.6,132.8 337.9,64.4"
+            fill="none" stroke="rgba(28,140,60,0.9)" stroke-width="1.6" stroke-dasharray="6,3"/>
+  <!-- GT hollow circles -->
+  <circle cx="72.1"  cy="28.7"  r="3.4" fill="#fff" stroke="rgba(28,140,60,0.9)" stroke-width="1.5"/>
+  <circle cx="116.4" cy="120.4" r="3.4" fill="#fff" stroke="rgba(28,140,60,0.9)" stroke-width="1.5"/>
+  <circle cx="160.7" cy="172.7" r="3.4" fill="#fff" stroke="rgba(28,140,60,0.9)" stroke-width="1.5"/>
+  <circle cx="205"   cy="190"   r="3.4" fill="#fff" stroke="rgba(28,140,60,0.9)" stroke-width="1.5"/>
+  <circle cx="249.3" cy="175.6" r="3.4" fill="#fff" stroke="rgba(28,140,60,0.9)" stroke-width="1.5"/>
+  <circle cx="293.6" cy="132.8" r="3.4" fill="#fff" stroke="rgba(28,140,60,0.9)" stroke-width="1.5"/>
+  <circle cx="337.9" cy="64.4"  r="3.4" fill="#fff" stroke="rgba(28,140,60,0.9)" stroke-width="1.5"/>
+  <!-- agent filled (near-identical overlap, the realistic case) -->
+  <circle cx="72.1"  cy="28.7"  r="3" fill="rgba(44,102,192,0.95)"/>
+  <circle cx="116.4" cy="120.4" r="3" fill="rgba(44,102,192,0.95)"/>
+  <circle cx="160.7" cy="172.7" r="3" fill="rgba(44,102,192,0.95)"/>
+  <circle cx="205"   cy="190"   r="3" fill="rgba(44,102,192,0.95)"/>
+  <circle cx="249.3" cy="175.6" r="3" fill="rgba(44,102,192,0.95)"/>
+  <circle cx="293.6" cy="132.8" r="3" fill="rgba(44,102,192,0.95)"/>
+  <circle cx="337.9" cy="64.4"  r="3" fill="rgba(44,102,192,0.95)"/>
+  <!-- legend -->
+  <g transform="translate(64,34)">
+    <line x1="0" y1="0" x2="20" y2="0" stroke="rgba(44,102,192,0.95)" stroke-width="1.7"/>
+    <circle cx="10" cy="0" r="3" fill="rgba(44,102,192,0.95)"/>
+    <text x="26" y="3" font-size="9" fill="#666">agent</text>
+    <line x1="70" y1="0" x2="90" y2="0" stroke="rgba(28,140,60,0.9)" stroke-width="1.6" stroke-dasharray="6,3"/>
+    <circle cx="80" cy="0" r="3.2" fill="#fff" stroke="rgba(28,140,60,0.9)" stroke-width="1.5"/>
+    <text x="96" y="3" font-size="9" fill="#666">GT</text>
+  </g>
+</svg>
+<p class="viz-cap">手搓 SVG（沿用 band-plot.jsx 无图表库约束）。两侧各 7 个原始 ΔE 点（agent 实心 / GT 空心）+ 各自 BM3 拟合线，
+都先减各自最小值"对零"（和 scoring 里 eos_curve RMSE 的零对齐口径一致）。后端 <code>eos_data.py</code> 复算 RMSE，
+和打分用同一公式。<strong>上图为 CaO GT 真实数据；agent 点画成与 GT 近乎重合 —— 这正是一个好 run 的典型样子（也正是 §0 说的高一致性）。</strong></p>
+
+<h3>3.2 T4 — 画出 agent 和 GT 的弹性表格 + 差值</h3>
+<p>result 页 “Elastic Tensor (Cij)” 折叠块，三个并排 6×6 网格：<strong>Agent | Ground truth | Δ%</strong>。下图用 <strong>CaO</strong> 渲染（GT 为真实数据；
+<u>Agent 列为示意</u> —— 在 GT 基础上人为加 1–3% 偏差以展示配色，非某次真实 run）：</p>
+<div class="strip">
+  <span><b>elastic compare</b></span>
+  <span><span class="lbl">Cij score:</span> <b class="ok mono">1.00</b></span>
+  <span><span class="lbl">K_VRH:</span> <span class="mono">105.6 / 105.6</span> GPa</span>
+  <span><span class="lbl">G_VRH:</span> <span class="mono">74.2 / 74.2</span> GPa</span>
+  <span><span class="lbl">Born:</span> <span class="mono ok">stable</span> / <span class="mono">stable (reference)</span></span>
+  <span><span class="lbl">Frobenius rel:</span> <span class="mono">≈1.5%</span> <span style="color:#aaa">(仅参考，非打分规则)</span></span>
+</div>
+<div class="cijwrap">
+  <div>
+    <div class="gt">Agent <span style="color:#bbb">(示意)</span></div>
+    <table class="cij"><tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
+    <tr><th>1</th><td class="c-hi">208.5</td><td class="c-mid">56.3</td><td class="c-mid">55.5</td><td class="c-lo">0.02</td><td class="c-lo">−0.05</td><td class="c-neg">−1.66</td></tr>
+    <tr><th>2</th><td class="c-mid">56.3</td><td class="c-hi">203.5</td><td class="c-mid">55.4</td><td class="c-lo">0.01</td><td class="c-lo">−0.08</td><td class="c-lo">−0.02</td></tr>
+    <tr><th>3</th><td class="c-mid">55.5</td><td class="c-mid">55.4</td><td class="c-hi">207.5</td><td class="c-lo">0.04</td><td class="c-lo">−0.04</td><td class="c-q">1.72</td></tr>
+    <tr><th>4</th><td class="c-lo">0.02</td><td class="c-lo">0.01</td><td class="c-lo">0.04</td><td class="c-mid">72.3</td><td class="c-q">1.70</td><td class="c-lo">0.00</td></tr>
+    <tr><th>5</th><td class="c-lo">−0.05</td><td class="c-lo">−0.08</td><td class="c-lo">−0.04</td><td class="c-q">1.70</td><td class="c-mid">75.6</td><td class="c-lo">0.00</td></tr>
+    <tr><th>6</th><td class="c-neg">−1.66</td><td class="c-lo">−0.02</td><td class="c-q">1.72</td><td class="c-lo">0.00</td><td class="c-lo">0.00</td><td class="c-mid">73.9</td></tr></table>
+  </div>
+  <div>
+    <div class="gt">Ground truth</div>
+    <table class="cij"><tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
+    <tr><th>1</th><td class="c-hi">205.4</td><td class="c-mid">55.2</td><td class="c-mid">56.4</td><td class="c-lo">0.01</td><td class="c-lo">−0.06</td><td class="c-neg">−1.69</td></tr>
+    <tr><th>2</th><td class="c-mid">55.2</td><td class="c-hi">206.5</td><td class="c-mid">55.2</td><td class="c-lo">0.02</td><td class="c-lo">−0.07</td><td class="c-lo">−0.01</td></tr>
+    <tr><th>3</th><td class="c-mid">56.4</td><td class="c-mid">55.2</td><td class="c-hi">205.3</td><td class="c-lo">0.03</td><td class="c-lo">−0.05</td><td class="c-q">1.69</td></tr>
+    <tr><th>4</th><td class="c-lo">0.01</td><td class="c-lo">0.02</td><td class="c-lo">0.03</td><td class="c-mid">73.3</td><td class="c-q">1.72</td><td class="c-lo">0.00</td></tr>
+    <tr><th>5</th><td class="c-lo">−0.06</td><td class="c-lo">−0.07</td><td class="c-lo">−0.05</td><td class="c-q">1.72</td><td class="c-mid">74.5</td><td class="c-lo">0.00</td></tr>
+    <tr><th>6</th><td class="c-neg">−1.69</td><td class="c-lo">−0.01</td><td class="c-q">1.69</td><td class="c-lo">0.00</td><td class="c-lo">0.00</td><td class="c-mid">73.3</td></tr></table>
+  </div>
+  <div>
+    <div class="gt">Δ% (agent vs GT)</div>
+    <table class="cij"><tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>
+    <tr><th>1</th><td class="d-upf">+1.5%</td><td class="d-upf">+2.0%</td><td class="d-dnf">−1.6%</td><td class="d-abs">+0.01</td><td class="d-abs">+0.01</td><td class="d-dnf">−1.8%</td></tr>
+    <tr><th>2</th><td class="d-upf">+2.0%</td><td class="d-dnf">−1.5%</td><td class="d-upf">+0.4%</td><td class="d-abs">−0.01</td><td class="d-abs">−0.01</td><td class="d-abs">−0.01</td></tr>
+    <tr><th>3</th><td class="d-dnf">−1.6%</td><td class="d-upf">+0.4%</td><td class="d-upf">+1.1%</td><td class="d-abs">+0.01</td><td class="d-abs">+0.01</td><td class="d-upf">+1.8%</td></tr>
+    <tr><th>4</th><td class="d-abs">+0.01</td><td class="d-abs">−0.01</td><td class="d-abs">+0.01</td><td class="d-dnf">−1.3%</td><td class="d-dnf">−1.2%</td><td class="d-abs">0.00</td></tr>
+    <tr><th>5</th><td class="d-abs">+0.01</td><td class="d-abs">−0.01</td><td class="d-abs">+0.01</td><td class="d-dnf">−1.2%</td><td class="d-upf">+1.5%</td><td class="d-abs">0.00</td></tr>
+    <tr><th>6</th><td class="d-dnf">−1.8%</td><td class="d-abs">−0.01</td><td class="d-upf">+1.8%</td><td class="d-abs">0.00</td><td class="d-abs">0.00</td><td class="d-upf">+0.9%</td></tr></table>
+  </div>
+</div>
+<p class="viz-cap">
+Agent / GT 用同款符号-幅度 heatmap（<span style="color:#1c8c3c">绿</span>=正 / <span style="color:#c0392b">红</span>=负 / 灰=近零，强度 ∝ |C<sub>ij</sub>|/共享max）。
+Δ% 网格用发散色（<span style="color:#3c6ec8">蓝</span>=agent 低于 GT / <span style="color:#d25a46">红</span>=高于），并有 <strong>FLOOR 规则</strong>：
+<code>|GT_ij| ≥ 1 GPa</code> 显示百分比，否则显示绝对 Δ（GPa，灰斜体）—— 接近零的 C<sub>ij</sub> 用 (a−g)/g 会爆。
+strip 还显示 K/G_VRH 的 agent/GT、Born 稳定性、以及一个<u>仅供参考</u>的 Frobenius rel%（标注非打分规则；打分用 §1.3 的特征值比较）。
+<strong>注意</strong>：GT 侧 Born 目前 hardcode <code>"stable (reference)"</code>，没真算 6×6 本征 —— 见 <a href="#q-h">§4-H</a>。</p>
+
+<!-- ============ §4 ============ -->
+<h2 id="s4">4 · Bench 侧仍需确认的问题（重点 T3/T4）<span class="tag tag-bench">BENCH</span> <span class="tag tag-decide">请决策</span></h2>
+<p>按优先级排序，<strong>A–B 最该先拍板</strong>。</p>
+
+<div class="ask" id="q-a">
+<b>A.【最关键】Prompt 处方化程度 — 测执行还是测方法学？</b><br>
+现在 prompt 把整套 recipe 抄给 agent（§2），这是 v1 都高分的根因。要决定：保持处方化（测"能不能可靠跑完固定流程"），
+还是放松成只给目标（测"会不会自己选点 / 选拟合 / 保证一致性"）？可分档：M1 给 recipe、M2/M3 只给目标。
+</div>
+
+<div class="ask" id="q-b">
+<b>B. T3/T4 已预解平衡结构 → 天生低区分度</b><br>
+T3/T4 直接给 T1 弛豫后的结构，难点（找平衡态）已被解掉，剩下的观测量高度可复现。要决定：是否接受 T3/T4 定位为
+"驱动 QE 跑体积 / 应变扫描 + 拟合"的执行类任务（区分度本就低），还是重新设计成更有区分度
+（如不给结构、或加扰动结构让 agent 自己先 relax）。
+</div>
+
+<div class="ask" id="q-c">
+<b>C. GT 单源 → 高一致性有点"循环"</b><br>
+GT 是 weilin self-run（QE 7.5 / V100 / 同一套 GBRV 赝势）产的。agent 用同样的栈跑自然高度一致 —— 一致性高未必证明 agent 强。
+要确认：GT 可信度（收敛性看着很好，CaO fit_rms ~5×10⁻⁴ meV/atom）；是否需要第二套独立 GT（不同机器 / 版本）做交叉校验，
+或明确"我们就是要测对这套栈的复现"。
+</div>
+
+<div class="ask" id="q-d">
+<b>D. 0.3 满分比 + 各字段容差是否签字</b><br>
+§1.2 那张表的口径（尤其 V₀ 满分线 0.3% / 零分线 1%）是否符合你对"物理上可接受误差"的判断。
+V₀ 在 DFT 里极可复现（~0.1%），1% 归零应该不冤；但请你确认。
+</div>
+
+<div class="ask" id="q-e">
+<b>E. b0′ 仍用 <code>absolute</code> tol 0.75（≈19%，很松）</b><br>
+B0′ 难收敛 / 敏感，所以保留宽松绝对容差 + 低权重（0.1）。确认这是有意为之，不是漏收。
+</div>
+
+<div class="ask" id="q-f">
+<b>F. C<sub>ij</sub> 改特征值比较 — 物理含义确认</b><br>
+特征值比较旋转不变（解决了取向 / 约定误杀），但它<strong>只看谱、丢了取向信息</strong>：极端情况下，保持谱不变但
+C<sub>11</sub>↔C<sub>12</sub> 之类错排的矩阵可能漏判（实际很罕见）。要确认：① 旋转不变量（Kelvin moduli）是不是你想要的物理量；
+② 要不要额外加一个<strong>对称类一致性检查</strong>（如 cubic 材料 agent 给的张量是不是 cubic 形）作为补充。
+</div>
+
+<div class="ask" id="q-g">
+<b>G. 12 道占位题（GT 未 promote）当前已隐藏</b><br>
+这 12 道 GT 是 null / 未 promote，我先 <code>is_stable=False</code> 藏起来了：
+M1_T4: AlSb / CdSe / CdTe / GaSb / InSb / P_black / Sn_alpha / ZnTe（8）·
+M2_T3: CaTiO3_tet（1）· M2_T4: CaTiO3_tet / MgAl2O4_spinel / SiO2_alpha_quartz（3）。
+要决定：跑 EOS/elastic pipeline 补 GT 再 promote，还是直接从题库删。
+</div>
+
+<div class="ask" id="q-h">
+<b>H. Web GT 侧 Born 稳定性是 hardcode</b><br>
+§3.2 里 GT 的 Born 稳定性写死 <code>"stable (reference)"</code>，没真算 6×6 本征。bench GT 都是真实收敛材料、必然稳定，
+所以目前 OK。确认是否需要真算（要引入一个 6×6 eigensolver）。
+</div>
+
+<div class="ask" id="q-i">
+<b>I. stale 测试 <code>test_v1_3_normal_visible_count_148</code></b><br>
+硬编码"可见题 148"，加了 T3/T4 题 + 隐藏 12 道后这数早过时、一直 fail。和本次逻辑无关，是独立 stale 测试。
+确认是否要我顺手更新成当前真实可见数。
+</div>
+
+<div class="ask" id="q-j">
+<b>J. audit 硬要求 7/24 点 — 会不会误杀合法少点</b><br>
+现在 T3 要 ≥7 pw.out、T4 要 ≥24 才算 <code>job_done</code>。prompt 明确要求正好 7/24，应该不冤；但若将来允许 agent
+复用某点 / 自适应取点，这个硬下限会误杀。确认是否保持硬下限。
+</div>
+
+<footer>
+  会议讨论稿 · 生成 <strong>2026-06-12</strong> · 范围 T3 (EOS) / T4 (elastic stiffness) ·
+  打分收紧已 merge <code>/srv/shared/science/bench</code> <code>main</code> <code>12ff208</code>（144 passed）·
+  Web 可视化 commit <code>/srv/shared/science/web</code> <code>31ac3fb</code> ·
+  §3 图表用 CaO 真实 GT 数据渲染（T4 agent 列为示意值，已标注）· self-contained · no external assets
+</footer>
+
+</body>
+</html>

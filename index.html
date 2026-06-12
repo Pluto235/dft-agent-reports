@@ -26,6 +26,12 @@ a:hover { text-decoration: underline; }
 
 <ul>
 <li>
+    <b><a href="t3t4-bench-review-2026-06-12.html">
+      T3/T4 bench 评审 · 打分收紧 + prompt 处方化 + Web 可视化（给杨博的讨论稿）
+    </a></b>
+    <small>2026-06-12 · 会议讨论稿（T3 EOS / T4 elastic）· <strong>起因：只用最简单 v1 baseline，T3/T4 也拿很高分</strong>——排查结论不是 bug/泄漏/作弊，而是 (a) 任务已预解平衡结构、(b) 观测量天然 ~0.1% 可复现、(c) 旧打分太松三者叠加 · <strong>已做并 merge（<code>12ff208</code>，144 passed）</strong>：① 新分级曲线 <code>graded_relative</code>（把 <code>tolerance</code> 改成"零分线"、<code>0.3·tol</code> 满分，整体严约 3.3×）② C<sub>ij</sub> 从原始 Frobenius 改<strong>旋转不变特征值比较</strong>（旧法 Si 误判 14%→0.16%，44 题里 21 个假阴）③ G/C<sub>ij</sub> 容差 0.15→0.08、b0′ 保留松绝对容差 ④ audit 改读真 pw.out 验 <code>JOB DONE</code>(T3≥7/T4≥24)+<code>WALL</code> + 失败 gate 归零保 raw · <strong>Web 两块可视化（commit <code>31ac3fb</code>）</strong>：T3 画 EOS 曲线（agent vs GT 7 点 ΔE + BM3 线，手搓 SVG）、T4 画 <strong>Agent | GT | Δ%</strong> 三个 6×6 C<sub>ij</sub> 热力表（Δ% 带 FLOOR 规则）· <strong>§2 贴出 <code>eos.txt</code> 完整 prompt 原文</strong>请杨博判处方化程度 · <strong>§4 列 10 条待拍板</strong>（处方化程度/低区分度/GT 单源/容差签字/b0′/C<sub>ij</sub> 丢取向/12 道占位题/Born 真算/stale 测试/audit 硬下限）· 图表用 CaO 真实 GT 渲染 · self-contained</small>
+  </li>
+  <li>
     <b><a href="v43-vs-v51-samebench-2026-06-08.html">
       v4.3 vs v5.1 · 同卷对比报告 · M1/M2/M3 × T1/T2（最终结果）
     </a></b>
